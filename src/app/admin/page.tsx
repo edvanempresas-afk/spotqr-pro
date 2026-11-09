@@ -166,6 +166,7 @@ export default function DeveloperAdminDashboard() {
   const [showInstallGuideModal, setShowInstallGuideModal] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const seenNotifIdsRef = useRef<Set<string>>(new Set());
+  const deletedLeadIdsRef = useRef<Set<string>>(new Set());
   const initialLoadDoneRef = useRef<boolean>(false);
 
   // Editing Notes & Estimated Value per lead
@@ -194,6 +195,18 @@ export default function DeveloperAdminDashboard() {
   // Register Service Worker & PWA Install Prompt
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      try {
+        const savedDeleted = JSON.parse(
+          localStorage.getItem('spotqr_deleted_leads') || '[]'
+        );
+        if (Array.isArray(savedDeleted)) {
+          savedDeleted.forEach((id: string) =>
+            deletedLeadIdsRef.current.add(id)
+          );
+        }
+      } catch {
+        // ignore
+      }
       if ('Notification' in window) {
         setNotifPermission(Notification.permission);
       }
@@ -476,7 +489,12 @@ export default function DeveloperAdminDashboard() {
       }
       if (res.ok) {
         const data = await res.json();
-        setLeads(data.leads || []);
+        const incomingLeads: DeveloperLead[] = (data.leads || []).filter(
+          (l: DeveloperLead) =>
+            !deletedLeadIdsRef.current.has(l.id) &&
+            !['lead-demo-1', 'lead-demo-2', 'lead-demo-3'].includes(l.id)
+        );
+        setLeads(incomingLeads);
         if (data.settings && !isBackgroundPoll) {
           setSettings({
             ...data.settings,
@@ -572,13 +590,18 @@ export default function DeveloperAdminDashboard() {
   };
 
   const handleDeleteLead = async (id: string) => {
+    deletedLeadIdsRef.current.add(id);
     try {
-      const res = await fetch(`/api/developer-leads?id=${id}`, {
+      const arr = Array.from(deletedLeadIdsRef.current);
+      localStorage.setItem('spotqr_deleted_leads', JSON.stringify(arr));
+    } catch {
+      // ignore
+    }
+    setLeads((prev) => prev.filter((item) => item.id !== id));
+    try {
+      await fetch(`/api/developer-leads?id=${id}`, {
         method: 'DELETE',
       });
-      if (res.ok) {
-        setLeads((prev) => prev.filter((item) => item.id !== id));
-      }
     } catch (err) {
       console.error('Error deleting lead:', err);
     }

@@ -87,7 +87,7 @@ export default function ClientAuthModal({
       } else {
         setErrorMsg(
           data.error ||
-            'Não foi possível autenticar. Verifique os dados informados.'
+          'Não foi possível autenticar. Verifique os dados informados.'
         );
       }
     } catch (err) {
@@ -141,11 +141,10 @@ export default function ClientAuthModal({
               setTab('register');
               setErrorMsg('');
             }}
-            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-extrabold transition ${
-              tab === 'register'
+            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-extrabold transition ${tab === 'register'
                 ? 'bg-emerald-500 text-slate-950 shadow'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Criar Minha Conta</span>
@@ -157,11 +156,10 @@ export default function ClientAuthModal({
               setTab('login');
               setErrorMsg('');
             }}
-            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-extrabold transition ${
-              tab === 'login'
+            className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-extrabold transition ${tab === 'login'
                 ? 'bg-emerald-500 text-slate-950 shadow'
                 : 'text-slate-400 hover:text-white'
-            }`}
+              }`}
           >
             <LogIn className="w-3.5 h-3.5" />
             <span>Já Tenho Login</span>
@@ -291,8 +289,8 @@ export default function ClientAuthModal({
               {loading
                 ? 'Processando...'
                 : tab === 'register'
-                ? 'Cadastrar Conta e Continuar'
-                : 'Entrar na Minha Conta'}
+                  ? 'Cadastrar Conta e Continuar'
+                  : 'Entrar na Minha Conta'}
             </span>
           </button>
         </form>

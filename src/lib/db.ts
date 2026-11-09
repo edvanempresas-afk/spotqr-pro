@@ -274,11 +274,30 @@ function ensureDb(): DatabaseSchema {
     if (!parsed.developerLeads) {
       parsed.developerLeads = {};
       modified = true;
+    } else {
+      // Permanently purge any legacy demo leads if cached in /tmp
+      for (const demoId of ['lead-demo-1', 'lead-demo-2', 'lead-demo-3']) {
+        if (parsed.developerLeads[demoId]) {
+          delete parsed.developerLeads[demoId];
+          modified = true;
+        }
+      }
     }
 
     if (!parsed.developerNotifications) {
       parsed.developerNotifications = {};
       modified = true;
+    } else {
+      for (const demoNotifId of [
+        'notif-demo-1',
+        'notif-demo-2',
+        'notif-demo-3',
+      ]) {
+        if (parsed.developerNotifications[demoNotifId]) {
+          delete parsed.developerNotifications[demoNotifId];
+          modified = true;
+        }
+      }
     }
 
     if (!parsed.users) {
