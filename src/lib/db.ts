@@ -177,23 +177,20 @@ export function createStarterMenu(
   };
 }
 
-// Initial sample data so the site is instantly rich with demonstration examples
+// Initial data: ONLY the public visitor demo menu (/cardapio/demo-restaurante). Zero fictional leads, payments, notifications or users.
 const initialData: DatabaseSchema = {
   dynamicQRs: {
     'demo-restaurante': {
-      id: 'qr-1',
+      id: 'qr-demo-visitante',
       slug: 'demo-restaurante',
-      title: 'Smash & Grill Burger (Exemplo PRO)',
+      title: 'Smash & Grill Burger (Cardápio Demonstração Visitantes)',
       targetUrl: '/cardapio/demo-restaurante',
       type: 'menu',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      scansCount: 148,
-      lastScannedAt: new Date().toISOString(),
+      scansCount: 0,
       isPaid: true,
       linkedMenuId: 'demo-restaurante',
-      ownerId: 'user-demo-1',
-      ownerEmail: 'cliente@restaurante.com.br',
       qrConfig: {
         fgColor: '#0f172a',
         bgColor: '#ffffff',
@@ -202,31 +199,6 @@ const initialData: DatabaseSchema = {
         frameStyle: 'table_tent',
         frameText: 'CARDÁPIO NA MESA',
         frameColor: '#16a34a',
-        frameTextColor: '#ffffff',
-      },
-    },
-    'cafeteria-central': {
-      id: 'qr-2',
-      slug: 'cafeteria-central',
-      title: 'Cafeteria Aroma & Grão (Exemplo Grátis)',
-      targetUrl: '/cardapio/cafeteria-central',
-      type: 'menu',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      scansCount: 34,
-      lastScannedAt: new Date().toISOString(),
-      isPaid: false,
-      linkedMenuId: 'cafeteria-central',
-      ownerId: 'user-demo-1',
-      ownerEmail: 'cliente@restaurante.com.br',
-      qrConfig: {
-        fgColor: '#1a140a',
-        bgColor: '#ffffff',
-        cornerColor: '#d97706',
-        dotStyle: 'classy',
-        frameStyle: 'bottom_tag',
-        frameText: 'ESCANEIE O CARDÁPIO',
-        frameColor: '#d97706',
         frameTextColor: '#ffffff',
       },
     },
@@ -253,60 +225,11 @@ const initialData: DatabaseSchema = {
     mpAccessToken:
       'APP_USR-4000171423020297-110821-0d5a69a11b676b64931811de85b054a0-244576316',
     proPriceReais: 10.9,
+    ntfyTopic: 'spotqr-edvan-alertas-1982',
   },
-  developerLeads: {
-    'lead-demo-1': {
-      id: 'lead-demo-1',
-      name: 'Ricardo Almeida',
-      businessName: 'Barbearia Dom Bigode',
-      contact: '11988776655',
-      serviceType: 'salao_barbearia',
-      serviceLabel: 'Salão de Beleza & Barbearia',
-      budgetRange: 'R$ 1.000 a R$ 2.500',
-      urgency: 'Urgente (Esta semana)',
-      description:
-        'Olá! Gostei muito da qualidade do gerador de QR Code. Quero desenvolver um sistema e site próprio para minha barbearia onde os clientes escolhem o barbeiro, agendam horário de corte/barba sozinhos e recebem lembrete automático no WhatsApp.',
-      status: 'novo',
-      estimatedValue: 1800,
-      developerNotes: 'Cliente tem 4 cadeiras na barbearia, ótimo potencial de fechamento rápido.',
-      createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    },
-    'lead-demo-2': {
-      id: 'lead-demo-2',
-      name: 'Dra. Camila Rocha',
-      businessName: 'Clínica Odonto & Estética Prime',
-      contact: '11977665544',
-      serviceType: 'marcacao_consultas',
-      serviceLabel: 'Sites de Marcação de Consultas & Clínicas',
-      budgetRange: 'R$ 2.000 a R$ 4.000',
-      urgency: 'Neste mês',
-      description:
-        'Preciso de um site moderno de marcação de consultas integrado com uma IA de Atendimento no WhatsApp para responder pacientes 24 horas por dia, tirar dúvidas de procedimentos e confirmar horários na agenda.',
-      status: 'novo',
-      estimatedValue: 2800,
-      developerNotes: '',
-      createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-    },
-    'lead-demo-3': {
-      id: 'lead-demo-3',
-      name: 'Juliana Martins',
-      businessName: 'Studio Bella Hair & Nails',
-      contact: '21996655443',
-      serviceType: 'ia_atendimento',
-      serviceLabel: 'IA de Atendimento 24h (WhatsApp)',
-      budgetRange: 'R$ 800 a R$ 1.800',
-      urgency: 'Urgente (Esta semana)',
-      description:
-        'Tenho um salão de beleza e perdemos muitas clientes porque não damos conta de responder o WhatsApp rápido. Quero uma IA de Atendimento que passe a tabela de serviços e já marque o horário de cabelo e manicure.',
-      status: 'em_contato',
-      estimatedValue: 1500,
-      developerNotes: 'Enviei demonstração pelo WhatsApp, aguardando retorno.',
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    },
-  },
+  developerLeads: {},
+  developerNotifications: {},
+  users: {},
 };
 
 function ensureDb(): DatabaseSchema {
@@ -329,7 +252,7 @@ function ensureDb(): DatabaseSchema {
 
     let modified = false;
 
-    // Ensure demo-restaurante always has the full updated 9-item menu if it only had the old 4 items
+    // Ensure demo-restaurante always has the full updated 9-item menu for visitors
     if (
       parsed.menus['demo-restaurante'] &&
       parsed.menus['demo-restaurante'].items.length < 6
@@ -349,32 +272,17 @@ function ensureDb(): DatabaseSchema {
     }
 
     if (!parsed.developerLeads) {
-      parsed.developerLeads = initialData.developerLeads;
+      parsed.developerLeads = {};
+      modified = true;
+    }
+
+    if (!parsed.developerNotifications) {
+      parsed.developerNotifications = {};
       modified = true;
     }
 
     if (!parsed.users) {
-      parsed.users = {
-        'user-demo-1': {
-          id: 'user-demo-1',
-          name: 'Marcos Oliveira',
-          businessName: 'Smash & Grill Burger',
-          email: 'cliente@restaurante.com.br',
-          whatsapp: '11999998888',
-          passwordHash: hashClientPassword('123456'),
-          createdAt: new Date().toISOString(),
-        },
-      };
-      if (parsed.dynamicQRs['demo-restaurante']) {
-        parsed.dynamicQRs['demo-restaurante'].ownerId = 'user-demo-1';
-        parsed.dynamicQRs['demo-restaurante'].ownerEmail =
-          'cliente@restaurante.com.br';
-      }
-      if (parsed.dynamicQRs['cafeteria-central']) {
-        parsed.dynamicQRs['cafeteria-central'].ownerId = 'user-demo-1';
-        parsed.dynamicQRs['cafeteria-central'].ownerEmail =
-          'cliente@restaurante.com.br';
-      }
+      parsed.users = {};
       modified = true;
     }
 
@@ -550,46 +458,7 @@ export function createDeveloperNotification(input: {
 
 export function getAllDeveloperNotifications(): DeveloperNotification[] {
   const db = ensureDb();
-  if (!db.developerNotifications) {
-    db.developerNotifications = {
-      'notif-demo-1': {
-        id: 'notif-demo-1',
-        type: 'subscription_paid',
-        title: '💰 Assinatura PRO Confirmada (+ R$ 10,90)',
-        message:
-          'Smash & Grill Burger ativou o Plano PRO (/demo-restaurante) via Mercado Pago.',
-        amount: 10.9,
-        clientName: 'Marcos Oliveira (Smash & Grill Burger)',
-        slug: 'demo-restaurante',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-      },
-      'notif-demo-2': {
-        id: 'notif-demo-2',
-        type: 'new_lead',
-        title: '💬 Nova Proposta: Salão de Beleza & Barbearia',
-        message:
-          'Ricardo Almeida (Barbearia Dom Bigode) pediu orçamento de R$ 1.000 a R$ 2.500 • WhatsApp: 11988776655',
-        clientName: 'Ricardo Almeida',
-        contact: '11988776655',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-      },
-      'notif-demo-3': {
-        id: 'notif-demo-3',
-        type: 'new_lead',
-        title: '💬 Nova Proposta: Marcação de Consultas & IA',
-        message:
-          'Dra. Camila Rocha (Clínica Odonto Prime) pediu orçamento de R$ 2.000 a R$ 4.000 • WhatsApp: 11977665544',
-        clientName: 'Dra. Camila Rocha',
-        contact: '11977665544',
-        isRead: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-      },
-    };
-    saveDb(db);
-  }
-  return Object.values(db.developerNotifications).sort(
+  return Object.values(db.developerNotifications || {}).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
@@ -675,8 +544,13 @@ export function getPayment(paymentId: string) {
 
 export function getSubscriptionAnalytics() {
   const db = ensureDb();
-  const allQRs = Object.values(db.dynamicQRs || {});
-  const allPayments = Object.values(db.payments || {});
+  // Exclude visitor showcase ('demo-restaurante') from real business metrics
+  const realCustomerQRs = Object.values(db.dynamicQRs || {}).filter(
+    (q) => q.slug !== 'demo-restaurante'
+  );
+  const allPayments = Object.values(db.payments || {}).filter(
+    (p) => p.slug !== 'demo-restaurante' && !p.id.startsWith('demo_')
+  );
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -698,30 +572,6 @@ export function getSubscriptionAnalytics() {
     'Dezembro',
   ];
   const currentMonthLabel = `${monthNames[currentMonth]} / ${currentYear}`;
-
-  // Ensure every paid QR has a corresponding approved payment record for accurate monthly reporting
-  for (const qr of allQRs) {
-    if (qr.isPaid) {
-      const hasApprovedRecord = allPayments.some(
-        (p) => p.slug === qr.slug && p.status === 'approved'
-      );
-      if (!hasApprovedRecord) {
-        const syntheticId = qr.paymentId || `pro_${qr.slug}`;
-        const syntheticPayment: PaymentRecord = {
-          id: syntheticId,
-          slug: qr.slug,
-          clientName: qr.title || qr.slug,
-          clientEmail: qr.ownerEmail || 'cliente@restaurante.com.br',
-          status: 'approved',
-          amount: 10.9,
-          createdAt: qr.updatedAt || qr.createdAt,
-          approvedAt: qr.updatedAt || qr.createdAt,
-        };
-        db.payments[syntheticId] = syntheticPayment;
-        allPayments.push(syntheticPayment);
-      }
-    }
-  }
 
   const approvedPayments = allPayments.filter((p) => p.status === 'approved');
   const pendingPayments = allPayments.filter((p) => p.status === 'pending');
@@ -748,7 +598,7 @@ export function getSubscriptionAnalytics() {
     0
   );
 
-  const totalActiveProCount = allQRs.filter((q) => q.isPaid).length;
+  const totalActiveProCount = realCustomerQRs.filter((q) => q.isPaid).length;
   const totalAllTimeRevenue = approvedPayments.reduce(
     (acc, p) => acc + (Number(p.amount) || 10.9),
     0

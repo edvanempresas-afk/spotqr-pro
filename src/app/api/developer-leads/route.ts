@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
 
     const leads = getAllDeveloperLeads();
     const settings = getDeveloperSettings();
-    const qrs = getAllDynamicQRs();
+    const qrs = getAllDynamicQRs().filter(
+      (q) => q.slug !== 'demo-restaurante'
+    );
     const notifications = getAllDeveloperNotifications();
     const subscriptionAnalytics = getSubscriptionAnalytics();
 

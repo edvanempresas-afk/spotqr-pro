@@ -297,15 +297,11 @@ export default function ClientAuthModal({
           </button>
         </form>
 
-        {/* Demo Quick Fill Helper */}
+        {/* Security Footer */}
         <div className="mt-4 pt-3.5 border-t border-slate-800/80 text-center">
-          <button
-            type="button"
-            onClick={handleFillDemoClient}
-            className="text-[11px] text-emerald-400 hover:text-emerald-300 underline font-semibold"
-          >
-            Preencher com Conta Cliente Exemplo (cliente@restaurante.com.br)
-          </button>
+          <span className="text-[11px] text-slate-400">
+            🔒 Acesso seguro e exclusivo para gerenciar seu Cardápio Digital e QR Codes.
+          </span>
         </div>
       </div>
     </div>

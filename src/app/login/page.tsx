@@ -145,19 +145,18 @@ export default function ClientLoginPage() {
             <div className="bg-[#121929] border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4">
               <div className="text-xs">
                 <span className="font-bold text-white block">
-                  Quer testar uma conta de cliente pronta?
+                  Quer ver como fica o Cardápio Digital na prática?
                 </span>
                 <span className="text-slate-400">
-                  Login: <code className="text-emerald-400">cliente@restaurante.com.br</code> | Senha: <code className="text-emerald-400">123456</code>
+                  Confira o nosso cardápio de demonstração para visitantes antes de criar o seu.
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={fillDemoCustomer}
-                className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold shrink-0 transition"
+              <Link
+                href="/cardapio/demo-restaurante"
+                className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold shrink-0 transition whitespace-nowrap"
               >
-                Preencher Demo
-              </button>
+                Ver Cardápio Demo
+              </Link>
             </div>
           </div>
 
