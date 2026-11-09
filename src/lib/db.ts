@@ -1,0 +1,954 @@
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import {
+  DynamicQRRecord,
+  RestaurantMenu,
+  DeveloperLead,
+  DeveloperSettings,
+  ClientUser,
+  DeveloperNotification,
+  DeveloperNotificationType,
+  PaymentRecord,
+} from './types';
+
+interface DatabaseSchema {
+  dynamicQRs: Record<string, DynamicQRRecord>;
+  menus: Record<string, RestaurantMenu>;
+  payments: Record<string, PaymentRecord>;
+  developerLeads?: Record<string, DeveloperLead>;
+  developerSettings?: DeveloperSettings;
+  developerNotifications?: Record<string, DeveloperNotification>;
+  users?: Record<string, ClientUser>;
+}
+
+export function hashClientPassword(password: string): string {
+  return crypto
+    .createHmac('sha256', 'spotqr-client-salt-2026')
+    .update(password)
+    .digest('hex');
+}
+
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'database.json');
+const TMP_DB_FILE = path.join('/tmp', 'spotqr-database.json');
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __spotqrDbMemory: DatabaseSchema | undefined;
+}
+
+export function createStarterMenu(
+  slug: string,
+  title: string = 'Meu Restaurante & Grill',
+  whatsappNumber: string = '5511999998888',
+  pixKey: string = 'pix@seurestaurante.com.br'
+): RestaurantMenu {
+  return {
+    id: slug,
+    slug,
+    title,
+    description:
+      'Hambúrgueres artesanais grelhados no fogo, porções crocantes, bebidas geladas e sobremesas exclusivas.',
+    whatsappNumber,
+    currency: 'R$',
+    tableNumberPrompt: true,
+    themeColor: '#16a34a',
+    address: 'Rua Gastronômica, 142 - Jardins, São Paulo',
+    wifiInfo: 'Cliente_VIP | Senha: bemvindo2026',
+    pixKey,
+    openingHours: 'Ter a Dom • 11h30 às 23h30',
+    isOpen: true,
+    deliveryFee: 6.0,
+    updatedAt: new Date().toISOString(),
+    categories: [
+      { id: 'cat-1', name: '🍔 Burgers Especiais' },
+      { id: 'cat-2', name: '🍟 Porções & Entradas' },
+      { id: 'cat-3', name: '🥤 Bebidas & Drinks' },
+      { id: 'cat-4', name: '🍰 Sobremesas' },
+    ],
+    items: [
+      {
+        id: 'item-1',
+        name: 'Smash Bacon Supremo',
+        description:
+          'Duplo blend 100g de costela angus, queijo cheddar inglês derretido, tiras de bacon crocante e maionese defumada no pão brioche selado na manteiga.',
+        price: 36.9,
+        category: 'cat-1',
+        imageUrl:
+          'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
+        badge: 'Mais Vendido',
+        isAvailable: true,
+      },
+      {
+        id: 'item-2',
+        name: 'Truffle Gorgonzola Melt',
+        description:
+          'Blend 180g angus, fonduta cremosa de queijo gorgonzola, cebola caramelizada no melado e toque de azeite trufado.',
+        price: 42.0,
+        category: 'cat-1',
+        imageUrl:
+          'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80',
+        badge: 'Chef Especial',
+        isAvailable: true,
+      },
+      {
+        id: 'item-3',
+        name: 'Crispy Chicken Honey Mustard',
+        description:
+          'Sobrecoxa de frango empanada ultra crocante, alface americana, picles artesanal e molho honey mustard da casa.',
+        price: 34.5,
+        category: 'cat-1',
+        imageUrl:
+          'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=600&auto=format&fit=crop&q=80',
+        badge: 'Novo',
+        isAvailable: true,
+      },
+      {
+        id: 'item-4',
+        name: 'Batata Rústica com Alecrim & Páprica',
+        description:
+          'Batatas selecionadas crocantes por fora e macias por dentro, finalizadas com flor de sal, alecrim fresco e maionese de alho assado.',
+        price: 24.5,
+        category: 'cat-2',
+        imageUrl:
+          'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80',
+        badge: 'Mais Vendido',
+        isAvailable: true,
+      },
+      {
+        id: 'item-5',
+        name: 'Dadinhos de Tapioca com Geleia de Pimenta',
+        description:
+          'Porção com 12 unidades de dadinhos de queijo coalho dourados, acompanhados de geleia artesanal de pimenta biquinho.',
+        price: 28.9,
+        category: 'cat-2',
+        imageUrl:
+          'https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=600&auto=format&fit=crop&q=80',
+        isAvailable: true,
+      },
+      {
+        id: 'item-6',
+        name: 'Milkshake de Pistache Trufado 400ml',
+        description:
+          'Sorvete artesanal de pistache italiano batido com calda de chocolate branco e farofa crocante de pistache tostado.',
+        price: 24.9,
+        category: 'cat-3',
+        imageUrl:
+          'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80',
+        badge: 'Imperdível',
+        isAvailable: true,
+      },
+      {
+        id: 'item-7',
+        name: 'Soda Italiana de Frutas Vermelhas',
+        description:
+          'Água com gás super gelada, xarope artesanal de amora, framboesa e morango com folhas de hortelã fresca.',
+        price: 16.0,
+        category: 'cat-3',
+        imageUrl:
+          'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80',
+        isAvailable: true,
+      },
+      {
+        id: 'item-8',
+        name: 'Petit Gâteau de Doce de Leite com Sorvete',
+        description:
+          'Bolinho quente de doce de leite argentino com casquinha crocante, servido com bola de sorvete de baunilha de Madagascar.',
+        price: 26.9,
+        category: 'cat-4',
+        imageUrl:
+          'https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=600&auto=format&fit=crop&q=80',
+        badge: 'Mais Vendido',
+        isAvailable: true,
+      },
+      {
+        id: 'item-9',
+        name: 'Brownie Belga Meio Amargo com Calda Quente',
+        description:
+          'Brownie artesanal com nozes pecã, coberto com ganache de chocolate 70% e morangos frescos.',
+        price: 22.5,
+        category: 'cat-4',
+        imageUrl:
+          'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&auto=format&fit=crop&q=80',
+        isAvailable: true,
+      },
+    ],
+  };
+}
+
+// Initial sample data so the site is instantly rich with demonstration examples
+const initialData: DatabaseSchema = {
+  dynamicQRs: {
+    'demo-restaurante': {
+      id: 'qr-1',
+      slug: 'demo-restaurante',
+      title: 'Smash & Grill Burger (Exemplo PRO)',
+      targetUrl: '/cardapio/demo-restaurante',
+      type: 'menu',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      scansCount: 148,
+      lastScannedAt: new Date().toISOString(),
+      isPaid: true,
+      linkedMenuId: 'demo-restaurante',
+      ownerId: 'user-demo-1',
+      ownerEmail: 'cliente@restaurante.com.br',
+      qrConfig: {
+        fgColor: '#0f172a',
+        bgColor: '#ffffff',
+        cornerColor: '#16a34a',
+        dotStyle: 'rounded',
+        frameStyle: 'table_tent',
+        frameText: 'CARDÁPIO NA MESA',
+        frameColor: '#16a34a',
+        frameTextColor: '#ffffff',
+      },
+    },
+    'cafeteria-central': {
+      id: 'qr-2',
+      slug: 'cafeteria-central',
+      title: 'Cafeteria Aroma & Grão (Exemplo Grátis)',
+      targetUrl: '/cardapio/cafeteria-central',
+      type: 'menu',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      scansCount: 34,
+      lastScannedAt: new Date().toISOString(),
+      isPaid: false,
+      linkedMenuId: 'cafeteria-central',
+      ownerId: 'user-demo-1',
+      ownerEmail: 'cliente@restaurante.com.br',
+      qrConfig: {
+        fgColor: '#1a140a',
+        bgColor: '#ffffff',
+        cornerColor: '#d97706',
+        dotStyle: 'classy',
+        frameStyle: 'bottom_tag',
+        frameText: 'ESCANEIE O CARDÁPIO',
+        frameColor: '#d97706',
+        frameTextColor: '#ffffff',
+      },
+    },
+  },
+  menus: {
+    'demo-restaurante': createStarterMenu(
+      'demo-restaurante',
+      'Smash & Grill Burger',
+      '5511999998888',
+      'financeiro@smashgrill.com.br'
+    ),
+  },
+  payments: {},
+  developerSettings: {
+    developerName: 'Desenvolvedor Full-Stack & Especialista em IA',
+    developerWhatsapp: '5511999998888',
+    developerEmail: 'edvandonasicmentosilva@gmail.com',
+    adminUsername: 'edvandonasicmentosilva@gmail.com',
+    adminPassword: 'Edgatinho1982.',
+    agencyHeadline:
+      'Desenvolvemos Sites, IA de Atendimento 24h, Sistemas de Agendamento para Clínicas, Salões de Beleza, Barbearias e Restaurantes.',
+    availableForProjects: true,
+    mpPublicKey: 'APP_USR-8b245dbb-b6c0-4335-b46a-ae016ea5071d',
+    mpAccessToken:
+      'APP_USR-4000171423020297-110821-0d5a69a11b676b64931811de85b054a0-244576316',
+    proPriceReais: 10.9,
+  },
+  developerLeads: {
+    'lead-demo-1': {
+      id: 'lead-demo-1',
+      name: 'Ricardo Almeida',
+      businessName: 'Barbearia Dom Bigode',
+      contact: '11988776655',
+      serviceType: 'salao_barbearia',
+      serviceLabel: 'Salão de Beleza & Barbearia',
+      budgetRange: 'R$ 1.000 a R$ 2.500',
+      urgency: 'Urgente (Esta semana)',
+      description:
+        'Olá! Gostei muito da qualidade do gerador de QR Code. Quero desenvolver um sistema e site próprio para minha barbearia onde os clientes escolhem o barbeiro, agendam horário de corte/barba sozinhos e recebem lembrete automático no WhatsApp.',
+      status: 'novo',
+      estimatedValue: 1800,
+      developerNotes: 'Cliente tem 4 cadeiras na barbearia, ótimo potencial de fechamento rápido.',
+      createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+      updatedAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+    },
+    'lead-demo-2': {
+      id: 'lead-demo-2',
+      name: 'Dra. Camila Rocha',
+      businessName: 'Clínica Odonto & Estética Prime',
+      contact: '11977665544',
+      serviceType: 'marcacao_consultas',
+      serviceLabel: 'Sites de Marcação de Consultas & Clínicas',
+      budgetRange: 'R$ 2.000 a R$ 4.000',
+      urgency: 'Neste mês',
+      description:
+        'Preciso de um site moderno de marcação de consultas integrado com uma IA de Atendimento no WhatsApp para responder pacientes 24 horas por dia, tirar dúvidas de procedimentos e confirmar horários na agenda.',
+      status: 'novo',
+      estimatedValue: 2800,
+      developerNotes: '',
+      createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+      updatedAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+    },
+    'lead-demo-3': {
+      id: 'lead-demo-3',
+      name: 'Juliana Martins',
+      businessName: 'Studio Bella Hair & Nails',
+      contact: '21996655443',
+      serviceType: 'ia_atendimento',
+      serviceLabel: 'IA de Atendimento 24h (WhatsApp)',
+      budgetRange: 'R$ 800 a R$ 1.800',
+      urgency: 'Urgente (Esta semana)',
+      description:
+        'Tenho um salão de beleza e perdemos muitas clientes porque não damos conta de responder o WhatsApp rápido. Quero uma IA de Atendimento que passe a tabela de serviços e já marque o horário de cabelo e manicure.',
+      status: 'em_contato',
+      estimatedValue: 1500,
+      developerNotes: 'Enviei demonstração pelo WhatsApp, aguardando retorno.',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
+      updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    },
+  },
+};
+
+function ensureDb(): DatabaseSchema {
+  try {
+    let raw = '';
+    const isVercel = Boolean(process.env.VERCEL);
+
+    if (isVercel && fs.existsSync(TMP_DB_FILE)) {
+      raw = fs.readFileSync(TMP_DB_FILE, 'utf-8');
+    } else if (fs.existsSync(DB_FILE)) {
+      raw = fs.readFileSync(DB_FILE, 'utf-8');
+    } else if (globalThis.__spotqrDbMemory) {
+      return globalThis.__spotqrDbMemory;
+    } else {
+      saveDb(initialData);
+      return initialData;
+    }
+
+    const parsed: DatabaseSchema = JSON.parse(raw);
+
+    let modified = false;
+
+    // Ensure demo-restaurante always has the full updated 9-item menu if it only had the old 4 items
+    if (
+      parsed.menus['demo-restaurante'] &&
+      parsed.menus['demo-restaurante'].items.length < 6
+    ) {
+      parsed.menus['demo-restaurante'] = createStarterMenu(
+        'demo-restaurante',
+        'Smash & Grill Burger',
+        '5511999998888',
+        'financeiro@smashgrill.com.br'
+      );
+      modified = true;
+    }
+
+    if (!parsed.developerSettings) {
+      parsed.developerSettings = initialData.developerSettings;
+      modified = true;
+    }
+
+    if (!parsed.developerLeads) {
+      parsed.developerLeads = initialData.developerLeads;
+      modified = true;
+    }
+
+    if (!parsed.users) {
+      parsed.users = {
+        'user-demo-1': {
+          id: 'user-demo-1',
+          name: 'Marcos Oliveira',
+          businessName: 'Smash & Grill Burger',
+          email: 'cliente@restaurante.com.br',
+          whatsapp: '11999998888',
+          passwordHash: hashClientPassword('123456'),
+          createdAt: new Date().toISOString(),
+        },
+      };
+      if (parsed.dynamicQRs['demo-restaurante']) {
+        parsed.dynamicQRs['demo-restaurante'].ownerId = 'user-demo-1';
+        parsed.dynamicQRs['demo-restaurante'].ownerEmail =
+          'cliente@restaurante.com.br';
+      }
+      if (parsed.dynamicQRs['cafeteria-central']) {
+        parsed.dynamicQRs['cafeteria-central'].ownerId = 'user-demo-1';
+        parsed.dynamicQRs['cafeteria-central'].ownerEmail =
+          'cliente@restaurante.com.br';
+      }
+      modified = true;
+    }
+
+    if (modified) {
+      saveDb(parsed);
+    }
+
+    globalThis.__spotqrDbMemory = parsed;
+    return parsed;
+  } catch (err) {
+    console.error('Error reading database file:', err);
+    return globalThis.__spotqrDbMemory || initialData;
+  }
+}
+
+function saveDb(data: DatabaseSchema): void {
+  globalThis.__spotqrDbMemory = data;
+  const serialized = JSON.stringify(data, null, 2);
+  try {
+    if (process.env.VERCEL) {
+      fs.writeFileSync(TMP_DB_FILE, serialized, 'utf-8');
+      return;
+    }
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(DB_FILE, serialized, 'utf-8');
+  } catch {
+    try {
+      fs.writeFileSync(TMP_DB_FILE, serialized, 'utf-8');
+    } catch {
+      // Kept in globalThis.__spotqrDbMemory
+    }
+  }
+}
+
+// DYNAMIC QR CRUD
+export function getDynamicQRBySlug(slug: string): DynamicQRRecord | null {
+  const db = ensureDb();
+  return db.dynamicQRs[slug] || null;
+}
+
+export function getAllDynamicQRs(): DynamicQRRecord[] {
+  const db = ensureDb();
+  return Object.values(db.dynamicQRs);
+}
+
+export function saveDynamicQR(record: DynamicQRRecord): void {
+  const db = ensureDb();
+  db.dynamicQRs[record.slug] = record;
+
+  // If this QR is of type 'menu' and no menu exists for this slug yet, auto-create a starter menu!
+  if (record.type === 'menu' && !db.menus[record.slug]) {
+    db.menus[record.slug] = createStarterMenu(
+      record.slug,
+      record.title || `Cardápio ${record.slug}`,
+      record.qrConfig?.whatsappPhone || '5511999998888',
+      record.qrConfig?.pixKey || 'pix@restaurante.com.br'
+    );
+  }
+
+  saveDb(db);
+}
+
+export function incrementQRScan(slug: string): void {
+  const db = ensureDb();
+  const record = db.dynamicQRs[slug];
+  if (record) {
+    record.scansCount = (record.scansCount || 0) + 1;
+    record.lastScannedAt = new Date().toISOString();
+    saveDb(db);
+  }
+}
+
+// RESTAURANT MENU CRUD
+export function getMenuBySlug(slug: string): RestaurantMenu | null {
+  const db = ensureDb();
+  if (db.menus[slug]) {
+    return db.menus[slug];
+  }
+  // If user visits /cardapio/[slug] for a valid or new slug, auto-provision a starter menu so it never 404s!
+  const qr = db.dynamicQRs[slug];
+  const autoMenu = createStarterMenu(
+    slug,
+    qr?.title ||
+      slug
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' '),
+    qr?.qrConfig?.whatsappPhone || '5511999998888',
+    qr?.qrConfig?.pixKey || 'pix@restaurante.com.br'
+  );
+  db.menus[slug] = autoMenu;
+  saveDb(db);
+  return autoMenu;
+}
+
+export function saveMenu(menu: RestaurantMenu): void {
+  const db = ensureDb();
+  db.menus[menu.slug] = menu;
+  saveDb(db);
+}
+
+// PAYMENTS & NOTIFICATIONS
+function sendExternalMobilePush(
+  title: string,
+  message: string,
+  tags: string = 'moneybag,bell',
+  topicOverride?: string
+) {
+  try {
+    const db = ensureDb();
+    const topic = (
+      topicOverride ||
+      db.developerSettings?.ntfyTopic ||
+      'spotqr-edvan-alertas-1982'
+    ).trim();
+    if (!topic) return;
+
+    fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
+      method: 'POST',
+      headers: {
+        Title: title.replace(/[^\x20-\x7EÀ-ÿ]/g, ''),
+        Priority: 'high',
+        Tags: tags,
+      },
+      body: `${title}\n${message}`,
+    }).catch(() => {});
+  } catch {
+    // Non-blocking background push
+  }
+}
+
+export function createDeveloperNotification(input: {
+  type: DeveloperNotificationType;
+  title: string;
+  message: string;
+  amount?: number;
+  clientName?: string;
+  contact?: string;
+  slug?: string;
+}): DeveloperNotification {
+  const db = ensureDb();
+  if (!db.developerNotifications) {
+    db.developerNotifications = {};
+  }
+  const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const notif: DeveloperNotification = {
+    id,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    amount: input.amount,
+    clientName: input.clientName,
+    contact: input.contact,
+    slug: input.slug,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+  };
+  db.developerNotifications[id] = notif;
+  saveDb(db);
+
+  const pushTags =
+    input.type === 'subscription_paid'
+      ? 'moneybag,white_check_mark'
+      : input.type === 'new_lead'
+      ? 'speech_balloon,sparkles'
+      : 'bell';
+  sendExternalMobilePush(input.title, input.message, pushTags);
+
+  return notif;
+}
+
+export function getAllDeveloperNotifications(): DeveloperNotification[] {
+  const db = ensureDb();
+  if (!db.developerNotifications) {
+    db.developerNotifications = {
+      'notif-demo-1': {
+        id: 'notif-demo-1',
+        type: 'subscription_paid',
+        title: '💰 Assinatura PRO Confirmada (+ R$ 10,90)',
+        message:
+          'Smash & Grill Burger ativou o Plano PRO (/demo-restaurante) via Mercado Pago.',
+        amount: 10.9,
+        clientName: 'Marcos Oliveira (Smash & Grill Burger)',
+        slug: 'demo-restaurante',
+        isRead: false,
+        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+      },
+      'notif-demo-2': {
+        id: 'notif-demo-2',
+        type: 'new_lead',
+        title: '💬 Nova Proposta: Salão de Beleza & Barbearia',
+        message:
+          'Ricardo Almeida (Barbearia Dom Bigode) pediu orçamento de R$ 1.000 a R$ 2.500 • WhatsApp: 11988776655',
+        clientName: 'Ricardo Almeida',
+        contact: '11988776655',
+        isRead: false,
+        createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
+      },
+      'notif-demo-3': {
+        id: 'notif-demo-3',
+        type: 'new_lead',
+        title: '💬 Nova Proposta: Marcação de Consultas & IA',
+        message:
+          'Dra. Camila Rocha (Clínica Odonto Prime) pediu orçamento de R$ 2.000 a R$ 4.000 • WhatsApp: 11977665544',
+        clientName: 'Dra. Camila Rocha',
+        contact: '11977665544',
+        isRead: false,
+        createdAt: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
+      },
+    };
+    saveDb(db);
+  }
+  return Object.values(db.developerNotifications).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function markAllDeveloperNotificationsRead(): void {
+  const db = ensureDb();
+  if (!db.developerNotifications) return;
+  for (const key of Object.keys(db.developerNotifications)) {
+    db.developerNotifications[key].isRead = true;
+  }
+  saveDb(db);
+}
+
+export function recordPayment(
+  paymentId: string,
+  slug: string,
+  status: string,
+  amount: number,
+  clientName?: string,
+  clientEmail?: string
+) {
+  const db = ensureDb();
+  const prevPayment = db.payments[paymentId];
+  const wasAlreadyApproved = prevPayment?.status === 'approved';
+  const qr = db.dynamicQRs[slug];
+  const resolvedClientName =
+    clientName ||
+    prevPayment?.clientName ||
+    qr?.title ||
+    qr?.ownerEmail ||
+    slug;
+  const resolvedClientEmail =
+    clientEmail || prevPayment?.clientEmail || qr?.ownerEmail || '';
+
+  const now = new Date().toISOString();
+  db.payments[paymentId] = {
+    id: paymentId,
+    slug,
+    clientName: resolvedClientName,
+    clientEmail: resolvedClientEmail,
+    status,
+    amount,
+    createdAt: prevPayment?.createdAt || now,
+    approvedAt: status === 'approved' ? prevPayment?.approvedAt || now : undefined,
+  };
+
+  if (status === 'approved' && db.dynamicQRs[slug]) {
+    db.dynamicQRs[slug].isPaid = true;
+    db.dynamicQRs[slug].paymentId = paymentId;
+  }
+  saveDb(db);
+
+  // Trigger mobile notifications
+  if (status === 'approved' && !wasAlreadyApproved) {
+    createDeveloperNotification({
+      type: 'subscription_paid',
+      title: `💰 Nova Assinatura PRO Paga! (+ R$ ${amount
+        .toFixed(2)
+        .replace('.', ',')})`,
+      message: `${resolvedClientName} concluiu o pagamento da assinatura PRO para /${slug}.`,
+      amount,
+      clientName: resolvedClientName,
+      slug,
+    });
+  } else if (status === 'pending' && !prevPayment) {
+    createDeveloperNotification({
+      type: 'subscription_pending',
+      title: `⏳ Novo PIX / Checkout Gerado (R$ ${amount
+        .toFixed(2)
+        .replace('.', ',')})`,
+      message: `${resolvedClientName} abriu o checkout do Plano PRO para /${slug} (ID: ${paymentId}).`,
+      amount,
+      clientName: resolvedClientName,
+      slug,
+    });
+  }
+}
+
+export function getPayment(paymentId: string) {
+  const db = ensureDb();
+  return db.payments[paymentId] || null;
+}
+
+export function getSubscriptionAnalytics() {
+  const db = ensureDb();
+  const allQRs = Object.values(db.dynamicQRs || {});
+  const allPayments = Object.values(db.payments || {});
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const todayDateStr = now.toISOString().slice(0, 10);
+
+  const monthNames = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ];
+  const currentMonthLabel = `${monthNames[currentMonth]} / ${currentYear}`;
+
+  // Ensure every paid QR has a corresponding approved payment record for accurate monthly reporting
+  for (const qr of allQRs) {
+    if (qr.isPaid) {
+      const hasApprovedRecord = allPayments.some(
+        (p) => p.slug === qr.slug && p.status === 'approved'
+      );
+      if (!hasApprovedRecord) {
+        const syntheticId = qr.paymentId || `pro_${qr.slug}`;
+        const syntheticPayment: PaymentRecord = {
+          id: syntheticId,
+          slug: qr.slug,
+          clientName: qr.title || qr.slug,
+          clientEmail: qr.ownerEmail || 'cliente@restaurante.com.br',
+          status: 'approved',
+          amount: 10.9,
+          createdAt: qr.updatedAt || qr.createdAt,
+          approvedAt: qr.updatedAt || qr.createdAt,
+        };
+        db.payments[syntheticId] = syntheticPayment;
+        allPayments.push(syntheticPayment);
+      }
+    }
+  }
+
+  const approvedPayments = allPayments.filter((p) => p.status === 'approved');
+  const pendingPayments = allPayments.filter((p) => p.status === 'pending');
+
+  const monthlyApproved = approvedPayments.filter((p) => {
+    const dt = new Date(p.approvedAt || p.createdAt);
+    return dt.getMonth() === currentMonth && dt.getFullYear() === currentYear;
+  });
+
+  const todayApproved = approvedPayments.filter((p) => {
+    const dtStr = (p.approvedAt || p.createdAt).slice(0, 10);
+    return dtStr === todayDateStr;
+  });
+
+  const monthlyApprovedCount = monthlyApproved.length;
+  const monthlyRevenue = monthlyApproved.reduce(
+    (acc, p) => acc + (Number(p.amount) || 10.9),
+    0
+  );
+
+  const todayApprovedCount = todayApproved.length;
+  const todayRevenue = todayApproved.reduce(
+    (acc, p) => acc + (Number(p.amount) || 10.9),
+    0
+  );
+
+  const totalActiveProCount = allQRs.filter((q) => q.isPaid).length;
+  const totalAllTimeRevenue = approvedPayments.reduce(
+    (acc, p) => acc + (Number(p.amount) || 10.9),
+    0
+  );
+
+  const sortedPayments = [...allPayments].sort(
+    (a, b) =>
+      new Date(b.approvedAt || b.createdAt).getTime() -
+      new Date(a.approvedAt || a.createdAt).getTime()
+  );
+
+  return {
+    currentMonthLabel,
+    monthlyApprovedCount,
+    monthlyRevenue,
+    todayApprovedCount,
+    todayRevenue,
+    totalActiveProCount,
+    totalAllTimeRevenue,
+    pendingPaymentsCount: pendingPayments.length,
+    paymentsList: sortedPayments.slice(0, 50),
+  };
+}
+
+// DEVELOPER LEADS & SETTINGS CRUD
+export function getAllDeveloperLeads(): DeveloperLead[] {
+  const db = ensureDb();
+  const leads = Object.values(db.developerLeads || {});
+  return leads.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function createDeveloperLead(
+  input: Omit<DeveloperLead, 'id' | 'createdAt' | 'updatedAt' | 'status'>
+): DeveloperLead {
+  const db = ensureDb();
+  if (!db.developerLeads) {
+    db.developerLeads = {};
+  }
+  const id = `lead-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const now = new Date().toISOString();
+  const newLead: DeveloperLead = {
+    ...input,
+    id,
+    status: 'novo',
+    createdAt: now,
+    updatedAt: now,
+  };
+  db.developerLeads[id] = newLead;
+  saveDb(db);
+
+  createDeveloperNotification({
+    type: 'new_lead',
+    title: `💬 Nova Proposta: ${input.serviceLabel}`,
+    message: `${input.name}${
+      input.businessName ? ` (${input.businessName})` : ''
+    } enviou pedido de orçamento (${
+      input.budgetRange || 'A combinar'
+    }) • Contato: ${input.contact}`,
+    clientName: input.name,
+    contact: input.contact,
+  });
+
+  return newLead;
+}
+
+export function updateDeveloperLead(
+  id: string,
+  updates: Partial<DeveloperLead>
+): DeveloperLead | null {
+  const db = ensureDb();
+  if (!db.developerLeads || !db.developerLeads[id]) {
+    return null;
+  }
+  const updated: DeveloperLead = {
+    ...db.developerLeads[id],
+    ...updates,
+    id,
+    updatedAt: new Date().toISOString(),
+  };
+  db.developerLeads[id] = updated;
+  saveDb(db);
+  return updated;
+}
+
+export function deleteDeveloperLead(id: string): boolean {
+  const db = ensureDb();
+  if (!db.developerLeads || !db.developerLeads[id]) {
+    return false;
+  }
+  delete db.developerLeads[id];
+  saveDb(db);
+  return true;
+}
+
+export function getDeveloperSettings(): DeveloperSettings {
+  const db = ensureDb();
+  return (
+    db.developerSettings || {
+      developerName: 'Desenvolvedor Full-Stack & Especialista em IA',
+      developerWhatsapp: '5511999998888',
+      developerEmail: 'dev@spotqr.pro',
+      agencyHeadline:
+        'Desenvolvemos Sites, IA de Atendimento 24h, Sistemas de Agendamento para Clínicas, Salões de Beleza, Barbearias e Restaurantes.',
+      availableForProjects: true,
+    }
+  );
+}
+
+export function saveDeveloperSettings(
+  settings: Partial<DeveloperSettings>
+): DeveloperSettings {
+  const db = ensureDb();
+  const current = getDeveloperSettings();
+  const updated: DeveloperSettings = {
+    ...current,
+    ...settings,
+  };
+  db.developerSettings = updated;
+  saveDb(db);
+  return updated;
+}
+
+// CLIENT USERS CRUD
+export function getClientUserByEmail(email: string): ClientUser | null {
+  const db = ensureDb();
+  const clean = (email || '').trim().toLowerCase();
+  const users = Object.values(db.users || {});
+  return users.find((u) => u.email.toLowerCase() === clean) || null;
+}
+
+export function getClientUserById(id: string): ClientUser | null {
+  const db = ensureDb();
+  return (db.users && db.users[id]) || null;
+}
+
+export function getAllClientUsers(): ClientUser[] {
+  const db = ensureDb();
+  return Object.values(db.users || {});
+}
+
+export function createClientUser(input: {
+  name: string;
+  businessName: string;
+  email: string;
+  whatsapp: string;
+  passwordPlain: string;
+}): ClientUser {
+  const db = ensureDb();
+  if (!db.users) db.users = {};
+
+  const cleanEmail = input.email.trim().toLowerCase();
+  const existing = Object.values(db.users).find(
+    (u) => u.email.toLowerCase() === cleanEmail
+  );
+  if (existing) {
+    throw new Error('Já existe uma conta cadastrada com este e-mail/login.');
+  }
+
+  const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const user: ClientUser = {
+    id,
+    name: input.name.trim(),
+    businessName: (input.businessName || input.name).trim(),
+    email: cleanEmail,
+    whatsapp: (input.whatsapp || '').trim(),
+    passwordHash: hashClientPassword(input.passwordPlain),
+    createdAt: new Date().toISOString(),
+  };
+
+  db.users[id] = user;
+  saveDb(db);
+
+  createDeveloperNotification({
+    type: 'new_client',
+    title: `👤 Novo Cliente Cadastrado: ${user.businessName}`,
+    message: `${user.name} criou conta no site (${user.email}) • WhatsApp: ${
+      user.whatsapp || 'Não informado'
+    }`,
+    clientName: `${user.name} (${user.businessName})`,
+    contact: user.whatsapp || user.email,
+  });
+
+  return user;
+}
+
+export function getDynamicQRsByOwner(
+  ownerId: string,
+  ownerEmail?: string
+): DynamicQRRecord[] {
+  const db = ensureDb();
+  const all = Object.values(db.dynamicQRs || {});
+  return all.filter(
+    (qr) =>
+      qr.ownerId === ownerId ||
+      (ownerEmail &&
+        qr.ownerEmail &&
+        qr.ownerEmail.toLowerCase() === ownerEmail.toLowerCase())
+  );
+}
+
+

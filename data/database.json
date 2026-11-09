@@ -1,0 +1,444 @@
+{
+  "dynamicQRs": {
+    "demo-restaurante": {
+      "id": "qr-1",
+      "slug": "demo-restaurante",
+      "title": "Smash & Grill Burger (Exemplo PRO)",
+      "targetUrl": "/cardapio/demo-restaurante",
+      "type": "menu",
+      "createdAt": "2026-11-05T19:14:31.423Z",
+      "updatedAt": "2026-11-09T01:50:07.836Z",
+      "scansCount": 148,
+      "isPaid": true,
+      "paymentId": "187525887893",
+      "qrConfig": {
+        "fgColor": "#0f172a",
+        "bgColor": "#ffffff",
+        "cornerColor": "#16a34a",
+        "dotStyle": "rounded",
+        "frameStyle": "table_tent",
+        "frameText": "CARDÁPIO NA MESA",
+        "frameColor": "#16a34a",
+        "frameTextColor": "#ffffff"
+      },
+      "linkedMenuId": "demo-restaurante",
+      "ownerId": "user-demo-1",
+      "ownerEmail": "cliente@restaurante.com.br"
+    },
+    "cafeteria-central": {
+      "id": "qr-2",
+      "slug": "cafeteria-central",
+      "title": "Cafeteria Aroma & Grão (Exemplo Grátis)",
+      "targetUrl": "/cardapio/cafeteria-central",
+      "type": "menu",
+      "createdAt": "2026-11-05T19:14:31.423Z",
+      "updatedAt": "2026-11-05T19:14:31.423Z",
+      "scansCount": 34,
+      "lastScannedAt": "2026-11-05T19:14:31.423Z",
+      "isPaid": false,
+      "linkedMenuId": "cafeteria-central",
+      "qrConfig": {
+        "fgColor": "#1a140a",
+        "bgColor": "#ffffff",
+        "cornerColor": "#d97706",
+        "dotStyle": "classy",
+        "frameStyle": "bottom_tag",
+        "frameText": "ESCANEIE O CARDÁPIO",
+        "frameColor": "#d97706",
+        "frameTextColor": "#ffffff"
+      },
+      "ownerId": "user-demo-1",
+      "ownerEmail": "cliente@restaurante.com.br"
+    }
+  },
+  "menus": {
+    "demo-restaurante": {
+      "id": "demo-restaurante",
+      "slug": "demo-restaurante",
+      "title": "Smash & Grill Burger",
+      "description": "Hambúrgueres artesanais grelhados no fogo, porções crocantes, bebidas geladas e sobremesas exclusivas.",
+      "whatsappNumber": "5511999998888",
+      "currency": "R$",
+      "tableNumberPrompt": true,
+      "themeColor": "#16a34a",
+      "address": "Rua Gastronômica, 142 - Jardins, São Paulo",
+      "wifiInfo": "Cliente_VIP | Senha: bemvindo2026",
+      "pixKey": "financeiro@smashgrill.com.br",
+      "openingHours": "Ter a Dom • 11h30 às 23h30",
+      "isOpen": true,
+      "deliveryFee": 6,
+      "updatedAt": "2026-11-05T19:14:31.423Z",
+      "categories": [
+        {
+          "id": "cat-1",
+          "name": "🍔 Burgers Especiais"
+        },
+        {
+          "id": "cat-2",
+          "name": "🍟 Porções & Entradas"
+        },
+        {
+          "id": "cat-3",
+          "name": "🥤 Bebidas & Drinks"
+        },
+        {
+          "id": "cat-4",
+          "name": "🍰 Sobremesas"
+        }
+      ],
+      "items": [
+        {
+          "id": "item-1",
+          "name": "Smash Bacon Supremo",
+          "description": "Duplo blend 100g de costela angus, queijo cheddar inglês derretido, tiras de bacon crocante e maionese defumada no pão brioche selado na manteiga.",
+          "price": 36.9,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-2",
+          "name": "Truffle Gorgonzola Melt",
+          "description": "Blend 180g angus, fonduta cremosa de queijo gorgonzola, cebola caramelizada no melado e toque de azeite trufado.",
+          "price": 42,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80",
+          "badge": "Chef Especial",
+          "isAvailable": true
+        },
+        {
+          "id": "item-3",
+          "name": "Crispy Chicken Honey Mustard",
+          "description": "Sobrecoxa de frango empanada ultra crocante, alface americana, picles artesanal e molho honey mustard da casa.",
+          "price": 34.5,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=600&auto=format&fit=crop&q=80",
+          "badge": "Novo",
+          "isAvailable": true
+        },
+        {
+          "id": "item-4",
+          "name": "Batata Rústica com Alecrim & Páprica",
+          "description": "Batatas selecionadas crocantes por fora e macias por dentro, finalizadas com flor de sal, alecrim fresco e maionese de alho assado.",
+          "price": 24.5,
+          "category": "cat-2",
+          "imageUrl": "https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-5",
+          "name": "Dadinhos de Tapioca com Geleia de Pimenta",
+          "description": "Porção com 12 unidades de dadinhos de queijo coalho dourados, acompanhados de geleia artesanal de pimenta biquinho.",
+          "price": 28.9,
+          "category": "cat-2",
+          "imageUrl": "https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        },
+        {
+          "id": "item-6",
+          "name": "Milkshake de Pistache Trufado 400ml",
+          "description": "Sorvete artesanal de pistache italiano batido com calda de chocolate branco e farofa crocante de pistache tostado.",
+          "price": 24.9,
+          "category": "cat-3",
+          "imageUrl": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80",
+          "badge": "Imperdível",
+          "isAvailable": true
+        },
+        {
+          "id": "item-7",
+          "name": "Soda Italiana de Frutas Vermelhas",
+          "description": "Água com gás super gelada, xarope artesanal de amora, framboesa e morango com folhas de hortelã fresca.",
+          "price": 16,
+          "category": "cat-3",
+          "imageUrl": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        },
+        {
+          "id": "item-8",
+          "name": "Petit Gâteau de Doce de Leite com Sorvete",
+          "description": "Bolinho quente de doce de leite argentino com casquinha crocante, servido com bola de sorvete de baunilha de Madagascar.",
+          "price": 26.9,
+          "category": "cat-4",
+          "imageUrl": "https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-9",
+          "name": "Brownie Belga Meio Amargo com Calda Quente",
+          "description": "Brownie artesanal com nozes pecã, coberto com ganache de chocolate 70% e morangos frescos.",
+          "price": 22.5,
+          "category": "cat-4",
+          "imageUrl": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        }
+      ]
+    },
+    "cafeteria-central": {
+      "id": "cafeteria-central",
+      "slug": "cafeteria-central",
+      "title": "Cafeteria Aroma & Grão (Exemplo Grátis)",
+      "description": "Hambúrgueres artesanais grelhados no fogo, porções crocantes, bebidas geladas e sobremesas exclusivas.",
+      "whatsappNumber": "5511999998888",
+      "currency": "R$",
+      "tableNumberPrompt": true,
+      "themeColor": "#16a34a",
+      "address": "Rua Gastronômica, 142 - Jardins, São Paulo",
+      "wifiInfo": "Cliente_VIP | Senha: bemvindo2026",
+      "pixKey": "pix@restaurante.com.br",
+      "openingHours": "Ter a Dom • 11h30 às 23h30",
+      "isOpen": true,
+      "deliveryFee": 6,
+      "updatedAt": "2026-11-09T01:08:07.492Z",
+      "categories": [
+        {
+          "id": "cat-1",
+          "name": "🍔 Burgers Especiais"
+        },
+        {
+          "id": "cat-2",
+          "name": "🍟 Porções & Entradas"
+        },
+        {
+          "id": "cat-3",
+          "name": "🥤 Bebidas & Drinks"
+        },
+        {
+          "id": "cat-4",
+          "name": "🍰 Sobremesas"
+        }
+      ],
+      "items": [
+        {
+          "id": "item-1",
+          "name": "Smash Bacon Supremo",
+          "description": "Duplo blend 100g de costela angus, queijo cheddar inglês derretido, tiras de bacon crocante e maionese defumada no pão brioche selado na manteiga.",
+          "price": 36.9,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-2",
+          "name": "Truffle Gorgonzola Melt",
+          "description": "Blend 180g angus, fonduta cremosa de queijo gorgonzola, cebola caramelizada no melado e toque de azeite trufado.",
+          "price": 42,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?w=600&auto=format&fit=crop&q=80",
+          "badge": "Chef Especial",
+          "isAvailable": true
+        },
+        {
+          "id": "item-3",
+          "name": "Crispy Chicken Honey Mustard",
+          "description": "Sobrecoxa de frango empanada ultra crocante, alface americana, picles artesanal e molho honey mustard da casa.",
+          "price": 34.5,
+          "category": "cat-1",
+          "imageUrl": "https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=600&auto=format&fit=crop&q=80",
+          "badge": "Novo",
+          "isAvailable": true
+        },
+        {
+          "id": "item-4",
+          "name": "Batata Rústica com Alecrim & Páprica",
+          "description": "Batatas selecionadas crocantes por fora e macias por dentro, finalizadas com flor de sal, alecrim fresco e maionese de alho assado.",
+          "price": 24.5,
+          "category": "cat-2",
+          "imageUrl": "https://images.unsplash.com/photo-1576107232684-1279f3908594?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-5",
+          "name": "Dadinhos de Tapioca com Geleia de Pimenta",
+          "description": "Porção com 12 unidades de dadinhos de queijo coalho dourados, acompanhados de geleia artesanal de pimenta biquinho.",
+          "price": 28.9,
+          "category": "cat-2",
+          "imageUrl": "https://images.unsplash.com/photo-1541592106381-b31e9677c0e5?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        },
+        {
+          "id": "item-6",
+          "name": "Milkshake de Pistache Trufado 400ml",
+          "description": "Sorvete artesanal de pistache italiano batido com calda de chocolate branco e farofa crocante de pistache tostado.",
+          "price": 24.9,
+          "category": "cat-3",
+          "imageUrl": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=600&auto=format&fit=crop&q=80",
+          "badge": "Imperdível",
+          "isAvailable": true
+        },
+        {
+          "id": "item-7",
+          "name": "Soda Italiana de Frutas Vermelhas",
+          "description": "Água com gás super gelada, xarope artesanal de amora, framboesa e morango com folhas de hortelã fresca.",
+          "price": 16,
+          "category": "cat-3",
+          "imageUrl": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        },
+        {
+          "id": "item-8",
+          "name": "Petit Gâteau de Doce de Leite com Sorvete",
+          "description": "Bolinho quente de doce de leite argentino com casquinha crocante, servido com bola de sorvete de baunilha de Madagascar.",
+          "price": 26.9,
+          "category": "cat-4",
+          "imageUrl": "https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=600&auto=format&fit=crop&q=80",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "item-9",
+          "name": "Brownie Belga Meio Amargo com Calda Quente",
+          "description": "Brownie artesanal com nozes pecã, coberto com ganache de chocolate 70% e morangos frescos.",
+          "price": 22.5,
+          "category": "cat-4",
+          "imageUrl": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        }
+      ]
+    }
+  },
+  "payments": {
+    "demo_mp_1794188251765": {
+      "id": "demo_mp_1794188251765",
+      "slug": "demo-restaurante",
+      "status": "pending",
+      "amount": 10.9,
+      "createdAt": "2026-11-09T01:37:31.769Z"
+    },
+    "188590240844": {
+      "id": "188590240844",
+      "slug": "demo-restaurante",
+      "status": "pending",
+      "amount": 10.9,
+      "createdAt": "2026-11-09T01:49:21.018Z"
+    },
+    "187525887893": {
+      "id": "187525887893",
+      "slug": "demo-restaurante",
+      "status": "pending",
+      "amount": 10.9,
+      "createdAt": "2026-11-09T01:50:07.838Z"
+    }
+  },
+  "developerSettings": {
+    "developerName": "Desenvolvedor Full-Stack & Especialista em IA",
+    "developerWhatsapp": "5511999998888",
+    "developerEmail": "edvandonasicmentosilva@gmail.com",
+    "adminUsername": "edvandonasicmentosilva@gmail.com",
+    "adminPassword": "Edgatinho1982.",
+    "agencyHeadline": "Desenvolvemos Sites, IA de Atendimento 24h, Sistemas de Agendamento para Clínicas, Salões de Beleza, Barbearias e Restaurantes.",
+    "availableForProjects": true,
+    "mpPublicKey": "APP_USR-8b245dbb-b6c0-4335-b46a-ae016ea5071d",
+    "mpAccessToken": "APP_USR-4000171423020297-110821-0d5a69a11b676b64931811de85b054a0-244576316",
+    "proPriceReais": 10.9
+  },
+  "developerLeads": {
+    "lead-demo-1": {
+      "id": "lead-demo-1",
+      "name": "Ricardo Almeida",
+      "businessName": "Barbearia Dom Bigode",
+      "contact": "11988776655",
+      "serviceType": "salao_barbearia",
+      "serviceLabel": "Salão de Beleza & Barbearia",
+      "budgetRange": "R$ 1.000 a R$ 2.500",
+      "urgency": "Urgente (Esta semana)",
+      "description": "Olá! Gostei muito da qualidade do gerador de QR Code. Quero desenvolver um sistema e site próprio para minha barbearia onde os clientes escolhem o barbeiro, agendam horário de corte/barba sozinhos e recebem lembrete automático no WhatsApp.",
+      "status": "novo",
+      "estimatedValue": 1800,
+      "developerNotes": "Cliente tem 4 cadeiras na barbearia, ótimo potencial de fechamento rápido.",
+      "createdAt": "2026-11-05T21:48:24.825Z",
+      "updatedAt": "2026-11-05T21:48:24.825Z"
+    },
+    "lead-demo-2": {
+      "id": "lead-demo-2",
+      "name": "Dra. Camila Rocha",
+      "businessName": "Clínica Odonto & Estética Prime",
+      "contact": "11977665544",
+      "serviceType": "marcacao_consultas",
+      "serviceLabel": "Sites de Marcação de Consultas & Clínicas",
+      "budgetRange": "R$ 2.000 a R$ 4.000",
+      "urgency": "Neste mês",
+      "description": "Preciso de um site moderno de marcação de consultas integrado com uma IA de Atendimento no WhatsApp para responder pacientes 24 horas por dia, tirar dúvidas de procedimentos e confirmar horários na agenda.",
+      "status": "novo",
+      "estimatedValue": 2800,
+      "developerNotes": "",
+      "createdAt": "2026-11-05T20:03:24.825Z",
+      "updatedAt": "2026-11-05T20:03:24.825Z"
+    },
+    "lead-demo-3": {
+      "id": "lead-demo-3",
+      "name": "Juliana Martins",
+      "businessName": "Studio Bella Hair & Nails",
+      "contact": "21996655443",
+      "serviceType": "ia_atendimento",
+      "serviceLabel": "IA de Atendimento 24h (WhatsApp)",
+      "budgetRange": "R$ 800 a R$ 1.800",
+      "urgency": "Urgente (Esta semana)",
+      "description": "Tenho um salão de beleza e perdemos muitas clientes porque não damos conta de responder o WhatsApp rápido. Quero uma IA de Atendimento que passe a tabela de serviços e já marque o horário de cabelo e manicure.",
+      "status": "em_contato",
+      "estimatedValue": 1500,
+      "developerNotes": "Enviei demonstração pelo WhatsApp, aguardando retorno.",
+      "createdAt": "2026-11-05T04:23:24.825Z",
+      "updatedAt": "2026-11-05T17:23:24.825Z"
+    }
+  },
+  "users": {
+    "user-demo-1": {
+      "id": "user-demo-1",
+      "name": "Marcos Oliveira",
+      "businessName": "Smash & Grill Burger",
+      "email": "cliente@restaurante.com.br",
+      "whatsapp": "11999998888",
+      "passwordHash": "ffc12c935d123f719d113ee4df99c85979d2451953890f36df47f64650819f03",
+      "createdAt": "2026-11-05T23:59:12.781Z"
+    }
+  },
+  "developerNotifications": {
+    "notif-demo-1": {
+      "id": "notif-demo-1",
+      "type": "subscription_paid",
+      "title": "💰 Assinatura PRO Confirmada (+ R$ 10,90)",
+      "message": "Smash & Grill Burger ativou o Plano PRO (/demo-restaurante) via Mercado Pago.",
+      "amount": 10.9,
+      "clientName": "Marcos Oliveira (Smash & Grill Burger)",
+      "slug": "demo-restaurante",
+      "isRead": false,
+      "createdAt": "2026-11-09T01:58:30.293Z"
+    },
+    "notif-demo-2": {
+      "id": "notif-demo-2",
+      "type": "new_lead",
+      "title": "💬 Nova Proposta: Salão de Beleza & Barbearia",
+      "message": "Ricardo Almeida (Barbearia Dom Bigode) pediu orçamento de R$ 1.000 a R$ 2.500 • WhatsApp: 11988776655",
+      "clientName": "Ricardo Almeida",
+      "contact": "11988776655",
+      "isRead": false,
+      "createdAt": "2026-11-09T01:48:30.293Z"
+    },
+    "notif-demo-3": {
+      "id": "notif-demo-3",
+      "type": "new_lead",
+      "title": "💬 Nova Proposta: Marcação de Consultas & IA",
+      "message": "Dra. Camila Rocha (Clínica Odonto Prime) pediu orçamento de R$ 2.000 a R$ 4.000 • WhatsApp: 11977665544",
+      "clientName": "Dra. Camila Rocha",
+      "contact": "11977665544",
+      "isRead": false,
+      "createdAt": "2026-11-09T00:03:30.293Z"
+    },
+    "notif-1794191026958-4t7p": {
+      "id": "notif-1794191026958-4t7p",
+      "type": "subscription_paid",
+      "title": "💰 Teste de Alerta Mobile (+ R$ 10,90)",
+      "message": "Notificações do seu App SpotQR Dev estão ativas e funcionando em tempo real no seu celular!",
+      "amount": 10.9,
+      "clientName": "Teste Desenvolvedor Edvan",
+      "slug": "demo-restaurante",
+      "isRead": false,
+      "createdAt": "2026-11-09T02:23:46.958Z"
+    }
+  }
+}
