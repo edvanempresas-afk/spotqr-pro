@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://spotqr.com.br';
+  const baseUrl = 'https://www.spotqr.com.br';
   const now = new Date();
 
   return [
@@ -22,6 +22,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/privacidade`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.3,
+    },
+    {
+      url: `${baseUrl}/termos`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.3,
     },
   ];
 }

@@ -68,13 +68,19 @@ export default function Footer() {
 
         <div className="pt-8 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <p>Feito para impulsionar pequenos e médios negócios gastronômicos e comerciais.</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/privacidade" className="hover:text-emerald-400 transition">
+              Política de Privacidade
+            </Link>
+            <span className="text-slate-600">•</span>
+            <Link href="/termos" className="hover:text-emerald-400 transition">
+              Termos de Uso
+            </Link>
+            <span className="text-slate-600">•</span>
             <span className="flex items-center gap-1.5 text-slate-400">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
               API Mercado Pago Integrada
             </span>
-            <span className="text-slate-600">•</span>
-            <span>PIX Imediato</span>
           </div>
         </div>
       </div>
