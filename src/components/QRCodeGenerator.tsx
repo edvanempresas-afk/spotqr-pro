@@ -616,8 +616,8 @@ export default function QRCodeGenerator() {
                           </p>
                           <p>
                             {isCatalog
-                              ? 'Ideal para roupas, artesanato, impressões 3D e comércios. Com fotos, carrinho, entrega/retirada e PIX.'
-                              : 'Inclui carrinho, opção Na Mesa / Delivery, botão Chamar Garçom e pagamento PIX.'}
+                              ? 'Ideal para roupas, artesanato, impressões 3D e comércios. Configure fotos à esquerda ou direita, envio/retirada e PIX no editor.'
+                              : 'Inclui carrinho, opção Na Mesa / Delivery, foto esquerda ou direita, botão Chamar Garçom e PIX.'}
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto">

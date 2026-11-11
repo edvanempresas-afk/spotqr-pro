@@ -7,3 +7,4 @@ export default function DigitalCatalogPage({
 }) {
   return <DigitalShowcasePage slug={params.slug} defaultMode="catalog" />;
 }
+

@@ -182,12 +182,16 @@
       "tableNumberPrompt": false,
       "themeColor": "#10b981",
       "coverImage": "/catalogo/cover-loja.jpg",
-      "address": "Envio para todo o Brasil • Retirada no Ateliê",
+      "address": "São Paulo - SP",
       "wifiInfo": "",
       "pixKey": "pix@studiocriativo.com.br",
       "openingHours": "Seg a Sáb • 09h às 19h",
       "isOpen": true,
-      "deliveryFee": 15,
+      "deliveryFee": 0,
+      "allowDelivery": false,
+      "allowPickup": false,
+      "allowOnSite": false,
+      "productImagePosition": "right",
       "updatedAt": "2026-11-11T15:35:58.160Z",
       "categories": [
         {

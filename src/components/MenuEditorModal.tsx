@@ -80,6 +80,11 @@ export default function MenuEditorModal({
 
   const isCatalog = (menu?.mode || mode) === 'catalog';
   const activePresets = isCatalog ? CATALOG_IMAGE_PRESETS : FOOD_IMAGE_PRESETS;
+  const imagePos: 'left' | 'right' = menu?.productImagePosition || 'right';
+  const defaultFulfill = !isCatalog;
+  const allowDelivery = menu?.allowDelivery ?? defaultFulfill;
+  const allowPickup = menu?.allowPickup ?? defaultFulfill;
+  const allowOnSite = menu?.allowOnSite ?? defaultFulfill;
 
   useEffect(() => {
     if (!isOpen || !slug) return;
@@ -105,6 +110,10 @@ export default function MenuEditorModal({
       const payload: RestaurantMenu = {
         ...menu,
         mode: menu.mode || mode,
+        allowDelivery,
+        allowPickup,
+        allowOnSite,
+        productImagePosition: imagePos,
       };
       const res = await fetch('/api/cardapio', {
         method: 'POST',
@@ -293,6 +302,92 @@ export default function MenuEditorModal({
               {/* TAB 1: PRODUCTS / ITEMS */}
               {activeTab === 'items' && (
                 <div className="space-y-4">
+                  {/* Quick Visual & Fulfillment Bar: Photo Side + Shipping/Pickup */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-300">
+                        📸 Posição da Foto:
+                      </span>
+                      <div className="inline-flex bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({ ...menu, productImagePosition: 'left' })
+                          }
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
+                            imagePos === 'left'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          ◧ Lado Esquerdo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({ ...menu, productImagePosition: 'right' })
+                          }
+                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
+                            imagePos === 'right'
+                              ? 'bg-emerald-500 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          ◨ Lado Direito
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[11px] font-bold text-slate-300">
+                        🚚 Entrega / Retirada no Menu:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenu({ ...menu, allowDelivery: !allowDelivery })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                          allowDelivery
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {allowDelivery ? '✅' : '○'}{' '}
+                        {isCatalog ? 'Fazemos Envio' : 'Delivery'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenu({ ...menu, allowPickup: !allowPickup })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                          allowPickup
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {allowPickup ? '✅' : '○'} Retirada no Local
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenu({ ...menu, allowOnSite: !allowOnSite })
+                        }
+                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                          allowOnSite
+                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {allowOnSite ? '✅' : '○'}{' '}
+                        {isCatalog ? 'Presencial / Balcão' : 'Na Mesa'}
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-slate-400">
                       Adicione seus itens, ajuste os preços ou marque como <strong>Esgotado</strong> quando acabar no estoque.
@@ -684,6 +779,98 @@ export default function MenuEditorModal({
                     />
                   </div>
 
+                  {/* Layout & Fulfillment Controls in Settings Tab */}
+                  <div className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
+                    <div>
+                      <span className="text-xs font-bold text-white block mb-1">
+                        📸 Posição da Foto dos Produtos
+                      </span>
+                      <p className="text-[11px] text-slate-400 mb-2.5">
+                        Escolha em qual lado do cartão a foto do item aparece para seus clientes:
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({ ...menu, productImagePosition: 'left' })
+                          }
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${
+                            imagePos === 'left'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          ◧ Lado Esquerdo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({ ...menu, productImagePosition: 'right' })
+                          }
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${
+                            imagePos === 'right'
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          ◨ Lado Direito
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-bold text-white block mb-1">
+                        🚚 Opções de Envio & Retirada
+                      </span>
+                      <p className="text-[11px] text-slate-400 mb-2.5">
+                        Só aparece no site público o que você marcar abaixo:
+                      </p>
+                      <div className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-xs text-slate-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={allowDelivery}
+                            onChange={(e) =>
+                              setMenu({ ...menu, allowDelivery: e.target.checked })
+                            }
+                            className="accent-emerald-500 w-4 h-4"
+                          />
+                          <span>
+                            {isCatalog
+                              ? 'Fazemos Envio / Entrega (Correios, Motoboy, etc.)'
+                              : 'Fazemos Delivery / Entrega'}
+                          </span>
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-slate-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={allowPickup}
+                            onChange={(e) =>
+                              setMenu({ ...menu, allowPickup: e.target.checked })
+                            }
+                            className="accent-emerald-500 w-4 h-4"
+                          />
+                          <span>Aceita Retirada no Local / Loja</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-xs text-slate-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={allowOnSite}
+                            onChange={(e) =>
+                              setMenu({ ...menu, allowOnSite: e.target.checked })
+                            }
+                            className="accent-emerald-500 w-4 h-4"
+                          />
+                          <span>
+                            {isCatalog
+                              ? 'Atendimento Presencial / Balcão'
+                              : 'Pedidos na Mesa (QR nas Mesas)'}
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
                       {isCatalog ? 'Taxa de Entrega / Frete Fixo (R$):' : 'Taxa de Entrega Delivery (R$):'}
@@ -691,6 +878,7 @@ export default function MenuEditorModal({
                     <input
                       type="number"
                       step="0.50"
+                      disabled={!allowDelivery}
                       value={menu.deliveryFee || 0}
                       onChange={(e) =>
                         setMenu({
@@ -698,8 +886,15 @@ export default function MenuEditorModal({
                           deliveryFee: parseFloat(e.target.value) || 0,
                         })
                       }
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                      className={`w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white ${
+                        !allowDelivery ? 'opacity-40 cursor-not-allowed' : ''
+                      }`}
                     />
+                    {!allowDelivery && (
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        Ative "Fazemos Envio / Delivery" acima para configurar frete.
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">

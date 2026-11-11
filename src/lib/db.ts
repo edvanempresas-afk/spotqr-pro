@@ -61,6 +61,10 @@ export function createStarterMenu(
     openingHours: 'Ter a Dom • 11h30 às 23h30',
     isOpen: true,
     deliveryFee: 6.0,
+    allowDelivery: true,
+    allowPickup: true,
+    allowOnSite: true,
+    productImagePosition: 'right',
     updatedAt: new Date().toISOString(),
     categories: [
       { id: 'cat-1', name: '🍔 Burgers Especiais' },
@@ -196,12 +200,16 @@ export function createStarterCatalog(
     tableNumberPrompt: false,
     themeColor: '#10b981',
     coverImage: '/catalogo/cover-loja.jpg',
-    address: 'Envio para todo o Brasil • Retirada no Ateliê',
+    address: 'São Paulo - SP',
     wifiInfo: '',
     pixKey,
     openingHours: 'Seg a Sáb • 09h às 19h',
     isOpen: true,
-    deliveryFee: 15.0,
+    deliveryFee: 0,
+    allowDelivery: false,
+    allowPickup: false,
+    allowOnSite: false,
+    productImagePosition: 'right',
     updatedAt: new Date().toISOString(),
     categories: [
       { id: 'cat-3d', name: '🖨️ Impressões 3D' },
@@ -388,7 +396,11 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
-    if (!parsed.menus['demo-catalogo']) {
+    if (
+      !parsed.menus['demo-catalogo'] ||
+      parsed.menus['demo-catalogo'].address ===
+        'Envio para todo o Brasil • Retirada no Ateliê'
+    ) {
       parsed.menus['demo-catalogo'] = createStarterCatalog(
         'demo-catalogo',
         'Studio Criativo & Loja',

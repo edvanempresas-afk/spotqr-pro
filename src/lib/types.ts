@@ -101,6 +101,10 @@ export interface RestaurantMenu {
   openingHours?: string;
   isOpen?: boolean;
   deliveryFee?: number;
+  allowDelivery?: boolean;
+  allowPickup?: boolean;
+  allowOnSite?: boolean;
+  productImagePosition?: 'left' | 'right';
   ownerId?: string;
   ownerEmail?: string;
   updatedAt: string;
