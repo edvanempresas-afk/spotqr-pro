@@ -47,6 +47,7 @@ export function createStarterMenu(
   return {
     id: slug,
     slug,
+    mode: 'menu',
     title,
     description:
       'Hambúrgueres artesanais grelhados no fogo, porções crocantes, bebidas geladas e sobremesas exclusivas.',
@@ -177,7 +178,98 @@ export function createStarterMenu(
   };
 }
 
-// Initial data: ONLY the public visitor demo menu (/cardapio/demo-restaurante). Zero fictional leads, payments, notifications or users.
+export function createStarterCatalog(
+  slug: string,
+  title: string = 'Studio Criativo & Loja',
+  whatsappNumber: string = '5511999998888',
+  pixKey: string = 'pix@minhaloja.com.br'
+): RestaurantMenu {
+  return {
+    id: slug,
+    slug,
+    mode: 'catalog',
+    title,
+    description:
+      'Catálogo digital de produtos exclusivos: Impressões 3D personalizadas, Moda & Roupas, Artesanato feito à mão e Presentes especiais.',
+    whatsappNumber,
+    currency: 'R$',
+    tableNumberPrompt: false,
+    themeColor: '#10b981',
+    coverImage: '/catalogo/cover-loja.jpg',
+    address: 'Envio para todo o Brasil • Retirada no Ateliê',
+    wifiInfo: '',
+    pixKey,
+    openingHours: 'Seg a Sáb • 09h às 19h',
+    isOpen: true,
+    deliveryFee: 15.0,
+    updatedAt: new Date().toISOString(),
+    categories: [
+      { id: 'cat-3d', name: '🖨️ Impressões 3D' },
+      { id: 'cat-roupas', name: '👕 Roupas & Moda' },
+      { id: 'cat-artesanato', name: '🧶 Artesanato & Decor' },
+      { id: 'cat-presentes', name: '🕯️ Velas & Presentes' },
+    ],
+    items: [
+      {
+        id: 'cat-item-1',
+        name: 'Luminária Lua Cheia 3D + Organizador',
+        description:
+          'Impressão 3D em PLA biodegradável de alta precisão com base em madeira natural e iluminação LED quente. Pode personalizar nome.',
+        price: 89.9,
+        category: 'cat-3d',
+        imageUrl: '/catalogo/prod-3d.jpg',
+        badge: 'Mais Vendido',
+        isAvailable: true,
+      },
+      {
+        id: 'cat-item-2',
+        name: 'Suporte Geométrico 3D de Mesa',
+        description:
+          'Porta-canetas, celular ou controles impresso em 3D acabamento fosco grafite ou sob encomenda em várias cores.',
+        price: 49.9,
+        category: 'cat-3d',
+        imageUrl: '/catalogo/prod-3d.jpg',
+        badge: 'Sob Encomenda',
+        isAvailable: true,
+      },
+      {
+        id: 'cat-item-3',
+        name: 'Camiseta Oversized Algodão Premium',
+        description:
+          'Malha pesada 100% algodão fio 30.1 penteado, modelagem streetwear confortável unissex. Tamanhos disponíveis: P, M, G e GG.',
+        price: 119.9,
+        category: 'cat-roupas',
+        imageUrl: '/catalogo/prod-roupa.jpg',
+        badge: 'Pronta Entrega',
+        isAvailable: true,
+      },
+      {
+        id: 'cat-item-4',
+        name: 'Conjunto Vaso Cerâmica & Painel Macramê',
+        description:
+          'Peças exclusivas feitas 100% à mão em cerâmica terracota e algodão cru natural. Ideal para decorar sala, quarto ou escritório.',
+        price: 135.0,
+        category: 'cat-artesanato',
+        imageUrl: '/catalogo/prod-artesanato.jpg',
+        badge: 'Feito à Mão',
+        isAvailable: true,
+      },
+      {
+        id: 'cat-item-5',
+        name: 'Vela Aromática Lavanda & Caixa Presente',
+        description:
+          'Cera vegetal ecológica em vidro âmbar com tampa de cortiça + caixa de madeira artesanal. Queima limpa de até 40 horas.',
+        price: 68.0,
+        category: 'cat-presentes',
+        imageUrl: '/catalogo/prod-vela.jpg',
+        badge: 'Exclusivo',
+        isAvailable: true,
+      },
+    ],
+  };
+}
+
+// Initial data: ONLY the public visitor demos (/cardapio/demo-restaurante and /catalogo/demo-catalogo). Zero fictional leads, payments, notifications or users.
 const initialData: DatabaseSchema = {
   dynamicQRs: {
     'demo-restaurante': {
@@ -197,8 +289,32 @@ const initialData: DatabaseSchema = {
         cornerColor: '#16a34a',
         dotStyle: 'rounded',
         frameStyle: 'table_tent',
-        frameText: 'CARDÁPIO NA MESA',
+        frameTopText: '📱 CARDÁPIO NA MESA',
+        frameText: 'VER CARDÁPIO & PEDIR',
         frameColor: '#16a34a',
+        frameTextColor: '#ffffff',
+      },
+    },
+    'demo-catalogo': {
+      id: 'qr-demo-catalogo',
+      slug: 'demo-catalogo',
+      title: 'Studio Criativo & Loja (Catálogo Demonstração Visitantes)',
+      targetUrl: '/catalogo/demo-catalogo',
+      type: 'catalog',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      scansCount: 0,
+      isPaid: true,
+      linkedMenuId: 'demo-catalogo',
+      qrConfig: {
+        fgColor: '#0f172a',
+        bgColor: '#ffffff',
+        cornerColor: '#10b981',
+        dotStyle: 'rounded',
+        frameStyle: 'table_tent',
+        frameTopText: '🛍️ CATÁLOGO DIGITAL',
+        frameText: 'VER PRODUTOS & PEDIR',
+        frameColor: '#10b981',
         frameTextColor: '#ffffff',
       },
     },
@@ -209,6 +325,12 @@ const initialData: DatabaseSchema = {
       'Smash & Grill Burger',
       '5511999998888',
       'financeiro@smashgrill.com.br'
+    ),
+    'demo-catalogo': createStarterCatalog(
+      'demo-catalogo',
+      'Studio Criativo & Loja',
+      '5511999998888',
+      'pix@studiocriativo.com.br'
     ),
   },
   payments: {},
@@ -252,7 +374,7 @@ function ensureDb(): DatabaseSchema {
 
     let modified = false;
 
-    // Ensure demo-restaurante always has the full updated 9-item menu for visitors
+    // Ensure demo-restaurante and demo-catalogo always exist cleanly for visitors
     if (
       parsed.menus['demo-restaurante'] &&
       parsed.menus['demo-restaurante'].items.length < 6
@@ -263,6 +385,21 @@ function ensureDb(): DatabaseSchema {
         '5511999998888',
         'financeiro@smashgrill.com.br'
       );
+      modified = true;
+    }
+
+    if (!parsed.menus['demo-catalogo']) {
+      parsed.menus['demo-catalogo'] = createStarterCatalog(
+        'demo-catalogo',
+        'Studio Criativo & Loja',
+        '5511999998888',
+        'pix@studiocriativo.com.br'
+      );
+      modified = true;
+    }
+
+    if (!parsed.dynamicQRs['demo-catalogo']) {
+      parsed.dynamicQRs['demo-catalogo'] = initialData.dynamicQRs['demo-catalogo'];
       modified = true;
     }
 
@@ -353,14 +490,23 @@ export function saveDynamicQR(record: DynamicQRRecord): void {
   const db = ensureDb();
   db.dynamicQRs[record.slug] = record;
 
-  // If this QR is of type 'menu' and no menu exists for this slug yet, auto-create a starter menu!
-  if (record.type === 'menu' && !db.menus[record.slug]) {
-    db.menus[record.slug] = createStarterMenu(
-      record.slug,
-      record.title || `Cardápio ${record.slug}`,
-      record.qrConfig?.whatsappPhone || '5511999998888',
-      record.qrConfig?.pixKey || 'pix@restaurante.com.br'
-    );
+  // If this QR is of type 'menu' or 'catalog' and no menu/catalog exists for this slug yet, auto-create!
+  if ((record.type === 'menu' || record.type === 'catalog') && !db.menus[record.slug]) {
+    if (record.type === 'catalog') {
+      db.menus[record.slug] = createStarterCatalog(
+        record.slug,
+        record.title || `Catálogo ${record.slug}`,
+        record.qrConfig?.whatsappPhone || '5511999998888',
+        record.qrConfig?.pixKey || 'pix@minhaloja.com.br'
+      );
+    } else {
+      db.menus[record.slug] = createStarterMenu(
+        record.slug,
+        record.title || `Cardápio ${record.slug}`,
+        record.qrConfig?.whatsappPhone || '5511999998888',
+        record.qrConfig?.pixKey || 'pix@restaurante.com.br'
+      );
+    }
   }
 
   saveDb(db);
@@ -376,24 +522,39 @@ export function incrementQRScan(slug: string): void {
   }
 }
 
-// RESTAURANT MENU CRUD
-export function getMenuBySlug(slug: string): RestaurantMenu | null {
+// RESTAURANT MENU & STORE CATALOG CRUD
+export function getMenuBySlug(
+  slug: string,
+  defaultMode: 'menu' | 'catalog' = 'menu'
+): RestaurantMenu | null {
   const db = ensureDb();
   if (db.menus[slug]) {
     return db.menus[slug];
   }
-  // If user visits /cardapio/[slug] for a valid or new slug, auto-provision a starter menu so it never 404s!
+  // If user visits /cardapio/[slug] or /catalogo/[slug] for a valid or new slug, auto-provision starter showcase so it never 404s!
   const qr = db.dynamicQRs[slug];
-  const autoMenu = createStarterMenu(
-    slug,
+  const resolvedMode = qr?.type === 'catalog' ? 'catalog' : defaultMode;
+  const formattedTitle =
     qr?.title ||
-      slug
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' '),
-    qr?.qrConfig?.whatsappPhone || '5511999998888',
-    qr?.qrConfig?.pixKey || 'pix@restaurante.com.br'
-  );
+    slug
+      .split('-')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+
+  const autoMenu =
+    resolvedMode === 'catalog'
+      ? createStarterCatalog(
+          slug,
+          formattedTitle,
+          qr?.qrConfig?.whatsappPhone || '5511999998888',
+          qr?.qrConfig?.pixKey || 'pix@minhaloja.com.br'
+        )
+      : createStarterMenu(
+          slug,
+          formattedTitle,
+          qr?.qrConfig?.whatsappPhone || '5511999998888',
+          qr?.qrConfig?.pixKey || 'pix@restaurante.com.br'
+        );
   db.menus[slug] = autoMenu;
   saveDb(db);
   return autoMenu;
@@ -563,12 +724,15 @@ export function getPayment(paymentId: string) {
 
 export function getSubscriptionAnalytics() {
   const db = ensureDb();
-  // Exclude visitor showcase ('demo-restaurante') from real business metrics
+  // Exclude visitor showcases ('demo-restaurante', 'demo-catalogo') from real business metrics
   const realCustomerQRs = Object.values(db.dynamicQRs || {}).filter(
-    (q) => q.slug !== 'demo-restaurante'
+    (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
   );
   const allPayments = Object.values(db.payments || {}).filter(
-    (p) => p.slug !== 'demo-restaurante' && !p.id.startsWith('demo_')
+    (p) =>
+      p.slug !== 'demo-restaurante' &&
+      p.slug !== 'demo-catalogo' &&
+      !p.id.startsWith('demo_')
   );
 
   const now = new Date();

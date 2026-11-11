@@ -7,6 +7,7 @@ import {
   QrCode,
   Sparkles,
   Utensils,
+  ShoppingBag,
   LayoutDashboard,
   Code2,
   UserCheck,
@@ -60,7 +61,7 @@ export default function Navbar() {
               </span>
             </div>
             <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
-              QR Codes & Cardápios Digitais
+              QR Codes, Cardápios & Catálogos
             </span>
           </div>
         </Link>
@@ -78,7 +79,14 @@ export default function Navbar() {
             className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
           >
             <Utensils className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Cardápio Exemplo</span>
+            <span>Cardápio Demo</span>
+          </Link>
+          <Link
+            href="/catalogo/demo-catalogo"
+            className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>Catálogo Demo</span>
           </Link>
           <Link
             href="/#precos"

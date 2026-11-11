@@ -127,7 +127,7 @@ export default function QRPreview({
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
           >
             <Printer className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Plaquinha Mesa</span>
+            <span>{config.type === 'menu' ? 'Plaquinha Mesa' : 'Plaquinha Display'}</span>
           </button>
         </div>
 
@@ -195,10 +195,10 @@ export default function QRPreview({
               {targetContent}
             </span>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleCopyLink}
-              className="text-slate-400 hover:text-emerald-400 p-1"
+              className="text-slate-400 hover:text-emerald-400 p-1.5 rounded-lg hover:bg-slate-800 transition"
               title="Copiar Conteúdo / Link"
             >
               {copiedLink ? (
@@ -212,10 +212,11 @@ export default function QRPreview({
                 href={targetContent}
                 target="_blank"
                 rel="noreferrer"
-                className="text-slate-400 hover:text-emerald-400 p-1"
-                title="Testar Link em Nova Aba"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 font-bold text-[11px] transition"
+                title="Abrir Link em Nova Aba"
               >
-                <ExternalLink className="w-4 h-4" />
+                <span>Abrir</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
           </div>

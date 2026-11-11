@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const leads = getAllDeveloperLeads();
     const settings = getDeveloperSettings();
     const qrs = getAllDynamicQRs().filter(
-      (q) => q.slug !== 'demo-restaurante'
+      (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
     );
     const notifications = getAllDeveloperNotifications();
     const subscriptionAnalytics = getSubscriptionAnalytics();

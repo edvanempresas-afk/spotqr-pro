@@ -1,5 +1,59 @@
 import QRCode from 'qrcode';
-import { QRConfig } from './types';
+import { QRConfig, QRType } from './types';
+
+export function getDefaultFrameTexts(type: QRType): {
+  topText: string;
+  bottomText: string;
+} {
+  switch (type) {
+    case 'menu':
+      return {
+        topText: '📱 CARDÁPIO NA MESA',
+        bottomText: 'VER CARDÁPIO & PEDIR',
+      };
+    case 'catalog':
+      return {
+        topText: '🛍️ CATÁLOGO DIGITAL',
+        bottomText: 'VER PRODUTOS & PEDIR',
+      };
+    case 'pix':
+      return {
+        topText: '💠 PAGAMENTO VIA PIX',
+        bottomText: 'PAGUE COM PIX',
+      };
+    case 'whatsapp':
+      return {
+        topText: '💬 ATENDIMENTO WHATSAPP',
+        bottomText: 'CHAMAR NO WHATSAPP',
+      };
+    case 'wifi':
+      return {
+        topText: '📶 WI-FI PARA CLIENTES',
+        bottomText: 'CONECTAR NO WI-FI',
+      };
+    case 'google_reviews':
+      return {
+        topText: '⭐ AVALIE NO GOOGLE',
+        bottomText: 'DEIXE 5 ESTRELAS',
+      };
+    case 'instagram':
+      return {
+        topText: '📸 SIGA NO INSTAGRAM',
+        bottomText: 'SIGA NO INSTAGRAM',
+      };
+    case 'vcard':
+      return {
+        topText: '👤 CARTÃO DIGITAL',
+        bottomText: 'SALVAR CONTATO',
+      };
+    case 'url':
+    default:
+      return {
+        topText: '🌐 ACESSE NOSSO LINK',
+        bottomText: 'ESCANEIE AQUI',
+      };
+  }
+}
 
 export interface RenderQROptions {
   config: QRConfig;
@@ -342,7 +396,8 @@ function drawFrame(
 ) {
   const frameColor = config.frameColor || '#16a34a';
   const textColor = config.frameTextColor || '#ffffff';
-  const text = config.frameText || 'ESCANEIE AQUI';
+  const defaults = getDefaultFrameTexts(config.type);
+  const text = config.frameText || defaults.bottomText;
 
   switch (config.frameStyle) {
     case 'bottom_tag': {
@@ -361,10 +416,10 @@ function drawFrame(
       ctx.restore();
 
       ctx.fillStyle = textColor;
-      ctx.font = `bold ${Math.floor(tagH * 0.38)}px Inter, -apple-system, sans-serif`;
+      ctx.font = `bold ${Math.floor(tagH * 0.36)}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text.toUpperCase(), w / 2, tagY + tagH / 2);
+      ctx.fillText(text.toUpperCase(), w / 2, tagY + tagH / 2, tagW * 0.9);
       break;
     }
 
@@ -372,36 +427,49 @@ function drawFrame(
     case 'table_tent': {
       ctx.save();
       ctx.strokeStyle = frameColor;
-      ctx.lineWidth = 6;
+      ctx.lineWidth = Math.max(4, Math.round(w * 0.006));
       roundRect(ctx, 24, 24, w - 48, h - 48, 28);
       ctx.stroke();
 
-      const bannerH = 64;
+      const bannerH = Math.round(h * 0.068);
       ctx.fillStyle = frameColor;
-      roundRect(ctx, 32, 32, w - 64, bannerH, 18);
+      roundRect(ctx, 34, 34, w - 68, bannerH, 18);
       ctx.fill();
 
+      const topLabel = (
+        config.frameTopText ||
+        (config.frameStyle === 'table_tent'
+          ? defaults.topText
+          : 'ESCANEIE COM SEU CELULAR')
+      ).toUpperCase();
+
       ctx.fillStyle = textColor;
-      ctx.font = `bold 24px Inter, sans-serif`;
+      ctx.font = `bold ${Math.round(w * 0.025)}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(
-        config.frameStyle === 'table_tent'
-          ? '📱 CARDÁPIO NA MESA'
-          : 'ESCANEIE COM SEU CELULAR',
-        w / 2,
-        32 + bannerH / 2
-      );
+      ctx.fillText(topLabel, w / 2, 34 + bannerH / 2, w - 104);
 
-      const bottomTagH = 58;
-      const bottomTagY = h - 100;
+      const bottomTagH = Math.round(h * 0.058);
+      const bottomTagY = h - Math.round(h * 0.095);
       ctx.fillStyle = frameColor;
-      roundRect(ctx, w * 0.15, bottomTagY, w * 0.7, bottomTagH, bottomTagH / 2);
+      roundRect(
+        ctx,
+        w * 0.14,
+        bottomTagY,
+        w * 0.72,
+        bottomTagH,
+        bottomTagH / 2
+      );
       ctx.fill();
 
       ctx.fillStyle = textColor;
-      ctx.font = `bold 20px Inter, sans-serif`;
-      ctx.fillText(text.toUpperCase(), w / 2, bottomTagY + bottomTagH / 2);
+      ctx.font = `bold ${Math.round(w * 0.022)}px Inter, -apple-system, sans-serif`;
+      ctx.fillText(
+        text.toUpperCase(),
+        w / 2,
+        bottomTagY + bottomTagH / 2,
+        w * 0.66
+      );
       ctx.restore();
       break;
     }
@@ -409,31 +477,48 @@ function drawFrame(
     case 'badge': {
       ctx.save();
       ctx.strokeStyle = frameColor;
-      ctx.lineWidth = 8;
+      ctx.lineWidth = Math.max(6, Math.round(w * 0.007));
       roundRect(ctx, 30, 30, w - 60, h - 60, 40);
       ctx.stroke();
 
-      const pillW = 260;
-      const pillH = 46;
+      const pillW = Math.round(w * 0.34);
+      const pillH = Math.round(h * 0.052);
       ctx.fillStyle = frameColor;
       roundRect(ctx, (w - pillW) / 2, 10, pillW, pillH, pillH / 2);
       ctx.fill();
 
       ctx.fillStyle = textColor;
-      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.font = `bold ${Math.round(w * 0.02)}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('APONTE A CÂMERA', w / 2, 10 + pillH / 2);
+      ctx.fillText(
+        (config.frameTopText || 'APONTE A CÂMERA').toUpperCase(),
+        w / 2,
+        10 + pillH / 2,
+        pillW * 0.9
+      );
 
       const bottomW = w * 0.75;
-      const bottomH = 60;
+      const bottomH = Math.round(h * 0.065);
       ctx.fillStyle = frameColor;
-      roundRect(ctx, (w - bottomW) / 2, h - 84, bottomW, bottomH, 20);
+      roundRect(
+        ctx,
+        (w - bottomW) / 2,
+        h - Math.round(h * 0.098),
+        bottomW,
+        bottomH,
+        20
+      );
       ctx.fill();
 
       ctx.fillStyle = textColor;
-      ctx.font = 'bold 22px Inter, sans-serif';
-      ctx.fillText(text.toUpperCase(), w / 2, h - 84 + bottomH / 2);
+      ctx.font = `bold ${Math.round(w * 0.023)}px Inter, -apple-system, sans-serif`;
+      ctx.fillText(
+        text.toUpperCase(),
+        w / 2,
+        h - Math.round(h * 0.098) + bottomH / 2,
+        bottomW * 0.9
+      );
       ctx.restore();
       break;
     }
@@ -447,9 +532,9 @@ function drawFrame(
       ctx.strokeRect(44, 44, w - 88, h - 88);
 
       ctx.fillStyle = frameColor;
-      ctx.font = 'bold 22px Inter, sans-serif';
+      ctx.font = `bold ${Math.round(w * 0.022)}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(`✦ ${text.toUpperCase()} ✦`, w / 2, h - 60);
+      ctx.fillText(`✦ ${text.toUpperCase()} ✦`, w / 2, h - 60, w - 120);
       ctx.restore();
       break;
     }

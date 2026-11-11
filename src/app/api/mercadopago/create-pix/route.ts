@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       targetUrl:
         targetUrl ||
         existing?.targetUrl ||
-        `https://spotqr.pro/cardapio/${cleanSlug}`,
+        `/${type === 'catalog' ? 'catalogo' : 'cardapio'}/${cleanSlug}`,
       type: type || existing?.type || 'menu',
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),

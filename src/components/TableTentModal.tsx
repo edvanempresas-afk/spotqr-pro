@@ -10,6 +10,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { QRConfig } from '@/lib/types';
+import { getDefaultFrameTexts } from '@/lib/qr-canvas';
 
 interface TableTentModalProps {
   isOpen: boolean;
@@ -39,6 +40,55 @@ export default function TableTentModal({
 
   const t1 = String(startTableNum).padStart(2, '0');
   const t2 = String(startTableNum + 1).padStart(2, '0');
+
+  const frameDefaults = getDefaultFrameTexts(config.type);
+  const topLabel1 = config.frameTopText || config.frameText || frameDefaults.topText;
+  const topLabel2 =
+    config.type === 'pix'
+      ? 'PAGAMENTO PIX'
+      : config.type === 'catalog'
+      ? 'CATÁLOGO DE PRODUTOS'
+      : config.type === 'wifi'
+      ? 'ACESSE O WI-FI'
+      : config.type === 'whatsapp'
+      ? 'ATENDIMENTO WHATSAPP'
+      : config.type === 'google_reviews'
+      ? 'AVALIE NO GOOGLE'
+      : config.type === 'instagram'
+      ? 'SIGA NO INSTAGRAM'
+      : config.type === 'vcard'
+      ? 'CARTÃO DIGITAL'
+      : config.type === 'url'
+      ? 'ACESSE NOSSO LINK'
+      : 'PEÇA NA MESA';
+
+  const subtitle1 =
+    config.type === 'catalog'
+      ? 'Aponte a câmera do seu celular para ver os produtos e pedir'
+      : config.type === 'pix'
+      ? 'Aponte a câmera no app do seu banco para pagar com PIX'
+      : config.type === 'wifi'
+      ? 'Aponte a câmera do celular para conectar no Wi-Fi automaticamente'
+      : config.type === 'whatsapp'
+      ? 'Aponte a câmera para falar diretamente conosco no WhatsApp'
+      : config.type === 'google_reviews'
+      ? 'Sua opinião vale muito! Escaneie e avalie nosso atendimento'
+      : config.type === 'instagram'
+      ? 'Escaneie para seguir nosso perfil e acompanhar as novidades'
+      : config.type === 'vcard'
+      ? 'Escaneie para salvar nosso contato na agenda do seu celular'
+      : config.type === 'url'
+      ? 'Aponte a câmera do celular para abrir o link oficial'
+      : 'Aponte a câmera do seu celular para ver o cardápio e pedir';
+
+  const subtitle2 =
+    config.type === 'pix'
+      ? 'Pague com rapidez direto pela câmera'
+      : config.type === 'catalog'
+      ? 'Confira fotos, preços e faça seu pedido pelo WhatsApp'
+      : 'Confira nossas opções, promoções e novidades';
+
+  const numberLabel = config.type === 'catalog' ? 'BALCÃO' : 'MESA';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
@@ -136,7 +186,7 @@ export default function TableTentModal({
 
                 {showTableNumbers && (
                   <span className="absolute top-2 right-2 bg-slate-900 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
-                    MESA {t1}
+                    {numberLabel} {t1}
                   </span>
                 )}
 
@@ -145,7 +195,7 @@ export default function TableTentModal({
                   className="px-3 py-1 rounded-full text-white text-[11px] font-bold uppercase tracking-wider mb-3 mt-2 shadow-sm"
                   style={{ backgroundColor: config.frameColor || '#16a34a' }}
                 >
-                  {config.frameText || 'CARDÁPIO DIGITAL'}
+                  {topLabel1}
                 </div>
 
                 {/* Brand Title */}
@@ -153,7 +203,7 @@ export default function TableTentModal({
                   {config.title || 'Seja Bem-vindo!'}
                 </h4>
                 <p className="text-xs text-slate-500 max-w-[200px] mb-4">
-                  Aponte a câmera do seu celular para ver o cardápio e pedir
+                  {subtitle1}
                 </p>
 
                 {/* High-res QR Code */}
@@ -196,7 +246,7 @@ export default function TableTentModal({
 
                 {showTableNumbers && (
                   <span className="absolute top-2 right-2 bg-slate-900 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
-                    MESA {t2}
+                    {numberLabel} {t2}
                   </span>
                 )}
 
@@ -204,16 +254,14 @@ export default function TableTentModal({
                   className="px-3 py-1 rounded-full text-white text-[11px] font-bold uppercase tracking-wider mb-3 mt-2 shadow-sm"
                   style={{ backgroundColor: config.frameColor || '#16a34a' }}
                 >
-                  {config.type === 'pix' ? 'PAGAMENTO PIX' : 'PEÇA NA MESA'}
+                  {topLabel2}
                 </div>
 
                 <h4 className="text-lg font-extrabold text-slate-900 tracking-tight mb-1">
                   {config.title || 'Seja Bem-vindo!'}
                 </h4>
                 <p className="text-xs text-slate-500 max-w-[200px] mb-4">
-                  {config.type === 'pix'
-                    ? 'Pague sua conta sem esperar o garçom'
-                    : 'Confira nossas opções, promoções e novidades'}
+                  {subtitle2}
                 </p>
 
                 <div className="bg-white p-3 rounded-2xl shadow-md border border-slate-100 mb-4">

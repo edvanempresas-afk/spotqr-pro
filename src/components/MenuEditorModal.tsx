@@ -7,6 +7,7 @@ import {
   Trash2,
   Save,
   Utensils,
+  ShoppingBag,
   Sparkles,
   Check,
   Image as ImageIcon,
@@ -25,6 +26,7 @@ interface MenuEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   slug: string;
+  mode?: 'menu' | 'catalog';
   onSaved?: () => void;
 }
 
@@ -55,10 +57,18 @@ const FOOD_IMAGE_PRESETS = [
   },
 ];
 
+const CATALOG_IMAGE_PRESETS = [
+  { label: '🖨️ 3D', url: '/catalogo/prod-3d.jpg' },
+  { label: '👕 Moda', url: '/catalogo/prod-roupa.jpg' },
+  { label: '🧶 Artesanato', url: '/catalogo/prod-artesanato.jpg' },
+  { label: '🕯️ Presente', url: '/catalogo/prod-vela.jpg' },
+];
+
 export default function MenuEditorModal({
   isOpen,
   onClose,
   slug,
+  mode = 'menu',
   onSaved,
 }: MenuEditorModalProps) {
   const [menu, setMenu] = useState<RestaurantMenu | null>(null);
@@ -68,19 +78,22 @@ export default function MenuEditorModal({
   const [activeTab, setActiveTab] = useState<'info' | 'categories' | 'items'>('items');
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  const isCatalog = (menu?.mode || mode) === 'catalog';
+  const activePresets = isCatalog ? CATALOG_IMAGE_PRESETS : FOOD_IMAGE_PRESETS;
+
   useEffect(() => {
     if (!isOpen || !slug) return;
     setLoading(true);
-    fetch(`/api/cardapio?slug=${slug}`)
+    fetch(`/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${mode}`)
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
           setMenu(data);
         }
       })
-      .catch((err) => console.error('Error loading menu for editor:', err))
+      .catch((err) => console.error('Error loading showcase for editor:', err))
       .finally(() => setLoading(false));
-  }, [isOpen, slug]);
+  }, [isOpen, slug, mode]);
 
   if (!isOpen) return null;
 
@@ -89,10 +102,14 @@ export default function MenuEditorModal({
     setSaving(true);
     setSavedSuccess(false);
     try {
+      const payload: RestaurantMenu = {
+        ...menu,
+        mode: menu.mode || mode,
+      };
       const res = await fetch('/api/cardapio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(menu),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setSavedSuccess(true);
@@ -136,11 +153,13 @@ export default function MenuEditorModal({
     const defaultCat = menu.categories[0]?.id || 'cat-1';
     const newItem: MenuItem = {
       id: `item-${Date.now()}`,
-      name: 'Novo Prato ou Bebida',
-      description: 'Descrição saborosa dos ingredientes e acompanhamento.',
-      price: 29.9,
+      name: isCatalog ? 'Novo Produto da Loja' : 'Novo Prato ou Bebida',
+      description: isCatalog
+        ? 'Informe detalhes como material, tamanhos, cores disponíveis ou personalização.'
+        : 'Descrição saborosa dos ingredientes e acompanhamento.',
+      price: isCatalog ? 59.9 : 29.9,
       category: defaultCat,
-      imageUrl: FOOD_IMAGE_PRESETS[0].url,
+      imageUrl: activePresets[0].url,
       badge: 'Novo',
       isAvailable: true,
     };
@@ -173,11 +192,18 @@ export default function MenuEditorModal({
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-800 bg-[#0d1320]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-              <Utensils className="w-5 h-5" />
+              {isCatalog ? (
+                <ShoppingBag className="w-5 h-5" />
+              ) : (
+                <Utensils className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-extrabold text-white">
-                Editor de Cardápio Digital: <span className="text-emerald-400">/{slug}</span>
+                {isCatalog
+                  ? 'Editor de Catálogo Digital:'
+                  : 'Editor de Cardápio Digital:'}{' '}
+                <span className="text-emerald-400">/{slug}</span>
               </h3>
               <p className="text-xs text-slate-400">
                 Altere preços, fotos, categorias ou pause produtos esgotados em tempo real.
@@ -187,7 +213,7 @@ export default function MenuEditorModal({
 
           <div className="flex items-center gap-2">
             <a
-              href={`/cardapio/${slug}`}
+              href={`/${isCatalog ? 'catalogo' : 'cardapio'}/${slug}`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
@@ -226,9 +252,19 @@ export default function MenuEditorModal({
         {/* Navigation Sub-Tabs */}
         <div className="flex border-b border-slate-800 px-6 bg-slate-900/60 gap-4 overflow-x-auto">
           {[
-            { id: 'items', label: `🍔 Pratos & Produtos (${menu?.items.length || 0})` },
+            {
+              id: 'items',
+              label: isCatalog
+                ? `🛍️ Produtos (${menu?.items.length || 0})`
+                : `🍔 Pratos & Produtos (${menu?.items.length || 0})`,
+            },
             { id: 'categories', label: `📂 Categorias (${menu?.categories.length || 0})` },
-            { id: 'info', label: '⚙️ Dados do Restaurante, WhatsApp & PIX' },
+            {
+              id: 'info',
+              label: isCatalog
+                ? '⚙️ Dados da Loja, WhatsApp & PIX'
+                : '⚙️ Dados do Restaurante, WhatsApp & PIX',
+            },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -248,7 +284,9 @@ export default function MenuEditorModal({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading || !menu ? (
             <div className="py-20 text-center text-slate-400 text-xs">
-              Carregando editor de cardápio...
+              {isCatalog
+                ? 'Carregando editor de catálogo...'
+                : 'Carregando editor de cardápio...'}
             </div>
           ) : (
             <>
@@ -282,15 +320,12 @@ export default function MenuEditorModal({
                           {/* Image preview */}
                           <div className="md:col-span-2 flex flex-col items-center gap-2">
                             <img
-                              src={
-                                item.imageUrl ||
-                                'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&auto=format&fit=crop&q=80'
-                              }
+                              src={item.imageUrl || activePresets[0].url}
                               alt={item.name}
                               className="w-20 h-20 object-cover rounded-xl border border-slate-700"
                             />
                             <div className="flex flex-wrap gap-1 justify-center">
-                              {FOOD_IMAGE_PRESETS.slice(0, 3).map((preset) => (
+                              {activePresets.slice(0, 4).map((preset) => (
                                 <button
                                   key={preset.label}
                                   type="button"
@@ -310,7 +345,7 @@ export default function MenuEditorModal({
                           <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div className="sm:col-span-2">
                               <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Nome do Prato / Produto:
+                                {isCatalog ? 'Nome do Produto:' : 'Nome do Prato / Produto:'}
                               </label>
                               <input
                                 type="text"
@@ -341,7 +376,9 @@ export default function MenuEditorModal({
 
                             <div className="sm:col-span-3">
                               <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Descrição e Ingredientes:
+                                {isCatalog
+                                  ? 'Descrição, Tamanhos, Cores ou Material:'
+                                  : 'Descrição e Ingredientes:'}
                               </label>
                               <input
                                 type="text"
@@ -389,10 +426,18 @@ export default function MenuEditorModal({
                               >
                                 <option value="">Sem selo</option>
                                 <option value="Mais Vendido">🔥 Mais Vendido</option>
-                                <option value="Chef Especial">⭐ Chef Especial</option>
                                 <option value="Promoção">💸 Promoção</option>
                                 <option value="Novo">✨ Novo</option>
-                                <option value="Vegetariano">🌿 Vegetariano</option>
+                                <option value="Pronta Entrega">📦 Pronta Entrega</option>
+                                <option value="Sob Encomenda">🛠️ Sob Encomenda</option>
+                                <option value="Feito à Mão">🧶 Feito à Mão</option>
+                                <option value="Exclusivo">💎 Exclusivo</option>
+                                {!isCatalog && (
+                                  <>
+                                    <option value="Chef Especial">⭐ Chef Especial</option>
+                                    <option value="Vegetariano">🌿 Vegetariano</option>
+                                  </>
+                                )}
                               </select>
                             </div>
 
@@ -454,7 +499,11 @@ export default function MenuEditorModal({
                       type="text"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Ex: 🍕 Pizzas Artesanais"
+                      placeholder={
+                        isCatalog
+                          ? 'Ex: 🖨️ Impressões 3D • 👕 Camisetas'
+                          : 'Ex: 🍕 Pizzas Artesanais'
+                      }
                       className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white"
                     />
                     <button
@@ -497,12 +546,49 @@ export default function MenuEditorModal({
                 </div>
               )}
 
-              {/* TAB 3: RESTAURANT INFO & WHATSAPP/PIX */}
+              {/* TAB 3: INFO & WHATSAPP/PIX */}
               {activeTab === 'info' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
+                  <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        Formato da Vitrine Digital
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {isCatalog
+                          ? 'Catálogo de Produtos (Roupas, Artesanato, 3D e Lojas)'
+                          : 'Cardápio Digital (Restaurantes, Bares e Delivery)'}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMenu({ ...menu, mode: 'menu' })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          !isCatalog
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        🍔 Cardápio
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMenu({ ...menu, mode: 'catalog' })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                          isCatalog
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        🛍️ Catálogo / Loja
+                      </button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Nome do Restaurante:
+                      {isCatalog ? 'Nome da Loja / Marca:' : 'Nome do Restaurante:'}
                     </label>
                     <input
                       type="text"
@@ -543,7 +629,9 @@ export default function MenuEditorModal({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Chave PIX (Para pagamento da conta na mesa):
+                      {isCatalog
+                        ? 'Chave PIX (Para recebimento de pedidos):'
+                        : 'Chave PIX (Para pagamento da conta na mesa):'}
                     </label>
                     <input
                       type="text"
@@ -556,7 +644,7 @@ export default function MenuEditorModal({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Horário de Funcionamento:
+                      Horário de Atendimento:
                     </label>
                     <input
                       type="text"
@@ -564,14 +652,16 @@ export default function MenuEditorModal({
                       onChange={(e) =>
                         setMenu({ ...menu, openingHours: e.target.value })
                       }
-                      placeholder="Ter a Dom • 18h às 23h30"
+                      placeholder={
+                        isCatalog ? 'Seg a Sáb • 09h às 19h' : 'Ter a Dom • 18h às 23h30'
+                      }
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
                     />
                   </div>
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Endereço do Estabelecimento:
+                      {isCatalog ? 'Localização / Cidade:' : 'Endereço do Estabelecimento:'}
                     </label>
                     <input
                       type="text"
@@ -583,7 +673,7 @@ export default function MenuEditorModal({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Wi-Fi para Clientes (Rede e Senha):
+                      Wi-Fi para Clientes (opcional):
                     </label>
                     <input
                       type="text"
@@ -596,7 +686,7 @@ export default function MenuEditorModal({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      Taxa de Entrega Delivery (R$):
+                      {isCatalog ? 'Taxa de Entrega / Frete Fixo (R$):' : 'Taxa de Entrega Delivery (R$):'}
                     </label>
                     <input
                       type="number"
@@ -615,7 +705,7 @@ export default function MenuEditorModal({
                   <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
                     <div>
                       <span className="text-xs font-bold text-white block">
-                        Status da Cozinha / Loja
+                        {isCatalog ? 'Status da Loja' : 'Status da Cozinha / Loja'}
                       </span>
                       <span className="text-[11px] text-slate-400">
                         {menu.isOpen !== false

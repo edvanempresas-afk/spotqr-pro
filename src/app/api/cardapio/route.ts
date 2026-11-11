@@ -14,21 +14,24 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
+  const modeParam = searchParams.get('mode') === 'catalog' ? 'catalog' : 'menu';
 
   if (!slug) {
     return NextResponse.json({ error: 'Slug é obrigatório' }, { status: 400 });
   }
 
-  const menu = getMenuBySlug(slug);
+  const menu = getMenuBySlug(slug, modeParam);
   if (!menu) {
     return NextResponse.json(
-      { error: 'Cardápio não encontrado' },
+      { error: 'Cardápio ou catálogo não encontrado' },
       { status: 404 }
     );
   }
 
   const qr = getDynamicQRBySlug(slug);
-  const isPaid = Boolean(qr?.isPaid || slug === 'demo-restaurante');
+  const isPaid = Boolean(
+    qr?.isPaid || slug === 'demo-restaurante' || slug === 'demo-catalogo'
+  );
 
   return NextResponse.json({
     ...menu,
@@ -65,8 +68,10 @@ export async function POST(request: NextRequest) {
       .trim()
       .replace(/[^a-z0-9_-]/g, '-');
 
+    const isCatalog = body.mode === 'catalog';
     const updatedMenu: RestaurantMenu = {
       ...body,
+      mode: isCatalog ? 'catalog' : 'menu',
       slug: cleanSlug,
       ownerId: clientUser?.id || body.ownerId,
       ownerEmail: clientUser?.email || body.ownerEmail,
@@ -77,12 +82,14 @@ export async function POST(request: NextRequest) {
 
     // Ensure a corresponding DynamicQRRecord exists and is linked to this client!
     const existingQR = getDynamicQRBySlug(cleanSlug);
+    const qrType = isCatalog ? 'catalog' : 'menu';
+    const routePrefix = isCatalog ? '/catalogo/' : '/cardapio/';
     const qrRecord: DynamicQRRecord = {
       id: existingQR?.id || `qr_${Date.now()}`,
       slug: cleanSlug,
       title: body.title,
-      targetUrl: existingQR?.targetUrl || `/cardapio/${cleanSlug}`,
-      type: 'menu',
+      targetUrl: existingQR?.targetUrl || `${routePrefix}${cleanSlug}`,
+      type: existingQR?.type === 'catalog' || isCatalog ? 'catalog' : qrType,
       createdAt: existingQR?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       scansCount: existingQR?.scansCount || 0,
@@ -96,7 +103,8 @@ export async function POST(request: NextRequest) {
         cornerColor: body.themeColor || '#16a34a',
         dotStyle: 'rounded',
         frameStyle: 'table_tent',
-        frameText: 'CARDÁPIO NA MESA',
+        frameTopText: isCatalog ? '🛍️ CATÁLOGO DIGITAL' : '📱 CARDÁPIO NA MESA',
+        frameText: isCatalog ? 'VER PRODUTOS & PEDIR' : 'VER CARDÁPIO & PEDIR',
         frameColor: body.themeColor || '#16a34a',
         frameTextColor: '#ffffff',
       },

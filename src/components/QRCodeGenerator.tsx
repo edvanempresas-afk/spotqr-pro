@@ -7,6 +7,7 @@ import {
   QrCode as QrCodeIcon,
   Wifi,
   UtensilsCrossed,
+  ShoppingBag,
   Star,
   Sparkles,
   Palette,
@@ -20,9 +21,11 @@ import {
   Edit3,
   Lock,
   Check,
+  ExternalLink,
 } from 'lucide-react';
 import { QRConfig, QRType, QRStyle, FrameStyle } from '@/lib/types';
 import { generatePixPayload } from '@/lib/pix-brcode';
+import { getDefaultFrameTexts } from '@/lib/qr-canvas';
 import QRPreview from './QRPreview';
 import PixCheckoutModal from './PixCheckoutModal';
 import MenuEditorModal from './MenuEditorModal';
@@ -42,6 +45,8 @@ const makeSvgDataUri = (bg: string, emojiOrText: string) =>
 
 const PRESET_LOGOS = [
   { label: '🍔 Burger / Menu', url: makeSvgDataUri('#16a34a', '🍔') },
+  { label: '🛍️ Loja / Catálogo', url: makeSvgDataUri('#10b981', '🛍️') },
+  { label: '🖨️ 3D & Tech', url: makeSvgDataUri('#6366f1', '🖨️') },
   { label: '💸 PIX Oficial', url: makeSvgDataUri('#0d9488', '💠') },
   { label: '💬 WhatsApp', url: makeSvgDataUri('#25d366', '💬') },
   { label: '📶 Wi-Fi VIP', url: makeSvgDataUri('#0284c7', '📶') },
@@ -164,7 +169,8 @@ export default function QRCodeGenerator() {
     logoSize: 22,
 
     frameStyle: 'table_tent',
-    frameText: 'CARDÁPIO NA MESA',
+    frameTopText: '📱 CARDÁPIO NA MESA',
+    frameText: 'VER CARDÁPIO & PEDIR',
     frameColor: '#16a34a',
     frameTextColor: '#ffffff',
 
@@ -222,6 +228,12 @@ export default function QRCodeGenerator() {
       case 'menu': {
         return `${baseOrigin}/cardapio/${
           config.dynamicSlug || 'demo-restaurante'
+        }`;
+      }
+
+      case 'catalog': {
+        return `${baseOrigin}/catalogo/${
+          config.dynamicSlug || 'demo-catalogo'
         }`;
       }
 
@@ -308,7 +320,9 @@ export default function QRCodeGenerator() {
     const userToUse = activeUser || clientUser;
     setIsSubmitting(true);
     try {
-      const slug = (config.dynamicSlug || 'meu-restaurante')
+      const defaultSlug =
+        config.type === 'catalog' ? 'minha-loja' : 'meu-restaurante';
+      const slug = (config.dynamicSlug || defaultSlug)
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, '-');
 
@@ -317,11 +331,11 @@ export default function QRCodeGenerator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          email: userToUse?.email || 'dono@restaurante.com.br',
+          email: userToUse?.email || 'cliente@spotqr.com.br',
           name:
             userToUse?.name ||
             config.title ||
-            'Dono do Restaurante',
+            'Cliente SpotQR Pro',
           title:
             config.title ||
             userToUse?.businessName ||
@@ -393,27 +407,36 @@ export default function QRCodeGenerator() {
           </p>
         </div>
 
-        {/* Studio Grid: Controls (Left) + Live Preview (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Controls Column */}
-          <div className="lg:col-span-7">
-            <div className="bg-[#101726]/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-              {/* Top QR Type Selector (8 Types) */}
+        {/* Studio Grid: Controls (Order 1 Mobile / Left Top Desktop) + Live Preview (Order 2 Mobile / Right Sticky Desktop) + PRO & Video Ad (Order 3 Mobile / Left Bottom Desktop) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+          {/* BLOCK 1: Main Controls Card */}
+          <div className="order-1 lg:col-span-7 lg:col-start-1 lg:row-start-1">
+            <div className="bg-[#101726]/90 border border-slate-700/80 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-xl">
+              {/* Top QR Type Selector (9 Types including Catálogo Não-Alimentício!) */}
             <div className="mb-6">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 block">
                 1. Escolha o Tipo de Solução:
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {[
                   {
                     id: 'menu',
                     label: 'Cardápio Digital',
+                    sub: 'Alimentação & Mesas',
                     icon: UtensilsCrossed,
                     badge: 'Top #1',
                   },
                   {
+                    id: 'catalog',
+                    label: 'Catálogo / Loja',
+                    sub: 'Roupas, 3D & Artesanato',
+                    icon: ShoppingBag,
+                    badge: 'Novo',
+                  },
+                  {
                     id: 'pix',
                     label: 'PIX Oficial',
+                    sub: 'QR Banco Central',
                     icon: QrCodeIcon,
                     badge: 'Taxa 0%',
                   },
@@ -422,7 +445,7 @@ export default function QRCodeGenerator() {
                     label: 'WhatsApp',
                     icon: MessageCircle,
                   },
-                  { id: 'wifi', label: 'Wi-Fi Mesa', icon: Wifi },
+                  { id: 'wifi', label: 'Wi-Fi Clientes', icon: Wifi },
                   { id: 'url', label: 'Site / Link', icon: LinkIcon },
                   {
                     id: 'google_reviews',
@@ -438,54 +461,84 @@ export default function QRCodeGenerator() {
                     id: 'vcard',
                     label: 'Cartão vCard',
                     icon: UserCheck,
-                    badge: 'Novo',
                   },
-                ].map((item) => {
+                ].map((item, idx) => {
                   const Icon = item.icon;
                   const isSelected = config.type === item.id;
+                  const isLastOddMobile = idx === 8;
                   return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => {
-                        setConfig((prev) => ({
-                          ...prev,
-                          type: item.id as QRType,
-                          frameText:
-                            item.id === 'menu'
-                              ? 'CARDÁPIO NA MESA'
-                              : item.id === 'pix'
-                              ? 'PAGUE COM PIX'
-                              : item.id === 'wifi'
-                              ? 'NOSSO WI-FI'
-                              : item.id === 'google_reviews'
-                              ? 'AVALIE NO GOOGLE'
-                              : item.id === 'instagram'
-                              ? 'SIGA NO INSTAGRAM'
-                              : item.id === 'vcard'
-                              ? 'SALVAR CONTATO'
-                              : 'ESCANEIE AQUI',
-                        }));
+                        const nextType = item.id as QRType;
+                        const defaults = getDefaultFrameTexts(nextType);
+                        setConfig((prev) => {
+                          let nextSlug = prev.dynamicSlug;
+                          let nextTitle = prev.title;
+                          let nextWhatsappMsg = prev.whatsappMessage;
+
+                          if (nextType === 'catalog') {
+                            if (!nextSlug || nextSlug === 'demo-restaurante') {
+                              nextSlug = 'demo-catalogo';
+                            }
+                            if (!nextTitle || nextTitle === 'Smash & Grill Burger') {
+                              nextTitle = 'Studio Criativo & Loja';
+                            }
+                            nextWhatsappMsg =
+                              'Olá! Gostaria de ver os produtos e fazer um pedido.';
+                          } else if (nextType === 'menu') {
+                            if (!nextSlug || nextSlug === 'demo-catalogo') {
+                              nextSlug = 'demo-restaurante';
+                            }
+                            if (!nextTitle || nextTitle === 'Studio Criativo & Loja') {
+                              nextTitle = 'Smash & Grill Burger';
+                            }
+                            nextWhatsappMsg =
+                              'Olá! Gostaria de ver o cardápio e fazer um pedido.';
+                          }
+
+                          return {
+                            ...prev,
+                            type: nextType,
+                            dynamicSlug: nextSlug,
+                            title: nextTitle,
+                            whatsappMessage: nextWhatsappMsg,
+                            frameTopText: defaults.topText,
+                            frameText: defaults.bottomText,
+                          };
+                        });
                       }}
                       className={`relative flex flex-col items-center justify-center p-3 rounded-2xl border text-center transition-all ${
+                        isLastOddMobile ? 'col-span-2 sm:col-span-1' : ''
+                      } ${
                         isSelected
                           ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-glow'
                           : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                       }`}
                     >
                       {item.badge && (
-                        <span className="absolute -top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500 text-white uppercase tracking-wider">
+                        <span
+                          className={`absolute -top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white uppercase tracking-wider ${
+                            item.id === 'catalog' ? 'bg-amber-500 text-slate-950' : 'bg-emerald-500'
+                          }`}
+                        >
                           {item.badge}
                         </span>
                       )}
                       <Icon
-                        className={`w-5 h-5 mb-1.5 ${
+                        className={`w-5 h-5 mb-1 ${
                           isSelected ? 'text-emerald-400' : 'text-slate-400'
                         }`}
                       />
                       <span className="text-xs font-semibold leading-tight">
                         {item.label}
                       </span>
+                      {'sub' in item && item.sub && (
+                        <span className="text-[10px] text-slate-400 leading-tight mt-0.5 line-clamp-1">
+                          {item.sub}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -544,89 +597,129 @@ export default function QRCodeGenerator() {
             {/* TAB 1: Content Fields */}
             {activeTab === 'content' && (
               <div className="space-y-4 animate-fade-in">
-                {config.type === 'menu' && (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="text-xs text-slate-300">
-                        <p className="font-bold text-emerald-400 mb-0.5">
-                          🍔 Cardápio Digital com Pedidos no WhatsApp
-                        </p>
-                        <p>
-                          Inclui carrinho, opção Na Mesa / Delivery, botão Chamar
-                          Garçom e pagamento PIX.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleOpenMenuEditorWithAuth}
-                        className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-glow"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>Editar Pratos & Preços</span>
-                      </button>
-                    </div>
+                {(config.type === 'menu' || config.type === 'catalog') && (() => {
+                  const isCatalog = config.type === 'catalog';
+                  const currentSlug =
+                    config.dynamicSlug ||
+                    (isCatalog ? 'demo-catalogo' : 'demo-restaurante');
+                  const routeSeg = isCatalog ? 'catalogo' : 'cardapio';
+                  const livePath = `/${routeSeg}/${currentSlug}`;
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  return (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="text-xs text-slate-300">
+                          <p className="font-bold text-emerald-400 mb-0.5">
+                            {isCatalog
+                              ? '🛍️ Catálogo Digital de Produtos (Sem Taxas)'
+                              : '🍔 Cardápio Digital com Pedidos no WhatsApp'}
+                          </p>
+                          <p>
+                            {isCatalog
+                              ? 'Ideal para roupas, artesanato, impressões 3D e comércios. Com fotos, carrinho, entrega/retirada e PIX.'
+                              : 'Inclui carrinho, opção Na Mesa / Delivery, botão Chamar Garçom e pagamento PIX.'}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 w-full sm:w-auto">
+                          <button
+                            type="button"
+                            onClick={handleOpenMenuEditorWithAuth}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-glow"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>
+                              {isCatalog
+                                ? 'Editar Produtos & Preços'
+                                : 'Editar Pratos & Preços'}
+                            </span>
+                          </button>
+                          <a
+                            href={livePath}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition"
+                            title={
+                              isCatalog
+                                ? 'Abrir Catálogo ao Vivo'
+                                : 'Abrir Cardápio ao Vivo'
+                            }
+                          >
+                            <span>Abrir</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                          </a>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-semibold text-slate-300 block mb-1">
+                            {isCatalog
+                              ? 'Nome da Loja / Marca / Ateliê:'
+                              : 'Nome do Restaurante / Bar:'}
+                          </label>
+                          <input
+                            type="text"
+                            value={config.title}
+                            onChange={(e) =>
+                              setConfig({ ...config, title: e.target.value })
+                            }
+                            placeholder={
+                              isCatalog
+                                ? 'Ex: Studio 3D & Artesanato'
+                                : 'Ex: Smash & Grill Burger'
+                            }
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-semibold text-slate-300 block mb-1">
+                            WhatsApp para Receber Pedidos:
+                          </label>
+                          <input
+                            type="text"
+                            value={config.whatsappPhone}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                whatsappPhone: e.target.value,
+                              })
+                            }
+                            placeholder="5511999998888"
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-xs font-semibold text-slate-300 block mb-1">
-                          Nome do Restaurante / Bar:
+                          {isCatalog
+                            ? 'Endereço Personalizado do Catálogo:'
+                            : 'Endereço Personalizado do Cardápio:'}
                         </label>
-                        <input
-                          type="text"
-                          value={config.title}
-                          onChange={(e) =>
-                            setConfig({ ...config, title: e.target.value })
-                          }
-                          placeholder="Ex: Smash & Grill Burger"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-semibold text-slate-300 block mb-1">
-                          WhatsApp para Receber Pedidos:
-                        </label>
-                        <input
-                          type="text"
-                          value={config.whatsappPhone}
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              whatsappPhone: e.target.value,
-                            })
-                          }
-                          placeholder="5511999998888"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
-                        />
+                        <div className="flex items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-400">
+                          <span className="text-xs text-slate-500 mr-1 shrink-0">
+                            spotqr.com.br/{routeSeg}/
+                          </span>
+                          <input
+                            type="text"
+                            value={config.dynamicSlug}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                dynamicSlug: e.target.value
+                                  .toLowerCase()
+                                  .replace(/[^a-z0-9_-]/g, '-'),
+                              })
+                            }
+                            placeholder={isCatalog ? 'minha-loja' : 'meu-restaurante'}
+                            className="bg-transparent text-emerald-400 font-bold text-sm outline-none flex-1 min-w-0 font-mono"
+                          />
+                        </div>
                       </div>
                     </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Endereço Personalizado do Cardápio:
-                      </label>
-                      <div className="flex items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-400">
-                        <span className="text-xs text-slate-500 mr-1">
-                          spotqr.pro/cardapio/
-                        </span>
-                        <input
-                          type="text"
-                          value={config.dynamicSlug}
-                          onChange={(e) =>
-                            setConfig({
-                              ...config,
-                              dynamicSlug: e.target.value
-                                .toLowerCase()
-                                .replace(/[^a-z0-9_-]/g, '-'),
-                            })
-                          }
-                          placeholder="meu-restaurante"
-                          className="bg-transparent text-emerald-400 font-bold text-sm outline-none flex-1 font-mono"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {config.type === 'pix' && (
                   <div className="space-y-4">
@@ -1241,7 +1334,7 @@ export default function QRCodeGenerator() {
                     {[
                       {
                         id: 'table_tent',
-                        label: 'Display de Mesa (Restaurante)',
+                        label: 'Display c/ Cabeçalho',
                       },
                       { id: 'bottom_tag', label: 'Etiqueta Inferior (Pill)' },
                       { id: 'polaroid', label: 'Card Moderno' },
@@ -1272,9 +1365,34 @@ export default function QRCodeGenerator() {
 
                 {config.frameStyle !== 'none' && (
                   <div className="space-y-4">
+                    {(config.frameStyle === 'table_tent' ||
+                      config.frameStyle === 'polaroid' ||
+                      config.frameStyle === 'badge') && (
+                      <div>
+                        <label className="text-xs font-semibold text-slate-300 block mb-1">
+                          Título Superior (Em cima do QR Code):
+                        </label>
+                        <input
+                          type="text"
+                          value={
+                            config.frameTopText ??
+                            getDefaultFrameTexts(config.type).topText
+                          }
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              frameTopText: e.target.value,
+                            })
+                          }
+                          placeholder="Ex: PAGAMENTO PIX ou CATÁLOGO DIGITAL"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Texto da Moldura (Call To Action):
+                        Texto Inferior da Moldura (Call To Action):
                       </label>
                       <input
                         type="text"
@@ -1336,9 +1454,24 @@ export default function QRCodeGenerator() {
                 )}
               </div>
             )}
+            </div>
+          </div>
 
+          {/* BLOCK 2: Live Preview Column (IMMEDIATELY below Controls on Mobile, Sticky Right Column on Desktop!) */}
+          <div className="order-2 lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
+            <QRPreview
+              config={config}
+              targetContent={targetContent}
+              onUpgradeToPro={() => {
+                handleInitiateProCheckout();
+              }}
+            />
+          </div>
+
+          {/* BLOCK 3: PRO Upgrade Box + Video Ad (Below QR Preview on Mobile, Left Column Below Controls on Desktop!) */}
+          <div className="order-3 lg:col-span-7 lg:col-start-1 lg:row-start-2 space-y-6">
             {/* DYNAMIC QR + LOGO IN CENTER PRO BOX - The Core Monetization Trigger */}
-            <div className="mt-8 pt-6 border-t border-slate-800">
+            <div className="bg-[#101726]/90 border border-slate-700/80 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl">
               <div
                 className={`p-5 rounded-2xl border transition-all ${
                   isProPurchased
@@ -1366,7 +1499,7 @@ export default function QRCodeGenerator() {
                       </strong>{' '}
                       e permite{' '}
                       <strong className="text-slate-200">
-                        mudar o link de destino ou cardápio
+                        mudar o link de destino, catálogo ou cardápio
                       </strong>{' '}
                       a qualquer momento sem precisar reimprimir adesivos.
                     </p>
@@ -1427,24 +1560,12 @@ export default function QRCodeGenerator() {
                 )}
               </div>
             </div>
-            </div>
 
-            {/* STRATEGIC LARGE VIDEO AD IN THE LEFT COLUMN SPACE (Screenshot 3) */}
+            {/* STRATEGIC LARGE VIDEO AD */}
             <AdBanner
               format="video-ad"
               isPro={isProPurchased}
               onUpgradeClick={handleInitiateProCheckout}
-            />
-          </div>
-
-          {/* Live Preview Column (Sticky on Desktop) */}
-          <div className="lg:col-span-5 sticky top-24">
-            <QRPreview
-              config={config}
-              targetContent={targetContent}
-              onUpgradeToPro={() => {
-                handleInitiateProCheckout();
-              }}
             />
           </div>
         </div>
@@ -1463,19 +1584,26 @@ export default function QRCodeGenerator() {
       <PixCheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
-        slug={config.dynamicSlug || 'meu-restaurante'}
+        slug={
+          config.dynamicSlug ||
+          (config.type === 'catalog' ? 'minha-loja' : 'meu-restaurante')
+        }
         paymentData={paymentData}
         onPaymentSuccess={handlePaymentSuccess}
       />
 
-      {/* Visual Menu Editor Modal */}
+      {/* Visual Menu / Catalog Editor Modal */}
       <MenuEditorModal
         isOpen={isMenuEditorOpen}
         onClose={() => setIsMenuEditorOpen(false)}
-        slug={config.dynamicSlug || 'demo-restaurante'}
+        slug={
+          config.dynamicSlug ||
+          (config.type === 'catalog' ? 'demo-catalogo' : 'demo-restaurante')
+        }
+        mode={config.type === 'catalog' ? 'catalog' : 'menu'}
       />
 
-      {/* Client Registration / Login Modal before saving Menu or activating PRO */}
+      {/* Client Registration / Login Modal before saving Showcase or activating PRO */}
       <ClientAuthModal
         isOpen={isAuthModalOpen}
         onClose={() => {
@@ -1486,7 +1614,7 @@ export default function QRCodeGenerator() {
         defaultWhatsapp={config.whatsappPhone}
         contextMessage={
           pendingAuthAction === 'menu'
-            ? 'Crie seu login e senha grátis para salvar seu Cardápio Digital e poder alterar seus pratos e preços a qualquer hora.'
+            ? 'Crie seu login e senha grátis para salvar seu Cardápio ou Catálogo Digital e alterar itens e preços a qualquer hora.'
             : 'Crie seu login e senha de cliente para vincular seu QR Code Dinâmico PRO (R$ 10,90) à sua conta exclusiva.'
         }
         onAuthSuccess={(user) => {

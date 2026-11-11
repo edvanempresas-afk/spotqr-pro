@@ -4,6 +4,7 @@ export type QRType =
   | 'pix'
   | 'wifi'
   | 'menu'
+  | 'catalog'
   | 'google_reviews'
   | 'vcard'
   | 'instagram';
@@ -52,6 +53,7 @@ export interface QRConfig {
 
   // Frame
   frameStyle: FrameStyle;
+  frameTopText?: string;
   frameText: string;
   frameColor: string;
   frameTextColor: string;
@@ -82,6 +84,7 @@ export interface MenuCategory {
 export interface RestaurantMenu {
   id: string;
   slug: string;
+  mode?: 'menu' | 'catalog';
   title: string;
   description: string;
   whatsappNumber: string;

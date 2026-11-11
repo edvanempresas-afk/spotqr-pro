@@ -19,6 +19,7 @@ import {
   Check,
   ArrowRight,
   Utensils,
+  ShoppingBag,
   PlusCircle,
   Copy,
   Lock,
@@ -30,7 +31,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { DynamicQRRecord, QRConfig } from '@/lib/types';
-import { renderStyledQR } from '@/lib/qr-canvas';
+import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -50,8 +51,11 @@ export default function DashboardPage() {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [creatingStarter, setCreatingStarter] = useState(false);
 
-  // Menu Editor Modal
+  // Menu / Catalog Editor Modal
   const [menuEditorSlug, setMenuEditorSlug] = useState<string | null>(null);
+  const [menuEditorMode, setMenuEditorMode] = useState<'menu' | 'catalog'>(
+    'menu'
+  );
 
   // Table Tent & Download QR Modal
   const [activeTentQR, setActiveTentQR] = useState<DynamicQRRecord | null>(
@@ -127,11 +131,14 @@ export default function DashboardPage() {
     }
   }
 
-  const handleCreateStarterMenuForClient = async () => {
+  const handleCreateStarterShowcase = async (
+    mode: 'menu' | 'catalog' = 'menu'
+  ) => {
     if (!currentUser) return;
     setCreatingStarter(true);
     try {
-      const baseSlug = (currentUser.businessName || currentUser.name || 'meu-cardapio')
+      const fallbackBase = mode === 'catalog' ? 'minha-loja' : 'meu-cardapio';
+      const baseSlug = (currentUser.businessName || currentUser.name || fallbackBase)
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
@@ -144,18 +151,23 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug,
-          title: currentUser.businessName || `Cardápio de ${currentUser.name}`,
-          targetUrl: `/cardapio/${slug}`,
-          type: 'menu',
+          title:
+            currentUser.businessName ||
+            (mode === 'catalog'
+              ? `Catálogo de ${currentUser.name}`
+              : `Cardápio de ${currentUser.name}`),
+          targetUrl: `/${mode === 'catalog' ? 'catalogo' : 'cardapio'}/${slug}`,
+          type: mode,
         }),
       });
 
       if (res.ok) {
         await fetchQRs();
+        setMenuEditorMode(mode);
         setMenuEditorSlug(slug);
       }
     } catch (err) {
-      console.error('Error creating starter menu:', err);
+      console.error('Error creating starter showcase:', err);
     } finally {
       setCreatingStarter(false);
     }
@@ -184,12 +196,15 @@ export default function DashboardPage() {
   };
 
   const handleOpenMenuEditor = (qr: DynamicQRRecord) => {
+    setMenuEditorMode(qr.type === 'catalog' ? 'catalog' : 'menu');
     setMenuEditorSlug(qr.slug);
   };
 
   const buildFullConfig = (qr: DynamicQRRecord): QRConfig => {
+    const resolvedType = qr.type || 'menu';
+    const defaults = getDefaultFrameTexts(resolvedType);
     return {
-      type: qr.type || 'menu',
+      type: resolvedType,
       url: qr.targetUrl,
       whatsappPhone: currentUser?.whatsapp || '5511999998888',
       whatsappMessage: '',
@@ -210,7 +225,8 @@ export default function DashboardPage() {
       logoUrl: qr.isPaid ? qr.qrConfig?.logoUrl || '' : '',
       logoSize: qr.qrConfig?.logoSize || 22,
       frameStyle: qr.qrConfig?.frameStyle || 'table_tent',
-      frameText: qr.qrConfig?.frameText || 'CARDÁPIO NA MESA',
+      frameTopText: qr.qrConfig?.frameTopText || defaults.topText,
+      frameText: qr.qrConfig?.frameText || defaults.bottomText,
       frameColor: qr.qrConfig?.frameColor || '#16a34a',
       frameTextColor: qr.qrConfig?.frameTextColor || '#ffffff',
       isDynamic: qr.isPaid,
@@ -423,16 +439,26 @@ export default function DashboardPage() {
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={handleCreateStarterMenuForClient}
+                  onClick={() => handleCreateStarterShowcase('menu')}
                   disabled={creatingStarter}
                   className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-glow"
                 >
                   <Utensils className="w-4 h-4" />
                   <span>
                     {creatingStarter
-                      ? 'Criando Cardápio...'
-                      : '+ Criar Novo Cardápio Digital'}
+                      ? 'Criando...'
+                      : '+ Novo Cardápio'}
                   </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCreateStarterShowcase('catalog')}
+                  disabled={creatingStarter}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-glow"
+                >
+                  <ShoppingBag className="w-4 h-4" />
+                  <span>+ Novo Catálogo / Loja</span>
                 </button>
 
                 <Link
@@ -512,19 +538,30 @@ export default function DashboardPage() {
                   Clique no botão abaixo para gerar seu Cardápio Digital com
                   pratos, fotos, preços e pedidos direto no seu WhatsApp.
                 </p>
-                <button
-                  type="button"
-                  onClick={handleCreateStarterMenuForClient}
-                  disabled={creatingStarter}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold shadow-glow transition"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>
-                    {creatingStarter
-                      ? 'Criando...'
-                      : 'Criar Meu Cardápio Digital Agora'}
-                  </span>
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleCreateStarterShowcase('menu')}
+                    disabled={creatingStarter}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold shadow-glow transition"
+                  >
+                    <Utensils className="w-4 h-4" />
+                    <span>
+                      {creatingStarter
+                        ? 'Criando...'
+                        : 'Criar Cardápio (Restaurante)'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateStarterShowcase('catalog')}
+                    disabled={creatingStarter}
+                    className="inline-flex items-center gap-2 px-5 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-extrabold shadow-glow transition"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    <span>Criar Catálogo (Loja / Produtos)</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -630,25 +667,38 @@ export default function DashboardPage() {
 
                         {/* Right: Actions */}
                         <div className="flex flex-wrap items-center gap-2 shrink-0">
-                          {(qr.type === 'menu' || qr.linkedMenuId) && (
-                            <>
-                              <button
-                                onClick={() => handleOpenMenuEditor(qr)}
-                                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-sm"
-                              >
-                                <Utensils className="w-3.5 h-3.5" />
-                                <span>Editar Meu Cardápio</span>
-                              </button>
+                          {(qr.type === 'menu' || qr.type === 'catalog' || qr.linkedMenuId) && (() => {
+                            const isCat = qr.type === 'catalog';
+                            return (
+                              <>
+                                <button
+                                  onClick={() => handleOpenMenuEditor(qr)}
+                                  className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-sm"
+                                >
+                                  {isCat ? (
+                                    <ShoppingBag className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Utensils className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>
+                                    {isCat
+                                      ? 'Editar Meu Catálogo'
+                                      : 'Editar Meu Cardápio'}
+                                  </span>
+                                </button>
 
-                              <Link
-                                href={`/cardapio/${qr.slug}`}
-                                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
-                              >
-                                <span>Ver Cardápio</span>
-                                <ExternalLink className="w-3 h-3 text-emerald-400" />
-                              </Link>
-                            </>
-                          )}
+                                <Link
+                                  href={`/${isCat ? 'catalogo' : 'cardapio'}/${qr.slug}`}
+                                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
+                                >
+                                  <span>
+                                    {isCat ? 'Ver Catálogo' : 'Ver Cardápio'}
+                                  </span>
+                                  <ExternalLink className="w-3 h-3 text-emerald-400" />
+                                </Link>
+                              </>
+                            );
+                          })()}
 
                           <button
                             onClick={() =>
@@ -784,12 +834,13 @@ export default function DashboardPage() {
         }}
       />
 
-      {/* Menu Editor Modal */}
+      {/* Menu / Catalog Editor Modal */}
       {menuEditorSlug && (
         <MenuEditorModal
           isOpen={Boolean(menuEditorSlug)}
           onClose={() => setMenuEditorSlug(null)}
           slug={menuEditorSlug}
+          mode={menuEditorMode}
           onSaved={() => fetchQRs()}
         />
       )}

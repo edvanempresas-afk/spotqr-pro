@@ -70,17 +70,17 @@ export default function HomePage() {
               <span>O Segredo dos Restaurantes e Comércios Mais Lucrativos</span>
             </div>
 
-            {/* Main Headline */}
+            {/* Hero Highlight */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl mx-auto leading-tight sm:leading-none">
               QR Code Dinâmico com Logomarca &{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500">
-                Cardápio Digital Sem Taxas
+                Cardápio ou Catálogo Digital
               </span>
             </h1>
 
             {/* Sub-headline */}
             <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Crie displays sofisticados para mesas, balcões, PIX e Wi-Fi. 
+              Crie vitrines digitais para restaurantes, roupas, artesanato, impressões 3D e comércios em geral.{' '}
               <strong className="text-white"> Mude o link de destino ou os preços a qualquer hora</strong> sem nunca mais jogar dinheiro fora reimprimindo adesivos ou acrílicos.
             </p>
 
@@ -263,13 +263,20 @@ export default function HomePage() {
               className="max-w-4xl mx-auto"
             />
 
-            {/* Demo Link */}
-            <div className="mt-8 text-center">
+            {/* Demo Links (Menu + Non-Food Catalog) */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/cardapio/demo-restaurante"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition shadow-md"
               >
-                <span>Ver Demonstração ao Vivo do Cardápio</span>
+                <span>🍔 Ver Demo de Cardápio (Restaurante)</span>
+                <ArrowRight className="w-4 h-4 text-emerald-400" />
+              </Link>
+              <Link
+                href="/catalogo/demo-catalogo"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/40 transition shadow-md"
+              >
+                <span>🛍️ Ver Demo de Catálogo (Roupas, 3D & Artesanato)</span>
                 <ArrowRight className="w-4 h-4 text-emerald-400" />
               </Link>
             </div>

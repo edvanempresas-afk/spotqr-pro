@@ -21,6 +21,29 @@
         "frameTextColor": "#ffffff"
       },
       "linkedMenuId": "demo-restaurante"
+    },
+    "demo-catalogo": {
+      "id": "qr-demo-catalogo",
+      "slug": "demo-catalogo",
+      "title": "Studio Criativo & Loja (Catálogo Demonstração Visitantes)",
+      "targetUrl": "/catalogo/demo-catalogo",
+      "type": "catalog",
+      "createdAt": "2026-11-11T15:35:58.154Z",
+      "updatedAt": "2026-11-11T15:35:58.154Z",
+      "scansCount": 0,
+      "isPaid": true,
+      "linkedMenuId": "demo-catalogo",
+      "qrConfig": {
+        "fgColor": "#0f172a",
+        "bgColor": "#ffffff",
+        "cornerColor": "#10b981",
+        "dotStyle": "rounded",
+        "frameStyle": "table_tent",
+        "frameTopText": "🛍️ CATÁLOGO DIGITAL",
+        "frameText": "VER PRODUTOS & PEDIR",
+        "frameColor": "#10b981",
+        "frameTextColor": "#ffffff"
+      }
     }
   },
   "menus": {
@@ -144,6 +167,95 @@
           "price": 22.5,
           "category": "cat-4",
           "imageUrl": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&auto=format&fit=crop&q=80",
+          "isAvailable": true
+        }
+      ]
+    },
+    "demo-catalogo": {
+      "id": "demo-catalogo",
+      "slug": "demo-catalogo",
+      "mode": "catalog",
+      "title": "Studio Criativo & Loja",
+      "description": "Catálogo digital de produtos exclusivos: Impressões 3D personalizadas, Moda & Roupas, Artesanato feito à mão e Presentes especiais.",
+      "whatsappNumber": "5511999998888",
+      "currency": "R$",
+      "tableNumberPrompt": false,
+      "themeColor": "#10b981",
+      "coverImage": "/catalogo/cover-loja.jpg",
+      "address": "Envio para todo o Brasil • Retirada no Ateliê",
+      "wifiInfo": "",
+      "pixKey": "pix@studiocriativo.com.br",
+      "openingHours": "Seg a Sáb • 09h às 19h",
+      "isOpen": true,
+      "deliveryFee": 15,
+      "updatedAt": "2026-11-11T15:35:58.160Z",
+      "categories": [
+        {
+          "id": "cat-3d",
+          "name": "🖨️ Impressões 3D"
+        },
+        {
+          "id": "cat-roupas",
+          "name": "👕 Roupas & Moda"
+        },
+        {
+          "id": "cat-artesanato",
+          "name": "🧶 Artesanato & Decor"
+        },
+        {
+          "id": "cat-presentes",
+          "name": "🕯️ Velas & Presentes"
+        }
+      ],
+      "items": [
+        {
+          "id": "cat-item-1",
+          "name": "Luminária Lua Cheia 3D + Organizador",
+          "description": "Impressão 3D em PLA biodegradável de alta precisão com base em madeira natural e iluminação LED quente. Pode personalizar nome.",
+          "price": 89.9,
+          "category": "cat-3d",
+          "imageUrl": "/catalogo/prod-3d.jpg",
+          "badge": "Mais Vendido",
+          "isAvailable": true
+        },
+        {
+          "id": "cat-item-2",
+          "name": "Suporte Geométrico 3D de Mesa",
+          "description": "Porta-canetas, celular ou controles impresso em 3D acabamento fosco grafite ou sob encomenda em várias cores.",
+          "price": 49.9,
+          "category": "cat-3d",
+          "imageUrl": "/catalogo/prod-3d.jpg",
+          "badge": "Sob Encomenda",
+          "isAvailable": true
+        },
+        {
+          "id": "cat-item-3",
+          "name": "Camiseta Oversized Algodão Premium",
+          "description": "Malha pesada 100% algodão fio 30.1 penteado, modelagem streetwear confortável unissex. Tamanhos disponíveis: P, M, G e GG.",
+          "price": 119.9,
+          "category": "cat-roupas",
+          "imageUrl": "/catalogo/prod-roupa.jpg",
+          "badge": "Pronta Entrega",
+          "isAvailable": true
+        },
+        {
+          "id": "cat-item-4",
+          "name": "Conjunto Vaso Cerâmica & Painel Macramê",
+          "description": "Peças exclusivas feitas 100% à mão em cerâmica terracota e algodão cru natural. Ideal para decorar sala, quarto ou escritório.",
+          "price": 135,
+          "category": "cat-artesanato",
+          "imageUrl": "/catalogo/prod-artesanato.jpg",
+          "badge": "Feito à Mão",
+          "isAvailable": true
+        },
+        {
+          "id": "cat-item-5",
+          "name": "Vela Aromática Lavanda & Caixa Presente",
+          "description": "Cera vegetal ecológica em vidro âmbar com tampa de cortiça + caixa de madeira artesanal. Queima limpa de até 40 horas.",
+          "price": 68,
+          "category": "cat-presentes",
+          "imageUrl": "/catalogo/prod-vela.jpg",
+          "badge": "Exclusivo",
           "isAvailable": true
         }
       ]
