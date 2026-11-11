@@ -21,15 +21,21 @@ import {
   ExternalLink,
   Upload,
   RotateCcw,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+  Crop,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem, MenuCategory } from '@/lib/types';
-import { compressImageFileToDataUrl } from '@/lib/image-upload';
+import { ImageUploadPreset } from '@/lib/image-upload';
+import ImageCropModal from './ImageCropModal';
 
 interface MenuEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   slug: string;
   mode?: 'menu' | 'catalog';
+  defaultTitle?: string;
   onSaved?: () => void;
 }
 
@@ -82,17 +88,33 @@ export default function MenuEditorModal({
   onClose,
   slug,
   mode = 'menu',
+  defaultTitle,
   onSaved,
 }: MenuEditorModalProps) {
   const [menu, setMenu] = useState<RestaurantMenu | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [openingPreview, setOpeningPreview] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [uploadingTarget, setUploadingTarget] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     'info' | 'categories' | 'items' | 'branding'
   >('items');
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Image Crop / Framing Modal state
+  const [cropSession, setCropSession] = useState<{
+    src: string;
+    isObjectUrl: boolean;
+    preset: ImageUploadPreset;
+    target:
+      | { kind: 'item'; itemId: string }
+      | { kind: 'brand'; field: 'logoImage' | 'coverImage' };
+  } | null>(null);
+
+  // Drag & Drop snap-card ordering state
+  const [dragArmedId, setDragArmedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const isCatalog = (menu?.mode || mode) === 'catalog';
   const activePresets = isCatalog ? CATALOG_IMAGE_PRESETS : FOOD_IMAGE_PRESETS;
@@ -105,46 +127,111 @@ export default function MenuEditorModal({
   useEffect(() => {
     if (!isOpen || !slug) return;
     setLoading(true);
-    fetch(`/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${mode}`)
+    const titleQuery = defaultTitle
+      ? `&title=${encodeURIComponent(defaultTitle)}`
+      : '';
+    fetch(
+      `/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${mode}${titleQuery}&t=${Date.now()}`,
+      { cache: 'no-store' }
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data && !data.error) {
-          setMenu(data);
+          let resolved: RestaurantMenu = data;
+          if (typeof window !== 'undefined') {
+            try {
+              const rawDraft = localStorage.getItem(`spotqr_live_showcase_${slug}`);
+              if (rawDraft) {
+                const draft: RestaurantMenu = JSON.parse(rawDraft);
+                const draftTime = new Date(draft.updatedAt || 0).getTime();
+                const serverTime = new Date(data.updatedAt || 0).getTime();
+                if (draftTime > serverTime) {
+                  resolved = { ...draft, isPaid: data.isPaid } as RestaurantMenu;
+                }
+              }
+            } catch {
+              // Ignore localStorage parse failures
+            }
+          }
+          setMenu(resolved);
         }
       })
       .catch((err) => console.error('Error loading showcase for editor:', err))
       .finally(() => setLoading(false));
-  }, [isOpen, slug, mode]);
+  }, [isOpen, slug, mode, defaultTitle]);
 
   if (!isOpen) return null;
 
-  const handleSaveMenu = async () => {
-    if (!menu) return;
-    setSaving(true);
-    setSavedSuccess(false);
+  const buildCurrentPayload = (source: RestaurantMenu): RestaurantMenu => ({
+    ...source,
+    mode: source.mode || mode,
+    allowDelivery: source.allowDelivery ?? !( (source.mode || mode) === 'catalog' ),
+    allowPickup: source.allowPickup ?? !( (source.mode || mode) === 'catalog' ),
+    allowOnSite: source.allowOnSite ?? !( (source.mode || mode) === 'catalog' ),
+    productImagePosition: source.productImagePosition || 'right',
+    updatedAt: new Date().toISOString(),
+  });
+
+  const persistShowcase = async (): Promise<boolean> => {
+    if (!menu) return false;
+    const payload = buildCurrentPayload(menu);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(
+          `spotqr_live_showcase_${slug}`,
+          JSON.stringify(payload)
+        );
+      } catch {
+        // Ignore quota exceeded on private browsing
+      }
+    }
     try {
-      const payload: RestaurantMenu = {
-        ...menu,
-        mode: menu.mode || mode,
-        allowDelivery,
-        allowPickup,
-        allowOnSite,
-        productImagePosition: imagePos,
-      };
       const res = await fetch('/api/cardapio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        setSavedSuccess(true);
+        setMenu(payload);
         if (onSaved) onSaved();
-        setTimeout(() => setSavedSuccess(false), 3000);
+        return true;
       }
     } catch (err) {
-      console.error('Error saving menu:', err);
+      console.error('Error saving showcase:', err);
+    }
+    return false;
+  };
+
+  const handleSaveMenu = async () => {
+    if (!menu) return;
+    setSaving(true);
+    setSavedSuccess(false);
+    try {
+      const ok = await persistShowcase();
+      if (ok) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 3000);
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleOpenLivePreview = async () => {
+    if (!menu) return;
+    const targetUrl = `/${isCatalog ? 'catalogo' : 'cardapio'}/${slug}?preview=1`;
+    // Open synchronously before async fetch to prevent mobile popup blockers
+    const previewWin = window.open('about:blank', '_blank');
+    setOpeningPreview(true);
+    try {
+      await persistShowcase();
+      if (previewWin) {
+        previewWin.location.href = targetUrl;
+      } else {
+        window.open(targetUrl, '_blank');
+      }
+    } finally {
+      setOpeningPreview(false);
     }
   };
 
@@ -210,41 +297,78 @@ export default function MenuEditorModal({
     });
   };
 
-  const handleProductPhotoUpload = async (
+  const moveItem = (fromIdx: number, toIdx: number) => {
+    if (!menu || fromIdx < 0 || toIdx < 0 || toIdx >= menu.items.length || fromIdx === toIdx) {
+      return;
+    }
+    const next = [...menu.items];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved);
+    setMenu({ ...menu, items: next });
+  };
+
+  const openCropForFile = (
+    file: File,
+    preset: ImageUploadPreset,
+    target:
+      | { kind: 'item'; itemId: string }
+      | { kind: 'brand'; field: 'logoImage' | 'coverImage' }
+  ) => {
+    if (!file.type || !file.type.startsWith('image/')) {
+      alert('Selecione um arquivo de imagem válido (JPG, PNG ou WebP).');
+      return;
+    }
+    const objectUrl = URL.createObjectURL(file);
+    setCropSession({
+      src: objectUrl,
+      isObjectUrl: true,
+      preset,
+      target,
+    });
+  };
+
+  const handleProductPhotoUpload = (
     itemId: string,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setUploadingTarget(`item-${itemId}`);
-    try {
-      const dataUrl = await compressImageFileToDataUrl(file, 'product');
-      handleUpdateItem(itemId, { imageUrl: dataUrl });
-    } catch (err: any) {
-      alert(err?.message || 'Erro ao enviar foto do produto.');
-    } finally {
-      setUploadingTarget(null);
-    }
+    openCropForFile(file, 'product', { kind: 'item', itemId });
   };
 
-  const handleBrandImageUpload = async (
+  const handleBrandImageUpload = (
     field: 'logoImage' | 'coverImage',
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !menu) return;
-    setUploadingTarget(field);
-    try {
-      const preset = field === 'logoImage' ? 'logo' : 'cover';
-      const dataUrl = await compressImageFileToDataUrl(file, preset);
-      setMenu((prev) => (prev ? { ...prev, [field]: dataUrl } : prev));
-    } catch (err: any) {
-      alert(err?.message || 'Erro ao enviar imagem.');
-    } finally {
-      setUploadingTarget(null);
+    if (!file) return;
+    openCropForFile(file, field === 'logoImage' ? 'logo' : 'cover', {
+      kind: 'brand',
+      field,
+    });
+  };
+
+  const handleCloseCrop = () => {
+    if (cropSession?.isObjectUrl) {
+      URL.revokeObjectURL(cropSession.src);
     }
+    setCropSession(null);
+  };
+
+  const handleConfirmCrop = (croppedDataUrl: string) => {
+    if (!cropSession) return;
+    if (cropSession.target.kind === 'item') {
+      handleUpdateItem(cropSession.target.itemId, { imageUrl: croppedDataUrl });
+    } else {
+      const field = cropSession.target.field;
+      setMenu((prev) => (prev ? { ...prev, [field]: croppedDataUrl } : prev));
+    }
+    if (cropSession.isObjectUrl) {
+      URL.revokeObjectURL(cropSession.src);
+    }
+    setCropSession(null);
   };
 
   return (
@@ -274,15 +398,15 @@ export default function MenuEditorModal({
           </div>
 
           <div className="flex items-center gap-2">
-            <a
-              href={`/${isCatalog ? 'catalogo' : 'cardapio'}/${slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
+            <button
+              type="button"
+              onClick={handleOpenLivePreview}
+              disabled={openingPreview || !menu}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition disabled:opacity-60"
             >
-              <span>Ver ao Vivo</span>
+              <span>{openingPreview ? 'Abrindo...' : 'Ver ao Vivo'}</span>
               <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
-            </a>
+            </button>
 
             <button
               onClick={handleSaveMenu}
@@ -445,9 +569,9 @@ export default function MenuEditorModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-slate-400">
-                      Adicione seus itens, ajuste os preços ou marque como <strong>Esgotado</strong> quando acabar no estoque.
+                      Arraste pela alça <strong>⋮⋮</strong> ou use as setas <strong>↑ ↓</strong> para reordenar os cards.
                     </p>
                     <button
                       onClick={handleAddItem}
@@ -459,57 +583,162 @@ export default function MenuEditorModal({
                   </div>
 
                   <div className="space-y-4">
-                    {menu.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`p-4 rounded-2xl border transition ${
-                          item.isAvailable
-                            ? 'bg-slate-900/70 border-slate-800'
-                            : 'bg-rose-950/20 border-rose-500/30 opacity-75'
-                        }`}
-                      >
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                          {/* Image preview + Direct Upload from PC/Mobile */}
-                          <div className="md:col-span-2 flex flex-col items-center gap-2">
-                            <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0">
-                              <img
-                                src={item.imageUrl || activePresets[0].url}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
+                    {menu.items.map((item, idx) => {
+                      const isBeingDragged = draggingId === item.id;
+                      const isDropTarget =
+                        dragOverId === item.id && draggingId !== item.id;
+
+                      return (
+                        <div
+                          key={item.id}
+                          draggable={dragArmedId === item.id}
+                          onDragStart={(e) => {
+                            setDraggingId(item.id);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', item.id);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            if (draggingId && draggingId !== item.id) {
+                              setDragOverId(item.id);
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggingId && draggingId !== item.id) {
+                              const fromIdx = menu.items.findIndex(
+                                (it) => it.id === draggingId
+                              );
+                              moveItem(fromIdx, idx);
+                            }
+                            setDraggingId(null);
+                            setDragOverId(null);
+                            setDragArmedId(null);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingId(null);
+                            setDragOverId(null);
+                            setDragArmedId(null);
+                          }}
+                          className={`rounded-2xl border transition-all ${
+                            isBeingDragged
+                              ? 'opacity-45 scale-[0.98] border-dashed border-emerald-500 bg-slate-900'
+                              : isDropTarget
+                              ? 'ring-2 ring-emerald-400 border-emerald-400 bg-emerald-500/10 shadow-glow'
+                              : item.isAvailable
+                              ? 'bg-slate-900/70 border-slate-800'
+                              : 'bg-rose-950/20 border-rose-500/30 opacity-75'
+                          }`}
+                        >
+                          {isDropTarget && (
+                            <div className="px-4 py-1.5 bg-emerald-500/20 border-b border-emerald-500/40 rounded-t-2xl text-[11px] font-extrabold text-emerald-300 text-center">
+                              ⬇ Solte aqui para encaixar na posição #{idx + 1}
                             </div>
-                            <label className="w-full max-w-[112px] flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-bold cursor-pointer transition text-center">
-                              <Upload className="w-3 h-3 shrink-0" />
-                              <span>
-                                {uploadingTarget === `item-${item.id}`
-                                  ? 'Enviando...'
-                                  : 'Enviar Foto'}
+                          )}
+
+                          {/* Snap-Card Reorder Header Bar */}
+                          <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800/80 bg-slate-950/40 rounded-t-2xl">
+                            <div
+                              onMouseEnter={() => setDragArmedId(item.id)}
+                              onMouseLeave={() => {
+                                if (!draggingId) setDragArmedId(null);
+                              }}
+                              onPointerDown={() => setDragArmedId(item.id)}
+                              className="flex items-center gap-2 cursor-grab active:cursor-grabbing select-none text-slate-400 hover:text-emerald-400 transition py-0.5"
+                              title="Segure e arraste para encaixar em outra posição"
+                            >
+                              <GripVertical className="w-4 h-4 text-emerald-400" />
+                              <span className="px-2 py-0.5 rounded-md bg-slate-800 text-[10px] font-extrabold text-slate-200 font-mono">
+                                #{idx + 1}
                               </span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) =>
-                                  handleProductPhotoUpload(item.id, e)
-                                }
-                                className="hidden"
-                              />
-                            </label>
-                            <div className="flex flex-wrap gap-1 justify-center">
-                              {activePresets.slice(0, 4).map((preset) => (
-                                <button
-                                  key={preset.label}
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateItem(item.id, { imageUrl: preset.url })
-                                  }
-                                  className="text-[10px] bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-slate-300"
-                                  title={`Usar foto ${preset.label}`}
-                                >
-                                  {preset.label.split(' ')[0]}
-                                </button>
-                              ))}
+                              <span className="text-[11px] font-semibold">
+                                Arraste para reordenar
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={idx === 0}
+                                onClick={() => moveItem(idx, idx - 1)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                title="Mover para cima"
+                              >
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={idx === menu.items.length - 1}
+                                onClick={() => moveItem(idx, idx + 1)}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                                title="Mover para baixo"
+                              >
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
+
+                          <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                            {/* Image preview + Direct Upload + Crop Framing */}
+                            <div className="md:col-span-2 flex flex-col items-center gap-2">
+                              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0">
+                                <img
+                                  src={item.imageUrl || activePresets[0].url}
+                                  alt={item.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+
+                              <div className="w-full max-w-[120px] flex flex-col gap-1">
+                                <label className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-bold cursor-pointer transition text-center">
+                                  <Upload className="w-3 h-3 shrink-0" />
+                                  <span>Enviar Foto</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                      handleProductPhotoUpload(item.id, e)
+                                    }
+                                    className="hidden"
+                                  />
+                                </label>
+
+                                {(item.imageUrl || activePresets[0].url) && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setCropSession({
+                                        src: item.imageUrl || activePresets[0].url,
+                                        isObjectUrl: false,
+                                        preset: 'product',
+                                        target: { kind: 'item', itemId: item.id },
+                                      })
+                                    }
+                                    className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 rounded-lg text-[10px] font-semibold transition"
+                                    title="Ajustar zoom e enquadramento da foto"
+                                  >
+                                    <Crop className="w-3 h-3 text-amber-400" />
+                                    <span>Enquadrar</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {activePresets.slice(0, 4).map((preset) => (
+                                  <button
+                                    key={preset.label}
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateItem(item.id, { imageUrl: preset.url })
+                                    }
+                                    className="text-[10px] bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-slate-300"
+                                    title={`Usar foto ${preset.label}`}
+                                  >
+                                    {preset.label.split(' ')[0]}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
 
                           {/* Fields */}
                           <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -673,7 +902,8 @@ export default function MenuEditorModal({
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -757,11 +987,7 @@ export default function MenuEditorModal({
                           <div className="flex-1 space-y-2">
                             <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold cursor-pointer transition shadow-sm">
                               <Upload className="w-3.5 h-3.5" />
-                              <span>
-                                {uploadingTarget === 'logoImage'
-                                  ? 'Enviando Logo...'
-                                  : 'Upload da Logo'}
-                              </span>
+                              <span>Upload da Logo</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -773,16 +999,33 @@ export default function MenuEditorModal({
                             </label>
 
                             {menu.logoImage && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setMenu({ ...menu, logoImage: '' })
-                                }
-                                className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 rounded-lg text-[11px] font-semibold transition"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                                <span>Remover Logo (Usar Ícone)</span>
-                              </button>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCropSession({
+                                      src: menu.logoImage!,
+                                      isObjectUrl: false,
+                                      preset: 'logo',
+                                      target: { kind: 'brand', field: 'logoImage' },
+                                    })
+                                  }
+                                  className="flex items-center justify-center gap-1 px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold transition"
+                                >
+                                  <Crop className="w-3 h-3 text-amber-400" />
+                                  <span>Enquadrar</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setMenu({ ...menu, logoImage: '' })
+                                  }
+                                  className="flex items-center justify-center gap-1 px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 rounded-lg text-[11px] font-semibold transition"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Remover</span>
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -818,22 +1061,39 @@ export default function MenuEditorModal({
                         </div>
 
                         <div className="space-y-2">
-                          <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold cursor-pointer transition shadow-sm">
-                            <Upload className="w-3.5 h-3.5" />
-                            <span>
-                              {uploadingTarget === 'coverImage'
-                                ? 'Enviando Fundo...'
-                                : 'Upload Imagem de Fundo'}
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) =>
-                                handleBrandImageUpload('coverImage', e)
-                              }
-                              className="hidden"
-                            />
-                          </label>
+                          <div className="flex gap-2">
+                            <label className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold cursor-pointer transition shadow-sm">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Upload Imagem de Fundo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  handleBrandImageUpload('coverImage', e)
+                                }
+                                className="hidden"
+                              />
+                            </label>
+
+                            {(menu.coverImage || defaultCover) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCropSession({
+                                    src: menu.coverImage || defaultCover,
+                                    isObjectUrl: false,
+                                    preset: 'cover',
+                                    target: { kind: 'brand', field: 'coverImage' },
+                                  })
+                                }
+                                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 transition"
+                                title="Ajustar enquadramento da imagem de fundo"
+                              >
+                                <Crop className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Enquadrar</span>
+                              </button>
+                            )}
+                          </div>
 
                           <div className="flex flex-wrap gap-1.5">
                             {COVER_IMAGE_PRESETS.map((preset) => (
@@ -1251,6 +1511,15 @@ export default function MenuEditorModal({
           )}
         </div>
       </div>
+
+      {/* Interactive Image Crop / Framing Modal */}
+      <ImageCropModal
+        isOpen={Boolean(cropSession)}
+        imageSrc={cropSession?.src || null}
+        preset={cropSession?.preset || 'product'}
+        onCancel={handleCloseCrop}
+        onConfirm={handleConfirmCrop}
+      />
     </div>
   );
 }

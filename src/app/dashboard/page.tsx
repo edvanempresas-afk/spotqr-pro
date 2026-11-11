@@ -841,6 +841,10 @@ export default function DashboardPage() {
           onClose={() => setMenuEditorSlug(null)}
           slug={menuEditorSlug}
           mode={menuEditorMode}
+          defaultTitle={
+            qrs.find((q) => q.slug === menuEditorSlug)?.title ||
+            currentUser?.businessName
+          }
           onSaved={() => fetchQRs()}
         />
       )}

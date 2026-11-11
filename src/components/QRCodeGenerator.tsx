@@ -1601,6 +1601,7 @@ export default function QRCodeGenerator() {
           (config.type === 'catalog' ? 'demo-catalogo' : 'demo-restaurante')
         }
         mode={config.type === 'catalog' ? 'catalog' : 'menu'}
+        defaultTitle={config.title}
       />
 
       {/* Client Registration / Login Modal before saving Showcase or activating PRO */}

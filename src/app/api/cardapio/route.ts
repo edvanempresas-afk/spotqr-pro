@@ -15,12 +15,13 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
   const modeParam = searchParams.get('mode') === 'catalog' ? 'catalog' : 'menu';
+  const titleParam = searchParams.get('title') || undefined;
 
   if (!slug) {
     return NextResponse.json({ error: 'Slug é obrigatório' }, { status: 400 });
   }
 
-  const menu = getMenuBySlug(slug, modeParam);
+  const menu = getMenuBySlug(slug, modeParam, titleParam);
   if (!menu) {
     return NextResponse.json(
       { error: 'Cardápio ou catálogo não encontrado' },
@@ -33,10 +34,18 @@ export async function GET(request: NextRequest) {
     qr?.isPaid || slug === 'demo-restaurante' || slug === 'demo-catalogo'
   );
 
-  return NextResponse.json({
-    ...menu,
-    isPaid,
-  });
+  return NextResponse.json(
+    {
+      ...menu,
+      isPaid,
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        Pragma: 'no-cache',
+      },
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {

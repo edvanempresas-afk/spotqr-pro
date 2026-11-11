@@ -537,7 +537,8 @@ export function incrementQRScan(slug: string): void {
 // RESTAURANT MENU & STORE CATALOG CRUD
 export function getMenuBySlug(
   slug: string,
-  defaultMode: 'menu' | 'catalog' = 'menu'
+  defaultMode: 'menu' | 'catalog' = 'menu',
+  fallbackTitle?: string
 ): RestaurantMenu | null {
   const db = ensureDb();
   if (db.menus[slug]) {
@@ -548,6 +549,7 @@ export function getMenuBySlug(
   const resolvedMode = qr?.type === 'catalog' ? 'catalog' : defaultMode;
   const formattedTitle =
     qr?.title ||
+    fallbackTitle ||
     slug
       .split('-')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

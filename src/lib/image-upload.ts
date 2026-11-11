@@ -70,3 +70,4 @@ export function compressImageFileToDataUrl(
     img.src = objectUrl;
   });
 }
+

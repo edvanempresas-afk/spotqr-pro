@@ -85,23 +85,75 @@ export default function DigitalShowcasePage({
 
   useEffect(() => {
     async function loadMenu() {
+      const searchParams =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search)
+          : null;
+      const isPreviewParam = searchParams?.get('preview') === '1';
+      const hasMesaParam = Boolean(searchParams?.get('mesa'));
+
+      let localDraft: (RestaurantMenu & { isPaid?: boolean }) | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          const rawDraft = localStorage.getItem(
+            `spotqr_live_showcase_${slug}`
+          );
+          if (rawDraft) {
+            localDraft = JSON.parse(rawDraft);
+          }
+        } catch {
+          localDraft = null;
+        }
+      }
+
       try {
         const res = await fetch(
-          `/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${defaultMode}`
+          `/api/cardapio?slug=${encodeURIComponent(
+            slug
+          )}&mode=${defaultMode}&t=${Date.now()}`,
+          { cache: 'no-store' }
         );
         if (res.ok) {
           const data = await res.json();
-          setMenu(data);
-          const resolvedMode = data.mode || defaultMode;
-          const hasMesaParam =
-            typeof window !== 'undefined' &&
-            new URLSearchParams(window.location.search).has('mesa');
+          const draftTime = localDraft?.updatedAt
+            ? new Date(localDraft.updatedAt).getTime()
+            : 0;
+          const serverTime = data?.updatedAt
+            ? new Date(data.updatedAt).getTime()
+            : 0;
+
+          // If user clicked "Ver ao Vivo" OR local draft is newer than container state, use local draft immediately
+          const shouldUseLocal =
+            Boolean(localDraft) &&
+            (isPreviewParam || draftTime > serverTime);
+
+          const finalMenu = shouldUseLocal
+            ? { ...localDraft!, isPaid: data.isPaid }
+            : data;
+
+          setMenu(finalMenu);
+
+          // Self-heal cold serverless container if owner visits their edited page
+          if (shouldUseLocal) {
+            fetch('/api/cardapio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(finalMenu),
+            }).catch(() => {});
+          }
+
+          const resolvedMode = finalMenu.mode || defaultMode;
           if (resolvedMode === 'catalog' && !hasMesaParam) {
             setOrderMode('delivery');
           }
+        } else if (localDraft) {
+          setMenu(localDraft);
         }
       } catch (err) {
         console.error('Error loading showcase:', err);
+        if (localDraft) {
+          setMenu(localDraft);
+        }
       } finally {
         setLoading(false);
       }
