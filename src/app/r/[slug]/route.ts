@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getDynamicQRBySlug, incrementQRScan } from '@/lib/db';
+import {
+  getDynamicQRBySlug,
+  incrementQRScan,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
   { params }: { params: { slug: string } }
 ) {
+  await syncDbFromCloud();
   const { slug } = params;
   const qr = getDynamicQRBySlug(slug);
 
@@ -36,11 +44,15 @@ export async function GET(
 
   // Count scan
   incrementQRScan(slug);
+  await persistSliceToCloud('qrs');
 
   // If not yet paid (in demo or pending activation), we can still allow or show notice
   let destination = qr.targetUrl;
 
-  if (qr.type === 'menu' || qr.linkedMenuId) {
+  if (qr.type === 'catalog') {
+    const origin = new URL(request.url).origin;
+    destination = `${origin}/catalogo/${slug}`;
+  } else if (qr.type === 'menu' || qr.linkedMenuId) {
     const origin = new URL(request.url).origin;
     destination = `${origin}/cardapio/${slug}`;
   }

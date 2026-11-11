@@ -11,11 +11,16 @@ import {
   isAdminRequestAuthenticated,
   verifyCredentials,
 } from '@/lib/admin-auth';
-import { createClientUser } from '@/lib/db';
+import {
+  createClientUser,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  await syncDbFromCloud();
   const clientUser = getAuthenticatedClientUser(req);
   const isAdmin = isAdminRequestAuthenticated(req);
 
@@ -52,6 +57,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     const body = await req.json();
     const { action, name, businessName, email, whatsapp, password } = body;
 
@@ -82,7 +88,12 @@ export async function POST(req: NextRequest) {
           passwordPlain: String(password),
         });
 
-        const token = createClientSessionToken(newUser.id);
+        await Promise.all([
+          persistSliceToCloud('users'),
+          persistSliceToCloud('notifications'),
+        ]);
+
+        const token = createClientSessionToken(newUser);
         const { passwordHash, ...safeUser } = newUser;
 
         const res = NextResponse.json({
@@ -154,7 +165,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const token = createClientSessionToken(clientUser.id);
+    const token = createClientSessionToken(clientUser);
     const { passwordHash, ...safeUser } = clientUser;
 
     const res = NextResponse.json({

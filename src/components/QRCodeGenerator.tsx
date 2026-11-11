@@ -393,15 +393,15 @@ export default function QRCodeGenerator() {
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-3">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>ESTÚDIO COMPLETO DE QR CODE & CARDÁPIO</span>
+            <span>ESTÚDIO 3 EM 1 • QR CODE, CARDÁPIO & CATÁLOGO DIGITAL</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-            Personalize seu QR Code em Alta Resolução
+            Crie QR Codes com Logo, Cardápios ou Catálogos Online
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-400">
-            Crie grátis no modo estático ou desbloqueie o{' '}
+            Crie grátis e gere seu QR Code pronto para imprimir — ou ative o{' '}
             <strong className="text-emerald-400">
-              Modo PRO (Com Logomarca no Centro & Link Dinâmico)
+              Modo PRO (Logomarca no Centro & Link Dinâmico)
             </strong>
             .
           </p>

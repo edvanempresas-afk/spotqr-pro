@@ -114,23 +114,23 @@ export default function ClientLoginPage() {
             <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
               Gerencie Seu{' '}
               <span className="gradient-text">
-                Cardápio Digital & QR Codes Dinâmicos
+                Cardápio, Catálogo Digital & QR Codes Dinâmicos
               </span>{' '}
               em Tempo Real
             </h1>
 
             <p className="text-sm text-slate-300 leading-relaxed">
               Com seu login e senha exclusivos de cliente, você tem controle
-              total sobre seus pratos, preços, fotos e o link de destino dos
-              seus QR Codes sem nunca precisar reimprimir os adesivos das mesas.
+              total sobre seus pratos, produtos, preços, fotos e o link de destino dos
+              seus QR Codes sem nunca precisar reimprimir os adesivos.
             </p>
 
             <div className="space-y-3 pt-2">
               {[
-                'Altere preços, fotos e adicione novos pratos ao seu Cardápio Digital quando quiser',
+                'Altere preços, fotos e adicione itens ao seu Cardápio ou Catálogo Digital quando quiser',
                 'Mude o link de destino do seu QR Code Dinâmico PRO em 1 clique',
-                'Acompanhe quantas pessoas escanearam o QR Code nas suas mesas',
-                'Imprima plaquinhas de mesa A6/A5 prontas com a sua logomarca no centro',
+                'Acompanhe quantas pessoas escanearam o QR Code nas mesas ou balcões',
+                'Imprima plaquinhas A6/A5 prontas com a sua logomarca no centro',
               ].map((item, idx) => (
                 <div
                   key={idx}
@@ -142,21 +142,29 @@ export default function ClientLoginPage() {
               ))}
             </div>
 
-            <div className="bg-[#121929] border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4">
+            <div className="bg-[#121929] border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="text-xs">
                 <span className="font-bold text-white block">
-                  Quer ver como fica o Cardápio Digital na prática?
+                  Quer ver como fica na prática antes de criar o seu?
                 </span>
                 <span className="text-slate-400">
-                  Confira o nosso cardápio de demonstração para visitantes antes de criar o seu.
+                  Confira nossos modelos interativos de Cardápio e Catálogo Digital.
                 </span>
               </div>
-              <Link
-                href="/cardapio/demo-restaurante"
-                className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold shrink-0 transition whitespace-nowrap"
-              >
-                Ver Cardápio Demo
-              </Link>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Link
+                  href="/cardapio/demo-restaurante"
+                  className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition whitespace-nowrap"
+                >
+                  Cardápio Demo
+                </Link>
+                <Link
+                  href="/catalogo/demo-catalogo"
+                  className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition whitespace-nowrap"
+                >
+                  Catálogo Demo
+                </Link>
+              </div>
             </div>
           </div>
 

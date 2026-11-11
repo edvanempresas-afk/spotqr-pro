@@ -18,7 +18,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              A ferramenta de maior retorno sobre investimento para restaurantes, bares e comércios locais no Brasil. Economize centenas de reais em impressões.
+              Plataforma 3 em 1 para criar QR Codes com Logo, Cardápios Digitais e Catálogos Online para lojas, roupas, artesanato, impressões 3D e restaurantes.
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-lg w-fit">
               <ShieldCheck className="w-4 h-4" />
@@ -44,7 +44,7 @@ export default function Footer() {
             <ul className="space-y-2 text-xs">
               <li><a href="#precos" className="hover:text-emerald-400 transition">Logomarca ou Imagem no Centro do QR</a></li>
               <li><a href="#precos" className="hover:text-emerald-400 transition">QR Code Dinâmico (Link Editável)</a></li>
-              <li><a href="#precos" className="hover:text-emerald-400 transition">Cardápio Digital Mobile-First</a></li>
+              <li><a href="#precos" className="hover:text-emerald-400 transition">Cardápios & Catálogos Digitais</a></li>
               <li><a href="#precos" className="hover:text-emerald-400 transition">Pedidos sem Taxa pelo WhatsApp</a></li>
               <li><a href="#precos" className="hover:text-emerald-400 transition">Gerador de Plaquinhas A6/A5 para Mesas</a></li>
             </ul>

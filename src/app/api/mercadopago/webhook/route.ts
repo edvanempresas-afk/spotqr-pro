@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { checkPaymentStatus } from '@/lib/mercadopago';
-import { recordPayment, getPayment } from '@/lib/db';
+import {
+  recordPayment,
+  getPayment,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
+    await syncDbFromCloud();
     const body = await request.json();
 
     // Mercado Pago sends notifications for payment actions
@@ -20,6 +26,11 @@ export async function POST(request: Request) {
           const slug =
             result.externalReference || existing?.slug || 'unknown';
           recordPayment(String(paymentId), slug, 'approved', 10.9);
+          await Promise.all([
+            persistSliceToCloud('payments'),
+            persistSliceToCloud('qrs'),
+            persistSliceToCloud('notifications'),
+          ]);
         }
       }
     }

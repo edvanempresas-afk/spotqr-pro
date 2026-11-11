@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPixPayment } from '@/lib/mercadopago';
-import { saveDynamicQR, recordPayment, getDynamicQRBySlug } from '@/lib/db';
+import {
+  saveDynamicQR,
+  recordPayment,
+  getDynamicQRBySlug,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 import { DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 
 export async function POST(request: NextRequest) {
   try {
+    await syncDbFromCloud();
     const clientUser = getAuthenticatedClientUser(request);
     const body = await request.json();
     const { slug, email, name, title, targetUrl, type, qrConfig } = body;
@@ -71,6 +78,12 @@ export async function POST(request: NextRequest) {
       payerName,
       payerEmail
     );
+
+    await Promise.all([
+      persistSliceToCloud('qrs'),
+      persistSliceToCloud('payments'),
+      persistSliceToCloud('notifications'),
+    ]);
 
     return NextResponse.json({
       success: true,

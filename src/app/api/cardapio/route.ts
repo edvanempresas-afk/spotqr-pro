@@ -4,6 +4,10 @@ import {
   saveMenu,
   getDynamicQRBySlug,
   saveDynamicQR,
+  syncDbFromCloud,
+  syncMenuFromCloud,
+  persistMenuToCloud,
+  persistSliceToCloud,
 } from '@/lib/db';
 import { RestaurantMenu, DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
@@ -20,6 +24,9 @@ export async function GET(request: NextRequest) {
   if (!slug) {
     return NextResponse.json({ error: 'Slug é obrigatório' }, { status: 400 });
   }
+
+  await syncDbFromCloud();
+  await syncMenuFromCloud(slug);
 
   const menu = getMenuBySlug(slug, modeParam, titleParam);
   if (!menu) {
@@ -50,6 +57,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await syncDbFromCloud();
     const clientUser = getAuthenticatedClientUser(request);
     const isAdmin = isAdminRequestAuthenticated(request);
 
@@ -76,6 +84,8 @@ export async function POST(request: NextRequest) {
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9_-]/g, '-');
+
+    await syncMenuFromCloud(cleanSlug);
 
     const isCatalog = body.mode === 'catalog';
     const updatedMenu: RestaurantMenu = {
@@ -119,6 +129,10 @@ export async function POST(request: NextRequest) {
       },
     };
     saveDynamicQR(qrRecord);
+    await Promise.all([
+      persistMenuToCloud(updatedMenu),
+      persistSliceToCloud('qrs'),
+    ]);
 
     return NextResponse.json({ success: true, menu: updatedMenu });
   } catch (error) {

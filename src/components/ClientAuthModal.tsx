@@ -34,7 +34,7 @@ export default function ClientAuthModal({
   defaultTab = 'register',
   defaultBusinessName = '',
   defaultWhatsapp = '',
-  contextMessage = 'Cadastre seu login e senha para salvar seu Cardápio Digital e gerenciar seus QR Codes quando quiser.',
+  contextMessage = 'Cadastre seu login e senha para salvar seus Cardápios, Catálogos Digitais e QR Codes quando quiser.',
 }: ClientAuthModalProps) {
   const [tab, setTab] = useState<'register' | 'login'>(defaultTab);
   const [name, setName] = useState('');
@@ -46,6 +46,13 @@ export default function ClientAuthModal({
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setTab(defaultTab);
+      setErrorMsg('');
+    }
+  }, [defaultTab, isOpen]);
 
   useEffect(() => {
     if (defaultBusinessName && !businessName) {

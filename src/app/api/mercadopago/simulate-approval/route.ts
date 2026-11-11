@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
-import { recordPayment, getDynamicQRBySlug, saveDynamicQR } from '@/lib/db';
+import {
+  recordPayment,
+  getDynamicQRBySlug,
+  saveDynamicQR,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
+    await syncDbFromCloud();
     const { paymentId, slug } = await request.json();
 
     if (!paymentId || !slug) {
@@ -19,6 +26,12 @@ export async function POST(request: Request) {
       qr.updatedAt = new Date().toISOString();
       saveDynamicQR(qr);
     }
+
+    await Promise.all([
+      persistSliceToCloud('payments'),
+      persistSliceToCloud('qrs'),
+      persistSliceToCloud('notifications'),
+    ]);
 
     return NextResponse.json({
       success: true,

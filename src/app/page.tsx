@@ -13,6 +13,7 @@ import {
   TrendingUp,
   ShieldCheck,
   Utensils,
+  ShoppingBag,
   DollarSign,
   Smartphone,
   ArrowRight,
@@ -67,22 +68,82 @@ export default function HomePage() {
             {/* Top Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-6">
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>O Segredo dos Restaurantes e Comércios Mais Lucrativos</span>
+              <span>Plataforma 3 em 1 • QR Codes, Cardápios & Catálogos Digitais</span>
             </div>
 
             {/* Hero Highlight */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl mx-auto leading-tight sm:leading-none">
-              QR Code Dinâmico com Logomarca &{' '}
+              Crie{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500">
-                Cardápio ou Catálogo Digital
-              </span>
+                QR Codes, Cardápios & Catálogos Digitais
+              </span>{' '}
+              Sem Taxas
             </h1>
 
             {/* Sub-headline */}
-            <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
-              Crie vitrines digitais para restaurantes, roupas, artesanato, impressões 3D e comércios em geral.{' '}
-              <strong className="text-white"> Mude o link de destino ou os preços a qualquer hora</strong> sem nunca mais jogar dinheiro fora reimprimindo adesivos ou acrílicos.
+            <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed">
+              Muito além de um gerador de QR Code: monte na hora{' '}
+              <strong className="text-white">Cardápios para Restaurantes</strong>,{' '}
+              <strong className="text-white">Catálogos de Produtos</strong> (Roupas, Artesanato, Impressões 3D e Lojas) e{' '}
+              <strong className="text-white">QR Codes com Logomarca & Link Editável</strong>.
             </p>
+
+            {/* 3-in-1 Showcase Pillars */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto text-left">
+              <a
+                href="#gerador"
+                className="p-4 rounded-2xl bg-[#101726]/90 border border-slate-800 hover:border-emerald-500/50 transition flex items-start gap-3 shadow-lg"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">
+                    QR Codes Personalizados
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    PIX Banco Central, WhatsApp, Wi-Fi, Instagram, Google 5★ e Links Dinâmicos com logo no centro.
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="#gerador"
+                className="p-4 rounded-2xl bg-[#101726]/90 border border-slate-800 hover:border-emerald-500/50 transition flex items-start gap-3 shadow-lg"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white">
+                    Cardápios Digitais
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Para restaurantes, bares e delivery: comanda no WhatsApp, opção na mesa, PIX e zero comissões.
+                  </p>
+                </div>
+              </a>
+
+              <a
+                href="#gerador"
+                className="p-4 rounded-2xl bg-[#101726]/90 border border-amber-500/30 hover:border-amber-400/60 transition flex items-start gap-3 shadow-lg"
+              >
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                    <span>Catálogos Digitais</span>
+                    <span className="text-[9px] font-extrabold bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full uppercase">
+                      Novo
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Para lojas de roupas, artesanato, impressões 3D e comércio: suas fotos, logo própria e carrinho WhatsApp.
+                  </p>
+                </div>
+              </a>
+            </div>
 
             {/* Quick Proof Badges */}
             <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-400 font-medium">
@@ -211,14 +272,14 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-14">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-3">
-                <Utensils className="w-3.5 h-3.5" />
-                <span>INCLUSO NO PACOTE PRO</span>
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>CARDÁPIOS & CATÁLOGOS DIGITAIS SEM COMISSÕES</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                Cardápio Digital Mobile que Vende pelo WhatsApp
+                Cardápios e Catálogos Digitais que Vendem pelo WhatsApp
               </h2>
               <p className="mt-3 text-sm text-slate-400 leading-relaxed">
-                Pare de perder 27% do seu faturamento com taxas de marketplaces de entrega. Dê aos seus clientes na mesa uma experiência veloz com fotos, descrições e comanda direta.
+                Pare de perder até 27% do seu faturamento com taxas de marketplaces. Seja um restaurante ou loja de roupas, artesanato e impressões 3D, apresente seus produtos na internet com link próprio, carrinho e PIX.
               </p>
             </div>
 

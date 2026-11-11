@@ -4,9 +4,9 @@ import './globals.css';
 export const metadata: Metadata = {
   metadataBase: new URL('https://spotqr.com.br'),
   title:
-    'SpotQR Pro | Gerador de QR Code Dinâmico com Logomarca & Cardápio Digital',
+    'SpotQR Pro | QR Code Dinâmico com Logo, Cardápio & Catálogo Digital',
   description:
-    'Crie QR Codes dinâmicos com a sua logomarca no centro e cardápio digital para mesas, balcões e delivery. Altere links e preços sem reimprimir adesivos.',
+    'Crie QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos online para lojas de roupas, artesanato e impressões 3D.',
   manifest: '/manifest.json',
   alternates: {
     canonical: '/',

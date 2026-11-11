@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { checkPaymentStatus } from '@/lib/mercadopago';
-import { getPayment, recordPayment, getDynamicQRBySlug } from '@/lib/db';
+import {
+  getPayment,
+  recordPayment,
+  getDynamicQRBySlug,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 
 export async function GET(request: Request) {
+  await syncDbFromCloud();
   const { searchParams } = new URL(request.url);
   const paymentId = searchParams.get('paymentId');
   const slug = searchParams.get('slug');
@@ -36,6 +43,11 @@ export async function GET(request: Request) {
       const targetSlug = slug || remote.externalReference;
       if (targetSlug) {
         recordPayment(paymentId, targetSlug, 'approved', 10.9);
+        await Promise.all([
+          persistSliceToCloud('payments'),
+          persistSliceToCloud('qrs'),
+          persistSliceToCloud('notifications'),
+        ]);
       }
       return NextResponse.json({ status: 'approved' });
     }

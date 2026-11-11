@@ -11,6 +11,9 @@ import {
   markAllDeveloperNotificationsRead,
   createDeveloperNotification,
   getSubscriptionAnalytics,
+  syncDbFromCloud,
+  persistSliceToCloud,
+  isCloudPersistenceConfigured,
 } from '@/lib/db';
 import { DeveloperServiceType } from '@/lib/types';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
@@ -19,6 +22,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     if (!isAdminRequestAuthenticated(req)) {
       return NextResponse.json(
         { error: 'Acesso restrito. Faça login como desenvolvedor.' },
@@ -48,6 +52,7 @@ export async function GET(req: NextRequest) {
       settings: safeSettings,
       notifications,
       subscriptionAnalytics,
+      cloudPersistenceEnabled: isCloudPersistenceConfigured(),
       platformStats: {
         totalQRs: qrs.length,
         paidQRs,
@@ -66,6 +71,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     const body = await req.json();
     const {
       name,
@@ -101,6 +107,11 @@ export async function POST(req: NextRequest) {
       developerNotes: '',
     });
 
+    await Promise.all([
+      persistSliceToCloud('leads'),
+      persistSliceToCloud('notifications'),
+    ]);
+
     return NextResponse.json({ success: true, lead: newLead }, { status: 201 });
   } catch (err) {
     console.error('Error in POST /api/developer-leads:', err);
@@ -113,6 +124,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     if (!isAdminRequestAuthenticated(req)) {
       return NextResponse.json(
         { error: 'Acesso restrito ao desenvolvedor.' },
@@ -124,11 +136,13 @@ export async function PUT(req: NextRequest) {
 
     if (body.action === 'update_settings') {
       const updatedSettings = saveDeveloperSettings(body.settings || {});
+      await persistSliceToCloud('settings');
       return NextResponse.json({ success: true, settings: updatedSettings });
     }
 
     if (body.action === 'mark_notifications_read') {
       markAllDeveloperNotificationsRead();
+      await persistSliceToCloud('notifications');
       return NextResponse.json({
         success: true,
         notifications: getAllDeveloperNotifications(),
@@ -145,6 +159,7 @@ export async function PUT(req: NextRequest) {
         clientName: 'Teste Desenvolvedor Edvan',
         slug: 'demo-restaurante',
       });
+      await persistSliceToCloud('notifications');
       return NextResponse.json({
         success: true,
         notification: testNotif,
@@ -173,6 +188,7 @@ export async function PUT(req: NextRequest) {
         { status: 404 }
       );
     }
+    await persistSliceToCloud('leads');
 
     return NextResponse.json({ success: true, lead: updated });
   } catch (err) {
@@ -186,6 +202,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     if (!isAdminRequestAuthenticated(req)) {
       return NextResponse.json(
         { error: 'Acesso restrito ao desenvolvedor.' },
@@ -202,6 +219,9 @@ export async function DELETE(req: NextRequest) {
       );
     }
     const deleted = deleteDeveloperLead(id);
+    if (deleted) {
+      await persistSliceToCloud('leads');
+    }
     return NextResponse.json({ success: deleted });
   } catch (err) {
     console.error('Error in DELETE /api/developer-leads:', err);

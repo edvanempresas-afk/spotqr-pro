@@ -153,6 +153,9 @@ export default function DeveloperAdminDashboard() {
     qrRevenue: 0,
     totalScans: 0,
   });
+  const [cloudPersistenceEnabled, setCloudPersistenceEnabled] = useState<
+    boolean | null
+  >(null);
 
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('todos');
@@ -506,6 +509,9 @@ export default function DeveloperAdminDashboard() {
           }
         }
         if (data.platformStats) setPlatformStats(data.platformStats);
+        if (typeof data.cloudPersistenceEnabled === 'boolean') {
+          setCloudPersistenceEnabled(data.cloudPersistenceEnabled);
+        }
         if (data.subscriptionAnalytics) {
           setSubscriptionAnalytics(data.subscriptionAnalytics);
         }
@@ -841,7 +847,24 @@ export default function DeveloperAdminDashboard() {
                       : 'Propostas Novas'}
                   </button>
                 )}
+
+                {cloudPersistenceEnabled === true && (
+                  <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                    🟢 Banco Nuvem Ativo (Cadastros Salvos)
+                  </span>
+                )}
               </div>
+
+              {cloudPersistenceEnabled === false && (
+                <div className="mb-3 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-xs text-amber-200 max-w-2xl">
+                  <strong className="text-amber-300 block mb-0.5">
+                    ⚠️ Banco em Nuvem ainda não conectado na Vercel (Modo Temporário)
+                  </strong>
+                  <span>
+                    Sem banco externo, a Vercel limpa usuários e menus temporários quando você publica uma nova atualização. No painel da Vercel, abra a aba <strong>Storage ➔ Create Database ➔ Upstash Redis (Grátis)</strong> e conecte ao projeto <strong>spotqr</strong> para salvar todos os logins permanentemente.
+                  </span>
+                </div>
+              )}
 
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 Painel de Assinaturas, Faturamento & Propostas

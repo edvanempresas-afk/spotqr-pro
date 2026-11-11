@@ -487,6 +487,171 @@ function saveDb(data: DatabaseSchema): void {
   }
 }
 
+// PERSISTENCE LAYER: VERCEl KV / UPSTASH REDIS REST SYNC (NO EXTRA NPM PACKAGES NEEDED)
+export type CloudSliceKey =
+  | 'users'
+  | 'qrs'
+  | 'payments'
+  | 'leads'
+  | 'notifications'
+  | 'settings';
+
+const CLOUD_KEYS: CloudSliceKey[] = [
+  'users',
+  'qrs',
+  'payments',
+  'leads',
+  'notifications',
+  'settings',
+];
+
+function getCloudKVConfig(): { url: string; token: string } | null {
+  const url = (
+    process.env.KV_REST_API_URL ||
+    process.env.UPSTASH_REDIS_REST_URL ||
+    ''
+  ).trim();
+  const token = (
+    process.env.KV_REST_API_TOKEN ||
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    ''
+  ).trim();
+  return url && token ? { url: url.replace(/\/+$/, ''), token } : null;
+}
+
+export function isCloudPersistenceConfigured(): boolean {
+  return Boolean(getCloudKVConfig());
+}
+
+async function kvRequest(command: unknown[]): Promise<any> {
+  const cfg = getCloudKVConfig();
+  if (!cfg) return null;
+  try {
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncDbFromCloud(): Promise<void> {
+  if (!getCloudKVConfig()) return;
+  const db = ensureDb();
+  const results = await kvRequest([
+    'MGET',
+    ...CLOUD_KEYS.map((k) => `spotqr:${k}`),
+  ]);
+  if (!Array.isArray(results)) return;
+
+  let changed = false;
+  const parseSlice = <T,>(raw: unknown): T | null => {
+    if (typeof raw !== 'string' || !raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  };
+
+  const cloudUsers = parseSlice<Record<string, ClientUser>>(results[0]);
+  if (cloudUsers) {
+    db.users = { ...cloudUsers, ...(db.users || {}) };
+    // Cloud hash always wins over any partial session stub
+    for (const uid of Object.keys(cloudUsers)) {
+      if (cloudUsers[uid]?.passwordHash) {
+        db.users[uid] = cloudUsers[uid];
+      }
+    }
+    changed = true;
+  }
+
+  const cloudQRs = parseSlice<Record<string, DynamicQRRecord>>(results[1]);
+  if (cloudQRs) {
+    db.dynamicQRs = {
+      'demo-restaurante': initialData.dynamicQRs['demo-restaurante'],
+      'demo-catalogo': initialData.dynamicQRs['demo-catalogo'],
+      ...cloudQRs,
+    };
+    changed = true;
+  }
+
+  const cloudPayments = parseSlice<Record<string, PaymentRecord>>(results[2]);
+  if (cloudPayments) {
+    db.payments = cloudPayments;
+    changed = true;
+  }
+
+  const cloudLeads = parseSlice<Record<string, DeveloperLead>>(results[3]);
+  if (cloudLeads) {
+    db.developerLeads = cloudLeads;
+    changed = true;
+  }
+
+  const cloudNotifs = parseSlice<Record<string, DeveloperNotification>>(
+    results[4]
+  );
+  if (cloudNotifs) {
+    db.developerNotifications = cloudNotifs;
+    changed = true;
+  }
+
+  const cloudSettings = parseSlice<DeveloperSettings>(results[5]);
+  if (cloudSettings) {
+    db.developerSettings = {
+      ...initialData.developerSettings,
+      ...cloudSettings,
+    };
+    changed = true;
+  }
+
+  if (changed) {
+    saveDb(db);
+  }
+}
+
+export async function syncMenuFromCloud(slug: string): Promise<void> {
+  if (!slug || !getCloudKVConfig()) return;
+  const raw = await kvRequest(['GET', `spotqr:menu:${slug}`]);
+  if (typeof raw !== 'string' || !raw) return;
+  try {
+    const parsedMenu: RestaurantMenu = JSON.parse(raw);
+    const db = ensureDb();
+    db.menus[slug] = parsedMenu;
+    saveDb(db);
+  } catch {
+    // Ignore malformed cloud menu
+  }
+}
+
+export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
+  if (!getCloudKVConfig()) return;
+  const db = ensureDb();
+  const map: Record<CloudSliceKey, unknown> = {
+    users: db.users || {},
+    qrs: db.dynamicQRs || {},
+    payments: db.payments || {},
+    leads: db.developerLeads || {},
+    notifications: db.developerNotifications || {},
+    settings: db.developerSettings || initialData.developerSettings,
+  };
+  await kvRequest(['SET', `spotqr:${slice}`, JSON.stringify(map[slice])]);
+}
+
+export async function persistMenuToCloud(menu: RestaurantMenu): Promise<void> {
+  if (!menu?.slug || !getCloudKVConfig()) return;
+  await kvRequest(['SET', `spotqr:menu:${menu.slug}`, JSON.stringify(menu)]);
+}
+
 // DYNAMIC QR CRUD
 export function getDynamicQRBySlug(slug: string): DynamicQRRecord | null {
   const db = ensureDb();
@@ -981,6 +1146,31 @@ export function createClientUser(input: {
   });
 
   return user;
+}
+
+export function restoreClientUserFromSession(
+  profile: Omit<ClientUser, 'passwordHash'>
+): ClientUser {
+  const db = ensureDb();
+  if (!db.users) db.users = {};
+
+  const existingById = db.users[profile.id];
+  if (existingById) return existingById;
+
+  const cleanEmail = (profile.email || '').trim().toLowerCase();
+  const existingByEmail = Object.values(db.users).find(
+    (u) => u.email.toLowerCase() === cleanEmail
+  );
+  if (existingByEmail) return existingByEmail;
+
+  const restored: ClientUser = {
+    ...profile,
+    email: cleanEmail,
+    passwordHash: '',
+  };
+  db.users[restored.id] = restored;
+  saveDb(db);
+  return restored;
 }
 
 export function getDynamicQRsByOwner(

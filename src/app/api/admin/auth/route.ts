@@ -6,11 +6,16 @@ import {
   isAdminRequestAuthenticated,
   verifyCredentials,
 } from '@/lib/admin-auth';
-import { saveDeveloperSettings } from '@/lib/db';
+import {
+  saveDeveloperSettings,
+  syncDbFromCloud,
+  persistSliceToCloud,
+} from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  await syncDbFromCloud();
   const isAuthenticated = isAdminRequestAuthenticated(req);
   if (!isAuthenticated) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
@@ -24,6 +29,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     const body = await req.json();
     const { username, password } = body;
 
@@ -70,6 +76,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    await syncDbFromCloud();
     if (!isAdminRequestAuthenticated(req)) {
       return NextResponse.json(
         { error: 'Acesso negado. Faça login primeiro.' },
@@ -99,6 +106,7 @@ export async function PUT(req: NextRequest) {
       adminUsername: newUsername ? String(newUsername).trim() : 'admin',
       adminPassword: String(newPassword),
     });
+    await persistSliceToCloud('settings');
 
     const newToken = createAdminSessionToken();
     const response = NextResponse.json({

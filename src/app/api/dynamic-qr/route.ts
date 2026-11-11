@@ -4,6 +4,10 @@ import {
   getDynamicQRBySlug,
   getDynamicQRsByOwner,
   saveDynamicQR,
+  getMenuBySlug,
+  syncDbFromCloud,
+  persistSliceToCloud,
+  persistMenuToCloud,
 } from '@/lib/db';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
@@ -12,6 +16,7 @@ import { DynamicQRRecord } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  await syncDbFromCloud();
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
 
@@ -49,6 +54,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await syncDbFromCloud();
     const clientUser = getAuthenticatedClientUser(request);
     const isAdmin = isAdminRequestAuthenticated(request);
 
@@ -97,6 +103,11 @@ export async function POST(request: NextRequest) {
     };
 
     saveDynamicQR(record);
+    await persistSliceToCloud('qrs');
+    if (record.type === 'menu' || record.type === 'catalog') {
+      const m = getMenuBySlug(cleanSlug, record.type, record.title);
+      if (m) await persistMenuToCloud(m);
+    }
     return NextResponse.json({ success: true, qr: record });
   } catch (error) {
     console.error('Error creating/saving QR:', error);
@@ -109,6 +120,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    await syncDbFromCloud();
     const clientUser = getAuthenticatedClientUser(request);
     const isAdmin = isAdminRequestAuthenticated(request);
 
@@ -151,6 +163,7 @@ export async function PUT(request: NextRequest) {
     };
 
     saveDynamicQR(updated);
+    await persistSliceToCloud('qrs');
 
     return NextResponse.json({ success: true, qr: updated });
   } catch (error) {
