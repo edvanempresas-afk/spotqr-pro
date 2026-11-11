@@ -19,8 +19,11 @@ import {
   Phone,
   Layers,
   ExternalLink,
+  Upload,
+  RotateCcw,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem, MenuCategory } from '@/lib/types';
+import { compressImageFileToDataUrl } from '@/lib/image-upload';
 
 interface MenuEditorModalProps {
   isOpen: boolean;
@@ -64,6 +67,16 @@ const CATALOG_IMAGE_PRESETS = [
   { label: '🕯️ Presente', url: '/catalogo/prod-vela.jpg' },
 ];
 
+const COVER_IMAGE_PRESETS = [
+  { label: '🛍️ Ateliê & Loja', url: '/catalogo/cover-loja.jpg' },
+  {
+    label: '🍔 Restaurante Gourmet',
+    url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80',
+  },
+  { label: '🧶 Artesanato Decor', url: '/catalogo/prod-artesanato.jpg' },
+  { label: '👕 Boutique Minimal', url: '/catalogo/prod-roupa.jpg' },
+];
+
 export default function MenuEditorModal({
   isOpen,
   onClose,
@@ -75,7 +88,10 @@ export default function MenuEditorModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'categories' | 'items'>('items');
+  const [uploadingTarget, setUploadingTarget] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    'info' | 'categories' | 'items' | 'branding'
+  >('items');
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const isCatalog = (menu?.mode || mode) === 'catalog';
@@ -194,6 +210,43 @@ export default function MenuEditorModal({
     });
   };
 
+  const handleProductPhotoUpload = async (
+    itemId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingTarget(`item-${itemId}`);
+    try {
+      const dataUrl = await compressImageFileToDataUrl(file, 'product');
+      handleUpdateItem(itemId, { imageUrl: dataUrl });
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao enviar foto do produto.');
+    } finally {
+      setUploadingTarget(null);
+    }
+  };
+
+  const handleBrandImageUpload = async (
+    field: 'logoImage' | 'coverImage',
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !menu) return;
+    setUploadingTarget(field);
+    try {
+      const preset = field === 'logoImage' ? 'logo' : 'cover';
+      const dataUrl = await compressImageFileToDataUrl(file, preset);
+      setMenu((prev) => (prev ? { ...prev, [field]: dataUrl } : prev));
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao enviar imagem.');
+    } finally {
+      setUploadingTarget(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-[#101726] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
@@ -266,6 +319,10 @@ export default function MenuEditorModal({
               label: isCatalog
                 ? `🛍️ Produtos (${menu?.items.length || 0})`
                 : `🍔 Pratos & Produtos (${menu?.items.length || 0})`,
+            },
+            {
+              id: 'branding',
+              label: '🎨 Logo & Imagem de Fundo',
             },
             { id: 'categories', label: `📂 Categorias (${menu?.categories.length || 0})` },
             {
@@ -412,13 +469,31 @@ export default function MenuEditorModal({
                         }`}
                       >
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                          {/* Image preview */}
+                          {/* Image preview + Direct Upload from PC/Mobile */}
                           <div className="md:col-span-2 flex flex-col items-center gap-2">
-                            <img
-                              src={item.imageUrl || activePresets[0].url}
-                              alt={item.name}
-                              className="w-20 h-20 object-cover rounded-xl border border-slate-700"
-                            />
+                            <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0">
+                              <img
+                                src={item.imageUrl || activePresets[0].url}
+                                alt={item.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <label className="w-full max-w-[112px] flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 rounded-lg text-[10px] font-bold cursor-pointer transition text-center">
+                              <Upload className="w-3 h-3 shrink-0" />
+                              <span>
+                                {uploadingTarget === `item-${item.id}`
+                                  ? 'Enviando...'
+                                  : 'Enviar Foto'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  handleProductPhotoUpload(item.id, e)
+                                }
+                                className="hidden"
+                              />
+                            </label>
                             <div className="flex flex-wrap gap-1 justify-center">
                               {activePresets.slice(0, 4).map((preset) => (
                                 <button
@@ -538,17 +613,34 @@ export default function MenuEditorModal({
 
                             <div>
                               <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                URL da Foto:
+                                Foto do Produto (Upload ou URL):
                               </label>
-                              <input
-                                type="text"
-                                value={item.imageUrl || ''}
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, { imageUrl: e.target.value })
-                                }
-                                placeholder="https://..."
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono"
-                              />
+                              {item.imageUrl?.startsWith('data:') ? (
+                                <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-300">
+                                  <span className="truncate font-semibold">
+                                    ✅ Foto própria enviada
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleUpdateItem(item.id, { imageUrl: '' })
+                                    }
+                                    className="text-slate-400 hover:text-rose-400 text-[10px] underline shrink-0"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={item.imageUrl || ''}
+                                  onChange={(e) =>
+                                    handleUpdateItem(item.id, { imageUrl: e.target.value })
+                                  }
+                                  placeholder="https://... ou use Enviar Foto"
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono"
+                                />
+                              )}
                             </div>
                           </div>
 
@@ -585,6 +677,237 @@ export default function MenuEditorModal({
                   </div>
                 </div>
               )}
+
+              {/* TAB: BRANDING (LOGO & BACKGROUND COVER) */}
+              {activeTab === 'branding' && (() => {
+                const defaultCover = isCatalog
+                  ? '/catalogo/cover-loja.jpg'
+                  : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80';
+                return (
+                  <div className="space-y-6 max-w-3xl">
+                    {/* Live Header Mini Preview */}
+                    <div className="rounded-2xl overflow-hidden border border-slate-800 bg-[#090d14]">
+                      <div className="relative h-28 sm:h-36 bg-slate-900">
+                        <img
+                          src={menu.coverImage || defaultCover}
+                          alt="Capa da vitrine"
+                          className="w-full h-full object-cover opacity-65"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/40 to-transparent" />
+                        <span className="absolute top-2.5 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-300 border border-white/10">
+                          Prévia do Cabeçalho
+                        </span>
+                      </div>
+                      <div className="px-4 pb-4 -mt-8 relative z-10">
+                        <div className="bg-[#121929]/95 border border-slate-800 rounded-2xl p-4 flex items-center gap-3.5 shadow-xl">
+                          <div className="w-14 h-14 rounded-xl border-2 border-emerald-500/40 bg-slate-950 flex items-center justify-center overflow-hidden shrink-0">
+                            {menu.logoImage ? (
+                              <img
+                                src={menu.logoImage}
+                                alt="Logo"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : isCatalog ? (
+                              <ShoppingBag className="w-7 h-7 text-emerald-400" />
+                            ) : (
+                              <Utensils className="w-7 h-7 text-emerald-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-extrabold text-white truncate">
+                              {menu.title}
+                            </h4>
+                            <p className="text-[11px] text-slate-400 line-clamp-1">
+                              {menu.description}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Logo & Cover Upload Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Company Logo Card */}
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-emerald-400" />
+                            <span>Logo da Empresa (Cabeçalho)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Aparece no quadrado ao lado do nome da sua empresa.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-xl border border-slate-700 bg-slate-950 flex items-center justify-center overflow-hidden shrink-0">
+                            {menu.logoImage ? (
+                              <img
+                                src={menu.logoImage}
+                                alt="Logo atual"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : isCatalog ? (
+                              <ShoppingBag className="w-7 h-7 text-slate-600" />
+                            ) : (
+                              <Utensils className="w-7 h-7 text-slate-600" />
+                            )}
+                          </div>
+
+                          <div className="flex-1 space-y-2">
+                            <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold cursor-pointer transition shadow-sm">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>
+                                {uploadingTarget === 'logoImage'
+                                  ? 'Enviando Logo...'
+                                  : 'Upload da Logo'}
+                              </span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  handleBrandImageUpload('logoImage', e)
+                                }
+                                className="hidden"
+                              />
+                            </label>
+
+                            {menu.logoImage && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMenu({ ...menu, logoImage: '' })
+                                }
+                                className="w-full flex items-center justify-center gap-1 px-2 py-1 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 rounded-lg text-[11px] font-semibold transition"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Remover Logo (Usar Ícone)</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {!menu.logoImage?.startsWith('data:') && (
+                          <div>
+                            <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                              Ou cole URL da Logo:
+                            </label>
+                            <input
+                              type="text"
+                              value={menu.logoImage || ''}
+                              onChange={(e) =>
+                                setMenu({ ...menu, logoImage: e.target.value })
+                              }
+                              placeholder="https://..."
+                              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Cover Background Image Card */}
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                            <ImageIcon className="w-4 h-4 text-amber-400" />
+                            <span>Imagem de Fundo (Banner Topo)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Foto ampla exibida no topo atrás do cartão da loja.
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold cursor-pointer transition shadow-sm">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>
+                              {uploadingTarget === 'coverImage'
+                                ? 'Enviando Fundo...'
+                                : 'Upload Imagem de Fundo'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) =>
+                                handleBrandImageUpload('coverImage', e)
+                              }
+                              className="hidden"
+                            />
+                          </label>
+
+                          <div className="flex flex-wrap gap-1.5">
+                            {COVER_IMAGE_PRESETS.map((preset) => (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() =>
+                                  setMenu({ ...menu, coverImage: preset.url })
+                                }
+                                className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-semibold text-slate-300 transition"
+                              >
+                                {preset.label}
+                              </button>
+                            ))}
+                            {menu.coverImage && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMenu({ ...menu, coverImage: '' })
+                                }
+                                className="px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] font-semibold text-slate-400 flex items-center gap-1 transition"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Padrão</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {menu.coverImage?.startsWith('data:') ? (
+                            <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-300">
+                              <span className="font-semibold">
+                                ✅ Imagem de fundo própria enviada
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setMenu({ ...menu, coverImage: '' })
+                                }
+                                className="text-slate-400 hover:text-rose-400 text-[10px] underline"
+                              >
+                                Remover
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                Ou cole URL da Capa:
+                              </label>
+                              <input
+                                type="text"
+                                value={menu.coverImage || ''}
+                                onChange={(e) =>
+                                  setMenu({
+                                    ...menu,
+                                    coverImage: e.target.value,
+                                  })
+                                }
+                                placeholder="https://..."
+                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-[11px] text-amber-200 flex items-center justify-between gap-3">
+                      <span>
+                        💡 Depois de escolher sua logo, foto de fundo ou fotos dos produtos, clique em <strong>Salvar Alterações</strong> no topo para publicar no ar.
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* TAB 2: CATEGORIES */}
               {activeTab === 'categories' && (

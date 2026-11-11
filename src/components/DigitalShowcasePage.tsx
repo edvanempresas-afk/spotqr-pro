@@ -401,8 +401,20 @@ export default function DigitalShowcasePage({
         >
           <div className="bg-[#121929]/95 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-md">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border-2 border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-glow">
-                {isCatalog ? (
+              <div
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-emerald-500/40 flex items-center justify-center shrink-0 shadow-glow overflow-hidden ${
+                  menu.logoImage
+                    ? 'bg-slate-950'
+                    : 'bg-emerald-500/20 text-emerald-400'
+                }`}
+              >
+                {menu.logoImage ? (
+                  <img
+                    src={menu.logoImage}
+                    alt={`Logo de ${menu.title}`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : isCatalog ? (
                   <ShoppingBag className="w-8 h-8" />
                 ) : (
                   <Utensils className="w-8 h-8" />
