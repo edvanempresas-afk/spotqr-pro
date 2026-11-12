@@ -1809,9 +1809,7 @@ export default function MenuEditorModal({
 
                   <div>
                     <label className="text-xs font-semibold text-slate-300 block mb-1">
-                      {isCatalog
-                        ? 'Chave PIX (Para recebimento de pedidos):'
-                        : 'Chave PIX (Para pagamento da conta na mesa):'}
+                      Chave PIX (Gerada com valor exato somente após fechar pedido):
                     </label>
                     <input
                       type="text"
@@ -1984,7 +1982,7 @@ export default function MenuEditorModal({
                         !menu.pixKey?.trim() && (
                           <p className="text-[11px] text-amber-300 mt-2">
                             💡 Você marcou <strong>PIX</strong> — preencha sua{' '}
-                            <strong>Chave PIX</strong> acima para liberar o QR Code PIX no topo da página.
+                            <strong>Chave PIX</strong> acima para gerar automaticamente o QR Code PIX no valor exato quando o cliente fechar o pedido no carrinho.
                           </p>
                         )}
                     </div>

@@ -43,6 +43,15 @@ interface CartItem {
   quantity: number;
 }
 
+interface ClosedPixOrder {
+  amount: number;
+  subtotal: number;
+  deliveryFee: number;
+  itemsCount: number;
+  txId: string;
+  whatsappUrl: string;
+}
+
 type OrderMode = 'table' | 'delivery' | 'pickup';
 
 interface DigitalShowcasePageProps {
@@ -73,9 +82,11 @@ export default function DigitalShowcasePage({
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [notes, setNotes] = useState('');
 
-  // Quick actions
+  // Quick actions & post-checkout PIX order lock
   const [copiedWifi, setCopiedWifi] = useState(false);
-  const [isPixModalOpen, setIsPixModalOpen] = useState(false);
+  const [closedPixOrder, setClosedPixOrder] = useState<ClosedPixOrder | null>(
+    null
+  );
   const [pixQrUrl, setPixQrUrl] = useState('');
   const [copiedPix, setCopiedPix] = useState(false);
 
@@ -227,7 +238,11 @@ export default function DigitalShowcasePage({
     [menu]
   );
   const acceptsPix = acceptedPaymentIds.includes('pix');
-  const canShowPixButton = acceptsPix && Boolean(menu?.pixKey?.trim());
+  const hasPixKey = Boolean(menu?.pixKey?.trim());
+  const selectedPaymentOption =
+    acceptedPaymentOptions.find((opt) => opt.whatsappLabel === paymentMethod) ||
+    null;
+  const isPixSelected = selectedPaymentOption?.id === 'pix';
 
   useEffect(() => {
     if (acceptedPaymentOptions.length === 0) {
@@ -283,6 +298,7 @@ export default function DigitalShowcasePage({
   const addToCart = (item: MenuItem) => {
     const stock = getItemStockInfo(item);
     if (!stock.canOrder || stock.maxQuantity <= 0) return;
+    setClosedPixOrder(null);
     setCart((prev) => {
       const existing = prev[item.id];
       const currentQty = existing ? existing.quantity : 0;
@@ -300,6 +316,7 @@ export default function DigitalShowcasePage({
   };
 
   const removeFromCart = (itemId: string) => {
+    setClosedPixOrder(null);
     setCart((prev) => {
       const existing = prev[itemId];
       if (!existing) return prev;
@@ -328,25 +345,33 @@ export default function DigitalShowcasePage({
       ? Number(menu?.deliveryFee || 0)
       : 0;
   const totalPrice = subtotalPrice + deliveryFee;
+  const canPayPixAtCheckout =
+    acceptsPix && hasPixKey && isPixSelected && totalItems > 0 && totalPrice > 0;
 
-  // Generate PIX payload
+  // Generate PIX payload strictly locked to the closed cart/order total
   const pixPayload = useMemo(() => {
-    if (!menu?.pixKey) return '';
+    const cleanKey = menu?.pixKey?.trim();
+    if (!cleanKey || !closedPixOrder || closedPixOrder.amount <= 0) {
+      return '';
+    }
     return generatePixPayload({
-      key: menu.pixKey,
-      name: menu.title || (isCatalog ? 'Loja' : 'Restaurante'),
+      key: cleanKey,
+      name: menu?.title || (isCatalog ? 'Loja' : 'Restaurante'),
       city: 'SAO PAULO',
-      amount: totalPrice > 0 ? totalPrice : undefined,
+      amount: closedPixOrder.amount,
+      txId: closedPixOrder.txId,
     });
-  }, [menu, totalPrice, isCatalog]);
+  }, [menu?.pixKey, menu?.title, isCatalog, closedPixOrder]);
 
   useEffect(() => {
-    if (isPixModalOpen && pixPayload) {
+    if (closedPixOrder && pixPayload) {
       QRCode.toDataURL(pixPayload, { width: 260, margin: 2 })
         .then((url) => setPixQrUrl(url))
         .catch(() => {});
+    } else {
+      setPixQrUrl('');
     }
-  }, [isPixModalOpen, pixPayload]);
+  }, [closedPixOrder, pixPayload]);
 
   const handleCopyWifi = () => {
     if (menu?.wifiInfo) {
@@ -370,8 +395,8 @@ export default function DigitalShowcasePage({
     );
   };
 
-  const handleSendWhatsAppOrder = () => {
-    if (!menu?.whatsappNumber) return;
+  const buildWhatsAppOrderUrl = (pixTxId?: string): string => {
+    if (!menu?.whatsappNumber) return '';
 
     const itemsSummary = Object.values(cart)
       .map(
@@ -409,6 +434,10 @@ export default function DigitalShowcasePage({
       `*${isCatalog ? 'Loja / Marca' : 'Estabelecimento'}:* ${menu.title}\n` +
       `────────────────────\n`;
 
+    if (pixTxId) {
+      message += `*Código do Pedido (PIX):* #${pixTxId}\n`;
+    }
+
     if (!activeMode) {
       message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
     } else if (activeMode === 'table') {
@@ -439,6 +468,10 @@ export default function DigitalShowcasePage({
     }
     message += `\n*TOTAL: R$ ${totalPrice.toFixed(2)}*\n`;
 
+    if (pixTxId) {
+      message += `\n*Pagamento via PIX:* Gerado no valor exato de *R$ ${totalPrice.toFixed(2)}* (vou enviar o comprovante abaixo).\n`;
+    }
+
     if (notes) {
       message += `\n*Observações / Detalhes:* ${notes}\n`;
     }
@@ -448,10 +481,30 @@ export default function DigitalShowcasePage({
     } SpotQR Pro_`;
 
     const cleanNumber = menu.whatsappNumber.replace(/\D/g, '');
-    const url = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(
-      message
-    )}`;
-    window.open(url, '_blank');
+    return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
+  };
+
+  const handleConfirmCheckout = () => {
+    if (canPayPixAtCheckout) {
+      const txId = `PED${Date.now().toString().slice(-6)}`;
+      const whatsappUrl = buildWhatsAppOrderUrl(txId);
+      setCopiedPix(false);
+      setIsCartOpen(false);
+      setClosedPixOrder({
+        amount: Number(totalPrice.toFixed(2)),
+        subtotal: Number(subtotalPrice.toFixed(2)),
+        deliveryFee: Number(deliveryFee.toFixed(2)),
+        itemsCount: totalItems,
+        txId,
+        whatsappUrl,
+      });
+      return;
+    }
+
+    const url = buildWhatsAppOrderUrl();
+    if (url) {
+      window.open(url, '_blank');
+    }
   };
 
   if (loading) {
@@ -972,11 +1025,11 @@ export default function DigitalShowcasePage({
               </div>
             </div>
 
-            {/* Quick Assistance Bar (Waiter/Seller + Pay with PIX when enabled) */}
+            {/* Quick Assistance Bar (Waiter/Seller) — PIX only opens after closing cart order */}
             <div
-              className={`mt-5 pt-4 border-t grid gap-3 ${
+              className={`mt-5 pt-4 border-t grid grid-cols-1 gap-3 ${
                 isLight ? 'border-slate-200' : 'border-slate-800/80'
-              } ${canShowPixButton ? 'grid-cols-2' : 'grid-cols-1'}`}
+              }`}
             >
               <button
                 type="button"
@@ -1006,22 +1059,6 @@ export default function DigitalShowcasePage({
                   </>
                 )}
               </button>
-
-              {canShowPixButton && (
-                <button
-                  type="button"
-                  onClick={() => setIsPixModalOpen(true)}
-                  style={{
-                    backgroundColor: theme.accentSoftBg,
-                    borderColor: theme.accentBorder,
-                    color: theme.readableAccentText,
-                  }}
-                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition hover:brightness-105"
-                >
-                  <QrCode className="w-4 h-4" />
-                  <span>{isCatalog ? 'Pagar com PIX' : 'Pagar Conta com PIX'}</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -1321,14 +1358,15 @@ export default function DigitalShowcasePage({
         </div>
       )}
 
-      {/* PIX Bill Payment Modal */}
-      {isPixModalOpen && (
+      {/* Post-Checkout PIX Payment Modal (strictly locked to closed cart order total) */}
+      {closedPixOrder && closedPixOrder.amount > 0 && pixPayload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div
             className={`relative w-full max-w-sm border rounded-3xl p-6 text-center shadow-2xl space-y-4 ${modalBoxClass}`}
           >
             <button
-              onClick={() => setIsPixModalOpen(false)}
+              onClick={() => setClosedPixOrder(null)}
+              aria-label="Fechar janela de pagamento PIX"
               className={`absolute top-4 right-4 p-1.5 rounded-lg transition ${
                 isLight
                   ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
@@ -1349,13 +1387,49 @@ export default function DigitalShowcasePage({
             </div>
 
             <div>
+              <span
+                style={{
+                  backgroundColor: theme.accentSoftBg,
+                  borderColor: theme.accentBorder,
+                  color: theme.readableAccentText,
+                }}
+                className="inline-block border text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase mb-2"
+              >
+                Pedido #{closedPixOrder.txId} • {closedPixOrder.itemsCount}{' '}
+                {closedPixOrder.itemsCount === 1 ? 'item' : 'itens'}
+              </span>
               <h3 className={`text-lg font-extrabold ${headingTextClass}`}>
-                {isCatalog ? 'Pagamento via PIX' : 'Pagamento PIX na Mesa'}
+                Pague o Pedido via PIX
               </h3>
               <p className={`text-xs mt-1 ${mutedTextClass}`}>
-                Escaneie ou copie a chave PIX oficial de{' '}
-                <strong className={headingTextClass}>{menu.title}</strong>
+                PIX oficial para <strong className={headingTextClass}>{menu.title}</strong>{' '}
+                com o valor exato do seu carrinho
               </p>
+            </div>
+
+            {/* Locked exact amount summary */}
+            <div
+              style={{
+                backgroundColor: theme.accentSoftBg,
+                borderColor: theme.accentBorder,
+              }}
+              className="border rounded-2xl px-4 py-3"
+            >
+              <span className={`text-[10px] uppercase tracking-wider font-bold block ${mutedTextClass}`}>
+                Valor exato travado no PIX:
+              </span>
+              <strong
+                className="text-2xl font-black block mt-0.5"
+                style={{ color: theme.readableAccentText }}
+              >
+                R$ {closedPixOrder.amount.toFixed(2)}
+              </strong>
+              {closedPixOrder.deliveryFee > 0 && (
+                <span className={`text-[11px] block mt-0.5 ${mutedTextClass}`}>
+                  Subtotal R$ {closedPixOrder.subtotal.toFixed(2)} +{' '}
+                  {isCatalog ? 'Entrega' : 'Taxa'} R$ {closedPixOrder.deliveryFee.toFixed(2)}
+                </span>
+              )}
             </div>
 
             {pixQrUrl && (
@@ -1366,56 +1440,78 @@ export default function DigitalShowcasePage({
               >
                 <img
                   src={pixQrUrl}
-                  alt="QR Code PIX"
+                  alt={`QR Code PIX no valor de R$ ${closedPixOrder.amount.toFixed(2)}`}
                   className="w-44 h-44 object-contain"
                 />
               </div>
             )}
 
-            <div
-              className={`text-xs border rounded-xl p-3 ${
-                isLight
-                  ? 'text-slate-700 bg-slate-100 border-slate-200'
-                  : 'text-slate-300 bg-slate-900 border-slate-800'
-              }`}
-            >
-              <span className="text-slate-500 block text-[10px] uppercase mb-0.5">
-                Chave PIX Oficial:
-              </span>
-              <strong
-                className="font-mono"
-                style={{ color: theme.readableAccentText }}
-              >
-                {menu.pixKey || 'financeiro@spotqr.com.br'}
+            <p className={`text-[11px] leading-relaxed ${mutedTextClass}`}>
+              O QR Code e o Copia e Cola já incluem automaticamente o valor exato de{' '}
+              <strong className={headingTextClass}>
+                R$ {closedPixOrder.amount.toFixed(2)}
               </strong>
-            </div>
+              . Após pagar, envie o comprovante no WhatsApp para confirmar seu pedido.
+            </p>
 
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(
-                  pixPayload || menu.pixKey || 'financeiro@spotqr.com.br'
-                );
-                setCopiedPix(true);
-                setTimeout(() => setCopiedPix(false), 2500);
-              }}
-              style={{
-                backgroundColor: theme.accentHex,
-                color: theme.accentTextOnSolid,
-              }}
-              className="w-full py-3 rounded-xl text-xs font-bold transition hover:brightness-105 flex items-center justify-center gap-2"
-            >
-              {copiedPix ? (
-                <>
-                  <Check className="w-4 h-4" />
-                  <span>Código PIX Copiado!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4" />
-                  <span>Copiar PIX Copia e Cola</span>
-                </>
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(pixPayload);
+                  setCopiedPix(true);
+                  setTimeout(() => setCopiedPix(false), 2500);
+                }}
+                style={{
+                  backgroundColor: theme.accentHex,
+                  color: theme.accentTextOnSolid,
+                }}
+                className="w-full py-3 rounded-xl text-xs font-bold transition hover:brightness-105 flex items-center justify-center gap-2"
+              >
+                {copiedPix ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>PIX Copia e Cola Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    <span>
+                      Copiar PIX Copia e Cola (R$ {closedPixOrder.amount.toFixed(2)})
+                    </span>
+                  </>
+                )}
+              </button>
+
+              {closedPixOrder.whatsappUrl && (
+                <button
+                  type="button"
+                  onClick={() => window.open(closedPixOrder.whatsappUrl, '_blank')}
+                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-900 border-slate-200'
+                      : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                  }`}
+                >
+                  <MessageCircle
+                    className="w-4 h-4"
+                    style={{ color: theme.readableAccentText }}
+                  />
+                  <span>Enviar Pedido + Comprovante no WhatsApp</span>
+                </button>
               )}
-            </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setClosedPixOrder(null);
+                  setIsCartOpen(true);
+                }}
+                className={`w-full py-1.5 text-[11px] font-semibold transition ${mutedTextClass} hover:underline`}
+              >
+                ← Voltar e alterar itens do pedido
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1754,16 +1850,43 @@ export default function DigitalShowcasePage({
                 </span>
               </div>
 
+              {canPayPixAtCheckout && (
+                <p className={`text-[11px] leading-relaxed ${mutedTextClass}`}>
+                  Ao fechar o pedido, o QR Code PIX será gerado exatamente no valor de{' '}
+                  <strong className={headingTextClass}>
+                    R$ {totalPrice.toFixed(2)}
+                  </strong>
+                  .
+                </p>
+              )}
+
+              {isPixSelected && !hasPixKey && (
+                <p className={`text-[11px] leading-relaxed ${mutedTextClass}`}>
+                  A chave PIX será combinada com o atendente ao enviar o pedido.
+                </p>
+              )}
+
               <button
-                onClick={handleSendWhatsAppOrder}
+                onClick={handleConfirmCheckout}
                 style={{
                   backgroundColor: theme.accentHex,
                   color: theme.accentTextOnSolid,
                 }}
                 className="w-full py-3.5 px-4 rounded-xl text-xs font-bold transition shadow-md hover:brightness-105 flex items-center justify-center gap-2"
               >
-                <MessageCircle className="w-4 h-4" />
-                <span>Enviar Pedido pelo WhatsApp</span>
+                {canPayPixAtCheckout ? (
+                  <>
+                    <QrCode className="w-4 h-4" />
+                    <span>
+                      Fechar Pedido e Gerar PIX (R$ {totalPrice.toFixed(2)})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Enviar Pedido pelo WhatsApp</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
