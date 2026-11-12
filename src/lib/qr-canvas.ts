@@ -61,6 +61,7 @@ export interface RenderQROptions {
   canvas: HTMLCanvasElement;
   width?: number;
   height?: number;
+  isPro?: boolean;
 }
 
 /**
@@ -129,6 +130,7 @@ export async function renderStyledQR({
   canvas,
   width = 800,
   height = 800,
+  isPro = false,
 }: RenderQROptions): Promise<void> {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -186,8 +188,8 @@ export async function renderStyledQR({
     return false;
   };
 
-  // Center logo safety zone calculation (STRICT RULE: Logo in center is ONLY for PRO / isDynamic)
-  const hasLogo = Boolean(config.isDynamic && config.logoUrl);
+  // Center logo safety zone calculation (Logo in center is unlocked for PRO accounts or active dynamic PRO QRs)
+  const hasLogo = Boolean((isPro || config.isDynamic) && config.logoUrl);
   const logoPercentage = (config.logoSize || 22) / 100;
   const logoModulesSize = Math.floor(moduleCount * logoPercentage);
   const logoStart = Math.floor((moduleCount - logoModulesSize) / 2);
@@ -611,20 +613,16 @@ async function drawLogo(
 
   const natW = img.naturalWidth || img.width;
   const natH = img.naturalHeight || img.height;
-  const sSide = Math.min(natW, natH);
-  if (sSide > 0) {
-    const sx = (natW - sSide) / 2;
-    const sy = (natH - sSide) / 2;
+  if (natW > 0 && natH > 0) {
+    const scale = Math.min(logoBoxSize / natW, logoBoxSize / natH);
+    const drawW = natW * scale;
+    const drawH = natH * scale;
     ctx.drawImage(
       img,
-      sx,
-      sy,
-      sSide,
-      sSide,
-      centerX - logoBoxSize / 2,
-      centerY - logoBoxSize / 2,
-      logoBoxSize,
-      logoBoxSize
+      centerX - drawW / 2,
+      centerY - drawH / 2,
+      drawW,
+      drawH
     );
   } else {
     ctx.drawImage(

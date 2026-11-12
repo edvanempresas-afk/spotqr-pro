@@ -448,18 +448,27 @@ export default function DigitalShowcasePage({
     );
   };
 
+  const isMadeToOrderBadge = (badge?: string): boolean =>
+    typeof badge === 'string' && badge.trim().toLowerCase() === 'sob encomenda';
+
+  const getItemProductionDays = (item: MenuItem): number => {
+    if (!isMadeToOrderBadge(item.badge)) return 0;
+    const parsed = Math.round(Number(item.productionDays) || 0);
+    return parsed > 0 ? Math.min(365, parsed) : 0;
+  };
+
+  const formatProductionDaysLabel = (days: number): string =>
+    `Pronto em ${days} ${days === 1 ? 'dia' : 'dias'}`;
+
   const buildWhatsAppOrderUrl = (pixTxId?: string): string => {
     if (!menu?.whatsappNumber) return '';
 
     const itemsSummary = Object.values(cart)
       .map((c) => {
+        const prodDays = getItemProductionDays(c.item);
         const prodDaysInfo =
-          c.item.badge === 'Sob Encomenda' &&
-          c.item.productionDays &&
-          c.item.productionDays > 0
-            ? ` (Sob encomenda • pronto em ${c.item.productionDays} ${
-                c.item.productionDays === 1 ? 'dia' : 'dias'
-              })`
+          prodDays > 0
+            ? ` (Sob encomenda • ${formatProductionDaysLabel(prodDays).toLowerCase()})`
             : '';
         return `• ${c.quantity}x ${c.item.name}${prodDaysInfo} — R$ ${(
           c.quantity * c.item.price
@@ -887,14 +896,16 @@ export default function DigitalShowcasePage({
           }}
         />
 
-        {/* Back button */}
-        <Link
-          href="/"
-          className="absolute top-4 left-4 px-3 py-2 bg-black/55 backdrop-blur-md rounded-xl text-slate-100 hover:text-white border border-white/15 flex items-center gap-1.5 text-xs font-semibold"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Criador de QR</span>
-        </Link>
+        {/* Back button: hidden on PRO showcases; restored automatically if PRO expires */}
+        {!isPro && (
+          <Link
+            href="/"
+            className="absolute top-4 left-4 px-3 py-2 bg-black/55 backdrop-blur-md rounded-xl text-slate-100 hover:text-white border border-white/15 flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Criador de QR</span>
+          </Link>
+        )}
 
         {/* Table badge if detected from URL */}
         {tableNumber && (
@@ -966,7 +977,7 @@ export default function DigitalShowcasePage({
               </div>
 
               <div className="flex-1 space-y-1.5">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <div className="flex flex-col items-center sm:flex-row sm:flex-wrap sm:items-center sm:justify-start gap-1.5 sm:gap-2">
                   <h1
                     className={`text-xl sm:text-2xl font-extrabold tracking-tight ${headingTextClass}`}
                   >
@@ -991,17 +1002,6 @@ export default function DigitalShowcasePage({
                       }`}
                     >
                       ● Fechado
-                    </span>
-                  )}
-                  {isPro && (
-                    <span
-                      className={`border text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
-                        isLight
-                          ? 'bg-amber-50 border-amber-200 text-amber-700'
-                          : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                      }`}
-                    >
-                      Verificado PRO
                     </span>
                   )}
                 </div>
@@ -1250,6 +1250,7 @@ export default function DigitalShowcasePage({
             ) : (
               filteredItems.map((item, index) => {
                 const stock = getItemStockInfo(item);
+                const prodDays = getItemProductionDays(item);
                 const cartActionControl = renderCartActionControl(item);
 
                 return (
@@ -1289,21 +1290,17 @@ export default function DigitalShowcasePage({
                                 {item.badge}
                               </span>
                             )}
-                            {stock.canOrder &&
-                              item.badge === 'Sob Encomenda' &&
-                              item.productionDays &&
-                              item.productionDays > 0 && (
-                                <span
-                                  className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                    isLight
-                                      ? 'bg-orange-50 border-orange-200 text-orange-700'
-                                      : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
-                                  }`}
-                                >
-                                  ⏱️ Pronto em {item.productionDays}{' '}
-                                  {item.productionDays === 1 ? 'dia' : 'dias'}
-                                </span>
-                              )}
+                            {stock.canOrder && prodDays > 0 && (
+                              <span
+                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isLight
+                                    ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                    : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
+                                }`}
+                              >
+                                ⏱️ {formatProductionDaysLabel(prodDays)}
+                              </span>
+                            )}
                             {stock.canOrder && stock.isUnique && (
                               <span
                                 className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1343,6 +1340,19 @@ export default function DigitalShowcasePage({
                           >
                             {item.description}
                           </p>
+                          {stock.canOrder && prodDays > 0 && (
+                            <p
+                              className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                                isLight ? 'text-orange-700' : 'text-orange-300'
+                              }`}
+                            >
+                              <span>⏱️</span>
+                              <span>
+                                Prazo de produção: fica pronto em {prodDays}{' '}
+                                {prodDays === 1 ? 'dia' : 'dias'}
+                              </span>
+                            </p>
+                          )}
                         </div>
 
                         <div className="pt-1 flex flex-wrap items-center justify-between gap-2.5">
@@ -1770,16 +1780,13 @@ export default function DigitalShowcasePage({
                               : `• Limite: ${stock.maxQuantity} unid.`}
                           </span>
                         )}
-                        {c.item.badge === 'Sob Encomenda' &&
-                          c.item.productionDays &&
-                          c.item.productionDays > 0 && (
+                        {getItemProductionDays(c.item) > 0 && (
                             <span
                               className={`text-[10px] font-semibold ${
                                 isLight ? 'text-orange-700' : 'text-orange-300'
                               }`}
                             >
-                              • Pronto em {c.item.productionDays}{' '}
-                              {c.item.productionDays === 1 ? 'dia' : 'dias'}
+                              • {formatProductionDaysLabel(getItemProductionDays(c.item))}
                             </span>
                           )}
                       </div>
@@ -2155,9 +2162,7 @@ export default function DigitalShowcasePage({
             <div
               className={`shrink-0 p-4 sm:px-5 sm:py-4 border-t space-y-3 ${modalSubBarClass}`}
             >
-              {zoomedItem.badge === 'Sob Encomenda' &&
-                zoomedItem.productionDays &&
-                zoomedItem.productionDays > 0 && (
+              {getItemProductionDays(zoomedItem) > 0 && (
                   <span
                     className={`inline-block border text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
                       isLight
@@ -2165,8 +2170,8 @@ export default function DigitalShowcasePage({
                         : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
                     }`}
                   >
-                    🛠️ Sob Encomenda • Pronto em {zoomedItem.productionDays}{' '}
-                    {zoomedItem.productionDays === 1 ? 'dia' : 'dias'}
+                    🛠️ Sob Encomenda •{' '}
+                    {formatProductionDaysLabel(getItemProductionDays(zoomedItem))}
                   </span>
                 )}
               {zoomedItem.description && (

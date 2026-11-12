@@ -22,6 +22,7 @@ interface VoucherRedeemBoxProps {
   stores?: DynamicQRRecord[];
   onRedeemed?: (result: VoucherRedeemResult) => void;
   className?: string;
+  themeMode?: 'dark' | 'light';
 }
 
 export default function VoucherRedeemBox({
@@ -30,7 +31,9 @@ export default function VoucherRedeemBox({
   stores,
   onRedeemed,
   className = '',
+  themeMode = 'dark',
 }: VoucherRedeemBoxProps) {
+  const isLight = themeMode === 'light';
   const [code, setCode] = useState('');
   const [selectedSlug, setSelectedSlug] = useState<string>(targetSlug || '');
   const [submitting, setSubmitting] = useState(false);
@@ -132,27 +135,37 @@ export default function VoucherRedeemBox({
   return (
     <>
       <div
-        className={`rounded-2xl border ${
+        className={`rounded-2xl border transition-colors ${
           compact
-            ? 'bg-slate-900/90 border-amber-500/35 p-3.5'
+            ? isLight
+              ? 'bg-amber-50/70 border-amber-300 p-3.5'
+              : 'bg-slate-900/90 border-amber-500/35 p-3.5'
+            : isLight
+            ? 'bg-gradient-to-r from-amber-50 via-white to-emerald-50/60 border-amber-300/80 p-5 shadow-sm'
             : 'bg-gradient-to-r from-[#121c2e] via-[#101726] to-[#0f1d22] border-amber-500/40 p-5 shadow-lg'
         } ${className}`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 text-left">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/35 flex items-center justify-center text-amber-400 shrink-0">
+            <div
+              className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 ${
+                isLight
+                  ? 'bg-amber-100 border-amber-300 text-amber-700'
+                  : 'bg-amber-500/15 border-amber-500/35 text-amber-400'
+              }`}
+            >
               <Ticket className="w-4 h-4" />
             </div>
             <div>
               <h4
-                className={`font-extrabold text-white flex items-center gap-1.5 ${
+                className={`font-extrabold flex items-center gap-1.5 ${
                   compact ? 'text-xs' : 'text-sm'
-                }`}
+                } ${isLight ? 'text-slate-900' : 'text-white'}`}
               >
                 <span>Possui um Voucher / Código PRO? Digite o seu código aqui</span>
               </h4>
               {!compact && (
-                <p className="text-[11px] text-slate-400">
+                <p className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                   Recebeu um código teste com dias grátis de PRO? Insira abaixo para remover anúncios e liberar sua logomarca na hora.
                 </p>
               )}
@@ -168,7 +181,11 @@ export default function VoucherRedeemBox({
             <select
               value={resolvedSlug}
               onChange={(e) => setSelectedSlug(e.target.value)}
-              className="bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-xl px-3 py-2.5 text-xs text-slate-200 outline-none sm:max-w-[200px]"
+              className={`border focus:border-amber-500 rounded-xl px-3 py-2.5 text-xs outline-none sm:max-w-[200px] ${
+                isLight
+                  ? 'bg-white border-slate-300 text-slate-800'
+                  : 'bg-slate-950 border-slate-700 text-slate-200'
+              }`}
             >
               <option value="">Selecionar loja automaticamente</option>
               {realStores.map((s) => (
@@ -187,7 +204,11 @@ export default function VoucherRedeemBox({
               if (feedback) setFeedback(null);
             }}
             placeholder="Digite o seu código aqui (ex: SPOT-7D-XXXX)"
-            className="flex-1 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold tracking-wider text-white placeholder-slate-500 outline-none transition uppercase"
+            className={`flex-1 border focus:border-amber-400 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold tracking-wider outline-none transition uppercase ${
+              isLight
+                ? 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                : 'bg-slate-950 border-slate-700 text-white placeholder-slate-500'
+            }`}
           />
 
           <button
@@ -208,7 +229,11 @@ export default function VoucherRedeemBox({
           <div
             className={`mt-2.5 p-2.5 rounded-xl border text-xs font-semibold flex items-start gap-2 text-left ${
               feedback.type === 'success'
-                ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                ? isLight
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                : isLight
+                ? 'bg-rose-50 border-rose-300 text-rose-800'
                 : 'bg-rose-500/15 border-rose-500/35 text-rose-300'
             }`}
           >

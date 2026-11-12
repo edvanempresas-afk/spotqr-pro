@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
@@ -36,6 +36,18 @@ export default function HomePage() {
   const { proPrice, proPriceLabel } = useProPrice();
   const [tableCount, setTableCount] = useState(15);
   const [isLockModalOpen, setIsLockModalOpen] = useState(false);
+  const [isClientPro, setIsClientPro] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.hasActivePro) {
+          setIsClientPro(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const costPerTablePrint = 18; // Average price in BRL for acrylic tent + vinyl sticker printing
   const printingsPerYear = 3;
   const annualLossWithoutDynamic = tableCount * costPerTablePrint * printingsPerYear;
@@ -55,7 +67,7 @@ export default function HomePage() {
       {/* STRATEGIC AD 1: Top Leaderboard Banner (Visible only for free users) */}
       <AdBanner
         format="leaderboard"
-        isPro={false}
+        isPro={isClientPro}
         onUpgradeClick={handleOpenProCheckout}
         className="pt-2"
       />
@@ -173,7 +185,7 @@ export default function HomePage() {
         <div className="max-w-5xl mx-auto px-4">
           <AdBanner
             format="leaderboard"
-            isPro={false}
+            isPro={isClientPro}
             onUpgradeClick={handleOpenProCheckout}
           />
         </div>
@@ -322,7 +334,7 @@ export default function HomePage() {
             {/* STRATEGIC AD 3: In-Feed Banner within Digital Menu */}
             <AdBanner
               format="in-feed"
-              isPro={false}
+              isPro={isClientPro}
               onUpgradeClick={handleOpenProCheckout}
               className="max-w-4xl mx-auto"
             />
@@ -622,7 +634,7 @@ export default function HomePage() {
       {/* STRATEGIC AD 4: Sticky Footer Banner on Free Pages */}
       <AdBanner
         format="sticky-footer"
-        isPro={false}
+        isPro={isClientPro}
         onUpgradeClick={handleOpenProCheckout}
       />
 

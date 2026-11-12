@@ -16,6 +16,8 @@ import {
   getDynamicQRsByOwner,
   expireDueQRsIfAny,
   syncDbFromCloud,
+  syncMenuFromCloud,
+  peekExistingMenuBySlug,
   persistSliceToCloud,
   isCloudPersistenceConfigured,
 } from '@/lib/db';
@@ -38,6 +40,12 @@ export async function GET(req: NextRequest) {
       (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
     );
     const activeProQR = userQRs.find((q) => isProStillValid(q)) || null;
+    const primaryQR = activeProQR || userQRs[0] || null;
+    let activeMenu = null;
+    if (primaryQR?.slug) {
+      await syncMenuFromCloud(primaryQR.slug);
+      activeMenu = peekExistingMenuBySlug(primaryQR.slug);
+    }
     const creditExpMs = safeUser.proCreditExpiresAt
       ? new Date(safeUser.proCreditExpiresAt).getTime()
       : 0;
@@ -45,36 +53,59 @@ export async function GET(req: NextRequest) {
       Boolean(safeUser.proCreditExpiresAt) &&
       Number.isFinite(creditExpMs) &&
       Date.now() < creditExpMs;
+    const hasActivePro = Boolean(activeProQR || hasAccountCredit || isAdmin);
 
-    return NextResponse.json({
-      authenticated: true,
-      role: 'client',
-      isAdmin,
-      cloudPersistenceEnabled,
-      hasActivePro: Boolean(activeProQR || hasAccountCredit),
-      activeProSlug: activeProQR?.slug || null,
-      activeProExpiresAt:
-        activeProQR?.proExpiresAt ||
-        (hasAccountCredit ? safeUser.proCreditExpiresAt : null) ||
-        null,
-      user: safeUser,
-    });
+    return NextResponse.json(
+      {
+        authenticated: true,
+        role: 'client',
+        isAdmin,
+        cloudPersistenceEnabled,
+        hasActivePro,
+        activeProSlug: activeProQR?.slug || primaryQR?.slug || null,
+        activeProType: activeProQR?.type || primaryQR?.type || null,
+        activeProTitle: activeProQR?.title || activeMenu?.title || null,
+        activeProLogoUrl:
+          activeProQR?.qrConfig?.logoUrl ||
+          activeMenu?.logoImage ||
+          primaryQR?.qrConfig?.logoUrl ||
+          null,
+        activeProExpiresAt:
+          activeProQR?.proExpiresAt ||
+          (hasAccountCredit ? safeUser.proCreditExpiresAt : null) ||
+          null,
+        user: safeUser,
+      },
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    );
   }
 
   if (isAdmin) {
-    return NextResponse.json({
-      authenticated: true,
-      role: 'admin',
-      isAdmin: true,
-      cloudPersistenceEnabled,
-      user: {
-        id: 'admin',
-        name: 'Desenvolvedor (Admin)',
-        businessName: 'SpotQR Pro Admin',
-        email: 'dev@spotqr.pro',
-        whatsapp: '',
+    return NextResponse.json(
+      {
+        authenticated: true,
+        role: 'admin',
+        isAdmin: true,
+        hasActivePro: true,
+        cloudPersistenceEnabled,
+        user: {
+          id: 'admin',
+          name: 'Desenvolvedor (Admin)',
+          businessName: 'SpotQR Pro Admin',
+          email: 'dev@spotqr.pro',
+          whatsapp: '',
+        },
       },
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
+      }
+    );
   }
 
   return NextResponse.json(

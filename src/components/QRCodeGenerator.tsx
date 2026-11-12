@@ -129,21 +129,39 @@ export default function QRCodeGenerator() {
   >(null);
 
   const [proExpiresAt, setProExpiresAt] = useState<string | null>(null);
+  const [activeStoreLogoUrl, setActiveStoreLogoUrl] = useState<string | null>(
+    null
+  );
+  const [activeStoreTitle, setActiveStoreTitle] = useState<string | null>(null);
+
+  const refreshAuthProStatus = async () => {
+    try {
+      const res = await fetch('/api/auth', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        setClientUser(data.user);
+        if (data.hasActivePro) {
+          setIsProPurchased(true);
+          setProExpiresAt(data.activeProExpiresAt || null);
+          if (data.activeProLogoUrl) {
+            setActiveStoreLogoUrl(data.activeProLogoUrl);
+            setConfig((prev) =>
+              prev.logoUrl ? prev : { ...prev, logoUrl: data.activeProLogoUrl }
+            );
+          }
+          if (data.activeProTitle) {
+            setActiveStoreTitle(data.activeProTitle);
+          }
+        }
+      }
+    } catch {
+      // ignore network transient errors
+    }
+  };
 
   useEffect(() => {
     setBaseOrigin(window.location.origin);
-    fetch('/api/auth')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.authenticated && data.user) {
-          setClientUser(data.user);
-          if (data.hasActivePro) {
-            setIsProPurchased(true);
-            setProExpiresAt(data.activeProExpiresAt || null);
-          }
-        }
-      })
-      .catch(() => { });
+    refreshAuthProStatus();
   }, []);
 
   useEffect(() => {
@@ -222,7 +240,11 @@ export default function QRCodeGenerator() {
 
   // Compute actual payload string based on current type (SSR Hydration safe)
   const targetContent = useMemo(() => {
-    if (config.isDynamic && config.dynamicSlug) {
+    const supportsDynamicRedirect =
+      config.type !== 'pix' &&
+      config.type !== 'wifi' &&
+      config.type !== 'vcard';
+    if (config.isDynamic && config.dynamicSlug && supportsDynamicRedirect) {
       return `${baseOrigin}/r/${config.dynamicSlug}`;
     }
 
@@ -309,6 +331,7 @@ export default function QRCodeGenerator() {
       return;
     }
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -602,12 +625,18 @@ export default function QRCodeGenerator() {
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>{subTab.label}</span>
-                      {subTab.proOnly && !isProPurchased && (
-                        <span className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase">
-                          <Lock className="w-2.5 h-2.5" />
-                          PRO
-                        </span>
-                      )}
+                      {subTab.proOnly &&
+                        (isProPurchased ? (
+                          <span className="ml-1 inline-flex items-center gap-0.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase">
+                            <Check className="w-2.5 h-2.5" />
+                            PRO
+                          </span>
+                        ) : (
+                          <span className="ml-1 inline-flex items-center gap-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase">
+                            <Lock className="w-2.5 h-2.5" />
+                            PRO
+                          </span>
+                        ))}
                     </button>
                   );
                 })}
@@ -1201,6 +1230,36 @@ export default function QRCodeGenerator() {
               {/* TAB 3: Logo (STRICTLY EXCLUSIVE FOR PRO!) */}
               {activeTab === 'logo' && (
                 <div className="space-y-6 animate-fade-in">
+                  {isProPurchased && (
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/35 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                        <div className="text-xs text-emerald-100 leading-relaxed">
+                          <strong className="text-emerald-300 block">
+                            Plano PRO Ativo — Logo Central Liberada!
+                          </strong>
+                          Sua logomarca ou ícone funciona em todas as opções:
+                          PIX Oficial, WhatsApp, Wi-Fi, Catálogo, Cardápio,
+                          Site, Instagram, Google 5★ e vCard.
+                        </div>
+                      </div>
+                      {activeStoreLogoUrl && config.logoUrl !== activeStoreLogoUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfig((prev) => ({
+                              ...prev,
+                              logoUrl: activeStoreLogoUrl,
+                            }))
+                          }
+                          className="shrink-0 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition shadow-sm"
+                        >
+                          Usar Logo{activeStoreTitle ? ` (${activeStoreTitle})` : ' da Loja'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {!isProPurchased && (
                     <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-slate-900 to-emerald-500/15 border border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-start gap-3">
@@ -1478,6 +1537,7 @@ export default function QRCodeGenerator() {
             <QRPreview
               config={config}
               targetContent={targetContent}
+              isPro={isProPurchased}
               onUpgradeToPro={() => {
                 handleInitiateProCheckout();
               }}
@@ -1663,6 +1723,7 @@ export default function QRCodeGenerator() {
         onAuthSuccess={(user) => {
           setClientUser(user);
           setIsAuthModalOpen(false);
+          refreshAuthProStatus();
           if (pendingAuthAction === 'menu') {
             setPendingAuthAction(null);
             setIsMenuEditorOpen(true);

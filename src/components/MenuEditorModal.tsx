@@ -106,13 +106,60 @@ const CATALOG_IMAGE_PRESETS = [
 
 const COVER_IMAGE_PRESETS = [
   { label: '🛍️ Ateliê & Loja', url: '/catalogo/cover-loja.jpg' },
-  {
-    label: '🍔 Restaurante Gourmet',
-    url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80',
-  },
+  { label: '🍔 Restaurante Gourmet', url: '/catalogo/cover-restaurante.jpg' },
+  { label: '🥩 Churrascaria', url: '/catalogo/cover-churrascaria.jpg' },
+  { label: '🍺 Cervejaria Artesanal', url: '/catalogo/cover-cervejaria.jpg' },
   { label: '🧶 Artesanato Decor', url: '/catalogo/prod-artesanato.jpg' },
   { label: '👕 Boutique Minimal', url: '/catalogo/prod-roupa.jpg' },
 ];
+
+const COVER_VIDEO_PRESETS = [
+  {
+    label: '🥩 Churrascaria',
+    url: '/videos/churrascaria.webm',
+    poster: '/catalogo/cover-churrascaria.jpg',
+  },
+  {
+    label: '🍺 Cervejaria Artesanal',
+    url: '/videos/cervejaria.webm',
+    poster: '/catalogo/cover-cervejaria.jpg',
+  },
+  {
+    label: '🍔 Restaurante Gourmet',
+    url: '/videos/restaurante.webm',
+    poster: '/catalogo/cover-restaurante.jpg',
+  },
+  {
+    label: '🛍️ Ateliê & Loja',
+    url: '/videos/atelie-loja.webm',
+    poster: '/catalogo/cover-loja.jpg',
+  },
+  {
+    label: '🧶 Artesanato Decor',
+    url: '/videos/artesanato.webm',
+    poster: '/catalogo/prod-artesanato.jpg',
+  },
+  {
+    label: '👕 Boutique Minimal',
+    url: '/videos/boutique.webm',
+    poster: '/catalogo/prod-roupa.jpg',
+  },
+];
+
+const normalizeMenuItemsProductionDays = (items: MenuItem[]): MenuItem[] =>
+  items.map((item) => {
+    const isMadeToOrder =
+      typeof item.badge === 'string' &&
+      item.badge.trim().toLowerCase() === 'sob encomenda';
+    if (!isMadeToOrder) return item;
+    const parsedDays = Math.round(Number(item.productionDays) || 0);
+    return {
+      ...item,
+      badge: 'Sob Encomenda',
+      productionDays:
+        parsedDays > 0 ? Math.min(365, parsedDays) : 3,
+    };
+  });
 
 export default function MenuEditorModal({
   isOpen,
@@ -202,7 +249,12 @@ export default function MenuEditorModal({
               // Ignore localStorage parse failures
             }
           }
-          setMenu(resolved);
+          setMenu({
+            ...resolved,
+            items: Array.isArray(resolved.items)
+              ? normalizeMenuItemsProductionDays(resolved.items)
+              : [],
+          });
         }
       })
       .catch((err) => console.error('Error loading showcase for editor:', err))
@@ -246,6 +298,9 @@ export default function MenuEditorModal({
 
   const buildCurrentPayload = (source: RestaurantMenu): RestaurantMenu => ({
     ...source,
+    items: Array.isArray(source.items)
+      ? normalizeMenuItemsProductionDays(source.items)
+      : [],
     mode: source.mode || mode,
     allowDelivery: source.allowDelivery ?? !( (source.mode || mode) === 'catalog' ),
     allowPickup: source.allowPickup ?? !( (source.mode || mode) === 'catalog' ),
@@ -1925,6 +1980,56 @@ export default function MenuEditorModal({
                                     className="hidden"
                                   />
                                 </label>
+
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] font-semibold text-slate-400 uppercase block">
+                                    Vídeos Prontos por Ramo (clique para aplicar):
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {COVER_VIDEO_PRESETS.map((preset) => {
+                                      const active = menu.coverVideo === preset.url;
+                                      return (
+                                        <button
+                                          key={preset.url}
+                                          type="button"
+                                          onClick={() => {
+                                            setVideoError(null);
+                                            setMenu({
+                                              ...menu,
+                                              coverVideo: preset.url,
+                                              coverImage: menu.coverImage?.startsWith('data:')
+                                                ? menu.coverImage
+                                                : preset.poster,
+                                            });
+                                          }}
+                                          className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition ${
+                                            active
+                                              ? 'bg-violet-500/25 border-violet-400 text-violet-100 shadow-sm'
+                                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                                          }`}
+                                        >
+                                          {preset.label}
+                                        </button>
+                                      );
+                                    })}
+                                    {menu.coverVideo && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setVideoError(null);
+                                          setMenu({
+                                            ...menu,
+                                            coverVideo: undefined,
+                                          });
+                                        }}
+                                        className="px-2 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[10px] font-semibold text-slate-400 flex items-center gap-1 transition"
+                                      >
+                                        <RotateCcw className="w-3 h-3" />
+                                        <span>Sem Vídeo</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
 
                                 <div>
                                   <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">

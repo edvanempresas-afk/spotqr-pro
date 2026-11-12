@@ -18,6 +18,7 @@ interface FriendlySlugPanelProps {
   mode: 'menu' | 'catalog';
   onUpdated: (newSlug: string) => void;
   onClose: () => void;
+  themeMode?: 'dark' | 'light';
 }
 
 export default function FriendlySlugPanel({
@@ -27,7 +28,9 @@ export default function FriendlySlugPanel({
   mode,
   onUpdated,
   onClose,
+  themeMode = 'dark',
 }: FriendlySlugPanelProps) {
+  const isLight = themeMode === 'light';
   const pathPrefix = mode === 'catalog' ? '/catalogo/' : '/cardapio/';
   const [candidate, setCandidate] = useState(currentSlug);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -147,14 +150,26 @@ export default function FriendlySlugPanel({
       : 'https://www.spotqr.com.br';
 
   return (
-    <div className="mt-4 pt-4 border-t border-emerald-500/25 bg-slate-900/85 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-3.5 animate-fade-in">
+    <div
+      className={`mt-4 pt-4 border rounded-2xl p-4 sm:p-5 space-y-3.5 animate-fade-in ${
+        isLight
+          ? 'bg-emerald-50/50 border-emerald-300'
+          : 'bg-slate-900/85 border-emerald-500/30'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          <div
+            className={`inline-flex items-center gap-1.5 text-[11px] font-extrabold border px-2.5 py-0.5 rounded-full ${
+              isLight
+                ? 'text-emerald-800 bg-emerald-100 border-emerald-300'
+                : 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'
+            }`}
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
             <span>Você é PRO! Personalize seu Link Amigável</span>
           </div>
-          <p className="text-xs text-slate-300">
+          <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
             Seu link agora tem a possibilidade de ficar muito mais curto e
             confortável para os clientes digitarem e compartilharem.
           </p>
@@ -162,7 +177,11 @@ export default function FriendlySlugPanel({
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+          className={`p-1.5 rounded-lg transition ${
+            isLight
+              ? 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-900'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white'
+          }`}
           title="Fechar editor de link amigável"
         >
           <X className="w-4 h-4" />
@@ -171,19 +190,31 @@ export default function FriendlySlugPanel({
 
       {/* Editable Friendly URL Input */}
       <div className="space-y-2">
-        <label className="text-[11px] font-bold text-slate-300 block">
+        <label className={`text-[11px] font-bold block ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
           Escolha seu endereço personalizado (livre escolha, desde que disponível):
         </label>
         <div
           className={`flex flex-col sm:flex-row sm:items-center rounded-xl border-2 transition overflow-hidden ${
             isRedBlocked
-              ? 'border-red-500 bg-red-950/35 ring-2 ring-red-500/30'
+              ? isLight
+                ? 'border-red-500 bg-red-50 ring-2 ring-red-500/20'
+                : 'border-red-500 bg-red-950/35 ring-2 ring-red-500/30'
               : isGreenValid
-              ? 'border-emerald-500 bg-emerald-950/25 ring-2 ring-emerald-500/25'
+              ? isLight
+                ? 'border-emerald-500 bg-white ring-2 ring-emerald-500/20'
+                : 'border-emerald-500 bg-emerald-950/25 ring-2 ring-emerald-500/25'
+              : isLight
+              ? 'border-slate-300 bg-white'
               : 'border-slate-700 bg-slate-950'
           }`}
         >
-          <span className="px-3 py-2 text-[11px] font-mono text-slate-400 bg-slate-900/90 border-b sm:border-b-0 sm:border-r border-slate-800 whitespace-nowrap truncate">
+          <span
+            className={`px-3 py-2 text-[11px] font-mono border-b sm:border-b-0 sm:border-r whitespace-nowrap truncate ${
+              isLight
+                ? 'text-slate-500 bg-slate-100 border-slate-200'
+                : 'text-slate-400 bg-slate-900/90 border-slate-800'
+            }`}
+          >
             {originPreview}
             {pathPrefix}
           </span>
@@ -204,25 +235,37 @@ export default function FriendlySlugPanel({
               }}
               placeholder="sua-loja-aqui"
               className={`w-full bg-transparent px-3 py-2 text-xs font-mono font-bold outline-none ${
-                isRedBlocked ? 'text-red-200' : 'text-white'
+                isRedBlocked
+                  ? isLight
+                    ? 'text-red-700'
+                    : 'text-red-200'
+                  : isLight
+                  ? 'text-slate-900'
+                  : 'text-white'
               }`}
             />
             {checking && (
-              <Loader2 className="w-4 h-4 text-sky-400 animate-spin shrink-0" />
+              <Loader2 className="w-4 h-4 text-sky-500 animate-spin shrink-0" />
             )}
             {isRedBlocked && (
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
             )}
             {isGreenValid && (
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+              <Check className="w-4 h-4 text-emerald-500 shrink-0" />
             )}
           </div>
         </div>
 
         {/* Status Message */}
         {isRedBlocked && (
-          <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/40 text-xs text-red-200 flex items-start gap-2 font-semibold">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div
+            className={`p-2.5 rounded-xl border text-xs flex items-start gap-2 font-semibold ${
+              isLight
+                ? 'bg-red-50 border-red-300 text-red-800'
+                : 'bg-red-500/15 border-red-500/40 text-red-200'
+            }`}
+          >
+            <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
             <span>
               {availability?.reason ||
                 'Esse link já está sendo usado por outro usuário. Escolha outro ou clique em uma das 3 melhores opções abaixo.'}
@@ -231,8 +274,14 @@ export default function FriendlySlugPanel({
         )}
 
         {isGreenValid && (
-          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 text-xs text-emerald-200 flex items-center gap-2 font-semibold">
-            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div
+            className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 font-semibold ${
+              isLight
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-200'
+            }`}
+          >
+            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
             <span>
               Link disponível! Vai ficar:{' '}
               <strong className="font-mono">
@@ -244,7 +293,13 @@ export default function FriendlySlugPanel({
         )}
 
         {saveError && (
-          <div className="p-2.5 rounded-xl bg-red-500/15 border border-red-500/40 text-xs text-red-200 font-semibold">
+          <div
+            className={`p-2.5 rounded-xl border text-xs font-semibold ${
+              isLight
+                ? 'bg-red-50 border-red-300 text-red-800'
+                : 'bg-red-500/15 border-red-500/40 text-red-200'
+            }`}
+          >
             ⚠️ {saveError}
           </div>
         )}
@@ -253,7 +308,7 @@ export default function FriendlySlugPanel({
       {/* 3 Smart Available Suggestions */}
       {suggestions.length > 0 && (
         <div className="space-y-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+          <span className={`text-[10px] font-bold uppercase tracking-wider block ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             3 Melhores Opções Amigáveis Disponíveis (clique para usar):
           </span>
           <div className="flex flex-wrap gap-2">
@@ -270,6 +325,8 @@ export default function FriendlySlugPanel({
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold border transition ${
                     selected
                       ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow'
+                      : isLight
+                      ? 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300'
                       : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-emerald-500/30'
                   }`}
                 >
@@ -286,10 +343,10 @@ export default function FriendlySlugPanel({
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <p className="text-[10px] text-slate-400 leading-relaxed max-w-xl">
+        <p className={`text-[10px] leading-relaxed max-w-xl ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
           Caso você não renove seu Plano PRO ao final do período, seu endereço
           volta automaticamente para o link anterior (
-          <span className="font-mono text-slate-300">
+          <span className={`font-mono ${isLight ? 'text-slate-800' : 'text-slate-300'}`}>
             {pathPrefix}
             {originalSlug || currentSlug}
           </span>

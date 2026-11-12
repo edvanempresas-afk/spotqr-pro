@@ -5,10 +5,21 @@ import Link from 'next/link';
 import { QrCode, ShieldCheck, Heart, Zap, Coffee } from 'lucide-react';
 import { useProPrice } from '@/lib/pro-price';
 
-export default function Footer() {
+export default function Footer({
+  themeMode = 'dark',
+}: {
+  themeMode?: 'dark' | 'light';
+}) {
+  const isLight = themeMode === 'light';
   const { proPriceLabel } = useProPrice();
   return (
-    <footer className="w-full bg-[#080c14] border-t border-slate-800/80 pt-16 pb-12 text-slate-400 text-sm">
+    <footer
+      className={`w-full border-t pt-16 pb-12 text-sm transition-colors ${
+        isLight
+          ? 'bg-white border-slate-200 text-slate-600'
+          : 'bg-[#080c14] border-slate-800/80 text-slate-400'
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           {/* Brand Col */}
@@ -17,14 +28,24 @@ export default function Footer() {
               <div className="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white">
                 <QrCode className="w-5 h-5" />
               </div>
-              <span className="font-display font-bold text-lg text-white">
-                Spot<span className="text-emerald-400">QR</span> Pro
+              <span
+                className={`font-display font-bold text-lg ${
+                  isLight ? 'text-slate-900' : 'text-white'
+                }`}
+              >
+                Spot<span className={isLight ? 'text-emerald-600' : 'text-emerald-400'}>QR</span> Pro
               </span>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
               Plataforma 3 em 1 para criar QR Codes com Logo, Cardápios Digitais e Catálogos Online para lojas, roupas, artesanato, impressões 3D e restaurantes.
             </p>
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-3 py-1.5 rounded-lg w-fit">
+            <div
+              className={`flex items-center gap-2 text-xs border px-3 py-1.5 rounded-lg w-fit ${
+                isLight
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40'
+              }`}
+            >
               <ShieldCheck className="w-4 h-4" />
               <span>Pagamento Seguro Mercado Pago</span>
             </div>
@@ -32,37 +53,37 @@ export default function Footer() {
 
           {/* Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Recursos Gratuitos</h4>
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Recursos Gratuitos</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#gerador" className="hover:text-emerald-400 transition">QR Code Estático Personalizado</a></li>
-              <li><a href="#gerador" className="hover:text-emerald-400 transition">QR Code PIX com BRCode Oficial</a></li>
-              <li><a href="#gerador" className="hover:text-emerald-400 transition">QR Code Wi-Fi Automático</a></li>
-              <li><a href="#gerador" className="hover:text-emerald-400 transition">QR Code WhatsApp com Mensagem</a></li>
-              <li><a href="#gerador" className="hover:text-emerald-400 transition">Download em Alta Definição (300 DPI)</a></li>
+              <li><a href="#gerador" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code Estático Personalizado</a></li>
+              <li><a href="#gerador" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code PIX com BRCode Oficial</a></li>
+              <li><a href="#gerador" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code Wi-Fi Automático</a></li>
+              <li><a href="#gerador" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code WhatsApp com Mensagem</a></li>
+              <li><a href="#gerador" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Download em Alta Definição (300 DPI)</a></li>
             </ul>
           </div>
 
           {/* Pro Benefits */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Recursos PRO ({proPriceLabel})</h4>
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Recursos PRO ({proPriceLabel})</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="#precos" className="hover:text-emerald-400 transition">Logomarca ou Imagem no Centro do QR</a></li>
-              <li><a href="#precos" className="hover:text-emerald-400 transition">QR Code Dinâmico (Link Editável)</a></li>
-              <li><a href="#precos" className="hover:text-emerald-400 transition">Cardápios & Catálogos Digitais</a></li>
-              <li><a href="#precos" className="hover:text-emerald-400 transition">Pedidos sem Taxa pelo WhatsApp</a></li>
-              <li><a href="#precos" className="hover:text-emerald-400 transition">Gerador de Plaquinhas A6/A5 para Mesas</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Logomarca ou Imagem no Centro do QR</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code Dinâmico (Link Editável)</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Cardápios & Catálogos Digitais</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Pedidos sem Taxa pelo WhatsApp</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Gerador de Plaquinhas A6/A5 para Mesas</a></li>
             </ul>
           </div>
 
           {/* Finance & Tech */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Desenvolvimento Sob Medida</h4>
+            <h4 className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-white'}`}>Desenvolvimento Sob Medida</h4>
             <ul className="space-y-2 text-xs">
-              <li><a href="/#desenvolvedor" className="hover:text-emerald-400 transition">Fale com o Desenvolvedor</a></li>
-              <li><a href="/#desenvolvedor" className="hover:text-emerald-400 transition">IA de Atendimento 24h no WhatsApp</a></li>
-              <li><a href="/#desenvolvedor" className="hover:text-emerald-400 transition">Sistemas para Salão & Barbearia</a></li>
-              <li><a href="/#desenvolvedor" className="hover:text-emerald-400 transition">Sites de Marcação de Consultas</a></li>
-              <li><Link href="/login" className="text-emerald-400 hover:text-emerald-300 font-bold transition">Acessar Minha Conta</Link></li>
+              <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Fale com o Desenvolvedor</a></li>
+              <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>IA de Atendimento 24h no WhatsApp</a></li>
+              <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Sistemas para Salão & Barbearia</a></li>
+              <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Sites de Marcação de Consultas</a></li>
+              <li><Link href="/login" className={`font-bold transition ${isLight ? 'text-emerald-600 hover:text-emerald-700' : 'text-emerald-400 hover:text-emerald-300'}`}>Acessar Minha Conta</Link></li>
             </ul>
             <div className="pt-2 text-xs text-slate-500" suppressHydrationWarning>
               © {new Date().getFullYear()} SpotQR Pro. Todos os direitos reservados.
@@ -70,19 +91,19 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-slate-800/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+        <div className={`pt-8 border-t flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4 ${isLight ? 'border-slate-200' : 'border-slate-800/60'}`}>
           <p>Feito para impulsionar pequenos e médios negócios gastronômicos e comerciais.</p>
           <div className="flex flex-wrap items-center gap-4">
-            <Link href="/privacidade" className="hover:text-emerald-400 transition">
+            <Link href="/privacidade" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>
               Política de Privacidade
             </Link>
-            <span className="text-slate-600">•</span>
-            <Link href="/termos" className="hover:text-emerald-400 transition">
+            <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>•</span>
+            <Link href="/termos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>
               Termos de Uso
             </Link>
-            <span className="text-slate-600">•</span>
-            <span className="flex items-center gap-1.5 text-slate-400">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>•</span>
+            <span className={`flex items-center gap-1.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
               API Mercado Pago Integrada
             </span>
           </div>

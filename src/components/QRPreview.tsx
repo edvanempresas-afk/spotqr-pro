@@ -26,14 +26,17 @@ import { useProPrice } from '@/lib/pro-price';
 interface QRPreviewProps {
   config: QRConfig;
   targetContent: string;
+  isPro?: boolean;
   onUpgradeToPro?: () => void;
 }
 
 export default function QRPreview({
   config,
   targetContent,
+  isPro = false,
   onUpgradeToPro,
 }: QRPreviewProps) {
+  const effectivePro = Boolean(isPro || config.isDynamic);
   const { proPriceLabel } = useProPrice();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState<string>('');
@@ -56,12 +59,13 @@ export default function QRPreview({
       canvas: canvasRef.current,
       width: 1200,
       height: 1200,
+      isPro: effectivePro,
     }).then(() => {
       if (canvasRef.current) {
         setDataUrl(canvasRef.current.toDataURL('image/png'));
       }
     });
-  }, [config, targetContent]);
+  }, [config, targetContent, effectivePro]);
 
   // Actual download trigger
   const executeDownload = async (formatOverride?: 'png' | 'svg') => {
@@ -90,7 +94,7 @@ export default function QRPreview({
   // Click on Download button (FREE -> Interstitial Ad with 5s countdown; PRO -> Instant)
   const handleDownloadClick = (format: 'png' | 'svg' = 'png') => {
     setPendingFormat(format);
-    if (config.isDynamic) {
+    if (effectivePro) {
       executeDownload(format);
     } else {
       setIsDownloadAdOpen(true);
@@ -112,10 +116,10 @@ export default function QRPreview({
       <div className="relative w-full max-w-sm bg-gradient-to-b from-[#141c2e] to-[#0d131f] border border-slate-700/80 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col items-center">
         {/* Status Badge */}
         <div className="w-full flex items-center justify-between mb-4">
-          {config.isDynamic ? (
+          {effectivePro ? (
             <span className="flex items-center gap-1.5 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">
               <Sparkles className="w-3.5 h-3.5" />
-              QR DINÂMICO PRO (SEM ADS)
+              {config.isDynamic ? 'QR DINÂMICO PRO (SEM ADS)' : 'PRO ATIVO (LOGO & SEM ADS)'}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full">
@@ -235,7 +239,7 @@ export default function QRPreview({
           >
             <Download className="w-4 h-4" />
             <span>
-              {config.isDynamic
+              {effectivePro
                 ? 'Baixar PNG 1200px Instantâneo (PRO)'
                 : config.type === 'catalog'
                 ? 'Baixar QR do Catálogo (PNG Grátis)'
@@ -266,8 +270,8 @@ export default function QRPreview({
           </div>
         </div>
 
-        {/* Upsell Banner if not dynamic */}
-        {!config.isDynamic && onUpgradeToPro && (
+        {/* Upsell Banner if not PRO */}
+        {!effectivePro && onUpgradeToPro && (
           <div className="w-full mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-amber-500/30 text-left">
             <div className="flex items-start gap-2.5">
               <Sparkles className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -297,10 +301,10 @@ export default function QRPreview({
       </div>
 
       {/* STRATEGIC RECTANGLE AD BANNER BELOW PREVIEW (FOR FREE USERS) */}
-      {!config.isDynamic && (
+      {!effectivePro && (
         <AdBanner
           format="rectangle"
-          isPro={config.isDynamic}
+          isPro={effectivePro}
           onUpgradeClick={onUpgradeToPro}
           className="mt-5"
         />
@@ -320,7 +324,7 @@ export default function QRPreview({
         onClose={() => setIsTableTentOpen(false)}
         qrDataUrl={dataUrl}
         config={config}
-        isPro={config.isDynamic}
+        isPro={effectivePro}
         onUpgradeToPro={onUpgradeToPro}
       />
     </div>
