@@ -54,6 +54,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import Link from 'next/link';
+import { broadcastProPriceUpdate } from '@/lib/pro-price';
 
 const STATUS_CONFIG: Record<
   DeveloperLeadStatus,
@@ -626,6 +627,12 @@ export default function DeveloperAdminDashboard() {
         }),
       });
       if (res.ok) {
+        const data = await res.json();
+        const savedPrice =
+          data?.settings?.proPriceReais ?? settings.proPriceReais;
+        if (savedPrice) {
+          broadcastProPriceUpdate(savedPrice);
+        }
         setSettingsSavedToast(true);
         setTimeout(() => setSettingsSavedToast(false), 3000);
       }
@@ -1264,14 +1271,21 @@ export default function DeveloperAdminDashboard() {
                       </label>
                       <input
                         type="number"
-                        step="0.10"
+                        step="0.01"
+                        min="1"
                         value={settings.proPriceReais ?? 10.9}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const parsed = parseFloat(
+                            e.target.value.replace(',', '.')
+                          );
                           setSettings({
                             ...settings,
-                            proPriceReais: parseFloat(e.target.value) || 10.9,
-                          })
-                        }
+                            proPriceReais:
+                              Number.isFinite(parsed) && parsed > 0
+                                ? parsed
+                                : 10.9,
+                          });
+                        }}
                         className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-white"
                       />
                     </div>

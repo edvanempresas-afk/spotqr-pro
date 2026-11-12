@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { QRConfig } from '@/lib/types';
 import { getDefaultFrameTexts } from '@/lib/qr-canvas';
+import { useProPrice } from '@/lib/pro-price';
 
 interface TableTentModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function TableTentModal({
   isPro = false,
   onUpgradeToPro,
 }: TableTentModalProps) {
+  const { proPriceLabel } = useProPrice();
   const [showTableNumbers, setShowTableNumbers] = useState(true);
   const [startTableNum, setStartTableNum] = useState(1);
 
@@ -153,7 +155,7 @@ export default function TableTentModal({
                 className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl text-xs font-bold transition"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>Remover Marca d'Água (R$ 10,90)</span>
+                <span>Remover Marca d'Água ({proPriceLabel})</span>
               </button>
             )}
 

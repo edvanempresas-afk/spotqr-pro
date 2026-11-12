@@ -1,8 +1,12 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import { QrCode, ShieldCheck, Heart, Zap, Coffee } from 'lucide-react';
+import { useProPrice } from '@/lib/pro-price';
 
 export default function Footer() {
+  const { proPriceLabel } = useProPrice();
   return (
     <footer className="w-full bg-[#080c14] border-t border-slate-800/80 pt-16 pb-12 text-slate-400 text-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -40,7 +44,7 @@ export default function Footer() {
 
           {/* Pro Benefits */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Recursos PRO (R$ 10,90)</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Recursos PRO ({proPriceLabel})</h4>
             <ul className="space-y-2 text-xs">
               <li><a href="#precos" className="hover:text-emerald-400 transition">Logomarca ou Imagem no Centro do QR</a></li>
               <li><a href="#precos" className="hover:text-emerald-400 transition">QR Code Dinâmico (Link Editável)</a></li>

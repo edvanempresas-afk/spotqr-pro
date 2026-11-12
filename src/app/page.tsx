@@ -29,8 +29,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { FEATURES_MATRIX } from '@/lib/permissions';
+import { useProPrice } from '@/lib/pro-price';
 
 export default function HomePage() {
+  const { proPrice, proPriceLabel } = useProPrice();
   const [tableCount, setTableCount] = useState(15);
   const [isLockModalOpen, setIsLockModalOpen] = useState(false);
   const costPerTablePrint = 18; // Average price in BRL for acrylic tent + vinyl sticker printing
@@ -203,7 +205,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
-                    <span className="font-bold text-emerald-400">✅ A Solução Inteligente (PRO R$ 10,90):</span>
+                    <span className="font-bold text-emerald-400">✅ A Solução Inteligente (PRO {proPriceLabel}):</span>
                     <span>
                       Com o QR Code Dinâmico SpotQR, o adesivo físico fica nas mesas para sempre. Você acessa seu celular e muda o destino em 1 segundo.
                     </span>
@@ -254,13 +256,13 @@ export default function HomePage() {
                   <div className="bg-emerald-950/40 p-4 rounded-xl border border-emerald-800/40">
                     <span className="text-[11px] text-emerald-300 block mb-1">Investimento único SpotQR PRO:</span>
                     <div className="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono">
-                      R$ 10,90
+                      {proPriceLabel}
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center text-xs text-emerald-300 font-semibold">
-                  🎉 Você economiza <strong className="text-white text-sm">R$ {(annualLossWithoutDynamic - 10.90).toFixed(0)}</strong> logo no primeiro ano!
+                  🎉 Você economiza <strong className="text-white text-sm">R$ {Math.max(0, annualLossWithoutDynamic - proPrice).toFixed(0)}</strong> logo no primeiro ano!
                 </div>
               </div>
             </div>
@@ -373,7 +375,7 @@ export default function HomePage() {
                       <th className="py-4 px-6 font-bold text-center w-52 bg-emerald-950/30 border-l border-emerald-500/20">
                         <span className="text-emerald-400 font-extrabold flex items-center justify-center gap-1">
                           <Sparkles className="w-3.5 h-3.5" />
-                          PRO (R$ 10,90)
+                          PRO ({proPriceLabel})
                         </span>
                       </th>
                     </tr>
@@ -421,14 +423,14 @@ export default function HomePage() {
                   className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-glow flex items-center gap-2"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>Desbloquear Recursos PRO (R$ 10,90)</span>
+                  <span>Desbloquear Recursos PRO ({proPriceLabel})</span>
                 </button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* PRICING TABLE (Free vs PRO R$ 10,90) */}
+        {/* PRICING TABLE (Free vs PRO) */}
         <section id="precos" className="py-20 bg-[#090e18]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-3">
@@ -507,7 +509,7 @@ export default function HomePage() {
                     QR Dinâmico + Cardápio PRO
                   </span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-extrabold text-white">R$ 10,90</span>
+                    <span className="text-4xl font-extrabold text-white">{proPriceLabel}</span>
                     <span className="text-xs text-slate-400 font-semibold">/ ativação única</span>
                   </div>
                   <p className="text-xs text-slate-300">
@@ -555,7 +557,7 @@ export default function HomePage() {
                     href="#gerador"
                     className="block w-full py-3.5 px-4 rounded-xl text-center text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-glow transition-all"
                   >
-                    Ativar QR Dinâmico PRO (R$ 10,90)
+                    Ativar QR Dinâmico PRO ({proPriceLabel})
                   </a>
                 </div>
               </div>
@@ -577,19 +579,19 @@ export default function HomePage() {
               {[
                 {
                   q: 'Por que o site tem anúncios na versão gratuita?',
-                  a: 'Os anúncios viabilizam manter a infraestrutura 100% gratuita para quem precisa apenas de um QR Code estático básico. Ao assinar a versão PRO por R$ 10,90, todos os anúncios são completamente removidos do seu painel e do cardápio visualizado pelos seus clientes.',
+                  a: `Os anúncios viabilizam manter a infraestrutura 100% gratuita para quem precisa apenas de um QR Code estático básico. Ao assinar a versão PRO por ${proPriceLabel}, todos os anúncios são completamente removidos do seu painel e do cardápio visualizado pelos seus clientes.`,
                 },
                 {
                   q: 'Qual a diferença entre o QR Code Estático e o Dinâmico?',
                   a: 'No QR Code Estático, o link é codificado de forma fixa dentro dos pontos pretos. Se você mudar seu WhatsApp, seu site ou os preços, precisa imprimir novas plaquinhas. No QR Code Dinâmico PRO, o QR aponta para o seu link inteligente SpotQR (ex: spotqr.pro/r/seu-restaurante), permitindo que você altere o destino quantas vezes quiser pelo painel, sem nunca precisar reimprimir.',
                 },
                 {
-                  q: 'Como funciona o pagamento de R$ 10,90?',
+                  q: `Como funciona o pagamento de ${proPriceLabel}?`,
                   a: 'O pagamento é processado oficialmente via Mercado Pago através do PIX instantâneo. Assim que o Pix é pago, o sistema libera imediatamente a ativação do seu QR Code Dinâmico e o painel de gerenciamento.',
                 },
                 {
                   q: 'Eu preciso pagar mensalidade para manter meu QR Code funcionando?',
-                  a: 'Não! A taxa de R$ 10,90 é um valor de ativação única para o QR Code criado. Não cobramos taxas surpresas nem mensalidades ocultas.',
+                  a: `Não! A taxa de ${proPriceLabel} é um valor de ativação única para o QR Code criado. Não cobramos taxas surpresas nem mensalidades ocultas.`,
                 },
                 {
                   q: 'Como meus clientes fazem pedidos pelo Cardápio Digital?',

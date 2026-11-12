@@ -33,6 +33,7 @@ import ProFeatureLockModal from './ProFeatureLockModal';
 import ClientAuthModal from './ClientAuthModal';
 import AdBanner from './AdBanner';
 import { useRouter } from 'next/navigation';
+import { useProPrice } from '@/lib/pro-price';
 
 // Instant SVG Data-URI Logos (Zero CORS issues, 100% crisp at any resolution!)
 const makeSvgDataUri = (bg: string, emojiOrText: string) =>
@@ -115,6 +116,7 @@ const PRESET_THEMES = [
 
 export default function QRCodeGenerator() {
   const router = useRouter();
+  const { proPriceLabel } = useProPrice();
 
   // Avoid SSR Hydration mismatch by updating origin inside useEffect
   const [baseOrigin, setBaseOrigin] = useState<string>('https://spotqr.pro');
@@ -188,9 +190,7 @@ export default function QRCodeGenerator() {
   const [lockModalTitle, setLockModalTitle] = useState(
     'Logomarca ou Imagem no Centro é Exclusiva do Plano PRO'
   );
-  const [lockModalDesc, setLockModalDesc] = useState(
-    'A versão gratuita gera apenas QR Codes estáticos sem logo central. Adquira o Plano PRO por apenas R$ 10,90 para inserir sua logomarca ou imagem no centro do QR Code e torná-lo Dinâmico!'
-  );
+  const [lockModalDesc, setLockModalDesc] = useState('');
   const [paymentData, setPaymentData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -271,7 +271,7 @@ export default function QRCodeGenerator() {
       'Logomarca ou Imagem no Centro é Exclusiva do Plano PRO'
     );
     setLockModalDesc(
-      'Na versão gratuita o QR Code não possui imagem central. Desbloqueie o Plano PRO por apenas R$ 10,90 via PIX para colocar sua logomarca ou ícone no centro do QR Code e ter link dinâmico editável!'
+      `Na versão gratuita o QR Code não possui imagem central. Desbloqueie o Plano PRO por apenas ${proPriceLabel} via PIX para colocar sua logomarca ou ícone no centro do QR Code e ter link dinâmico editável!`
     );
     setIsLockModalOpen(true);
   };
@@ -1187,7 +1187,7 @@ export default function QRCodeGenerator() {
                               Logomarca ou Imagem no Centro é Exclusiva PRO
                             </h4>
                             <span className="bg-amber-500 text-slate-950 text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase">
-                              R$ 10,90
+                              {proPriceLabel}
                             </span>
                           </div>
                           <p className="text-xs text-slate-300 mt-1 leading-relaxed">
@@ -1203,7 +1203,7 @@ export default function QRCodeGenerator() {
                         onClick={handleInitiateProCheckout}
                         className="shrink-0 w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-glow transition"
                       >
-                        Desbloquear Agora (R$ 10,90)
+                        Desbloquear Agora ({proPriceLabel})
                       </button>
                     </div>
                   )}
@@ -1478,7 +1478,7 @@ export default function QRCodeGenerator() {
                           : 'Desbloquear Logo no Centro + QR Code Dinâmico PRO'}
                       </span>
                       <span className="bg-emerald-500 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase">
-                        {isProPurchased ? 'ATIVO' : 'R$ 10,90'}
+                        {isProPurchased ? 'ATIVO' : proPriceLabel}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">
@@ -1526,7 +1526,7 @@ export default function QRCodeGenerator() {
                       <span>
                         {isSubmitting
                           ? 'Gerando Pix...'
-                          : 'Liberar Logo no Centro + QR Dinâmico por R$ 10,90 (Pix)'}
+                          : `Liberar Logo no Centro + QR Dinâmico por ${proPriceLabel} (Pix)`}
                       </span>
                     </button>
                   </div>
@@ -1564,7 +1564,10 @@ export default function QRCodeGenerator() {
         onClose={() => setIsLockModalOpen(false)}
         onUpgrade={() => handleInitiateProCheckout()}
         featureTitle={lockModalTitle}
-        featureDescription={lockModalDesc}
+        featureDescription={
+          lockModalDesc ||
+          `A versão gratuita gera apenas QR Codes estáticos sem logo central. Adquira o Plano PRO por apenas ${proPriceLabel} para inserir sua logomarca ou imagem no centro do QR Code e torná-lo Dinâmico!`
+        }
       />
 
       {/* Pix Checkout Modal */}
@@ -1603,7 +1606,7 @@ export default function QRCodeGenerator() {
         contextMessage={
           pendingAuthAction === 'menu'
             ? 'Crie seu login e senha grátis para salvar seu Cardápio ou Catálogo Digital e alterar itens e preços a qualquer hora.'
-            : 'Crie seu login e senha de cliente para vincular seu QR Code Dinâmico PRO (R$ 10,90) à sua conta exclusiva.'
+            : `Crie seu login e senha de cliente para vincular seu QR Code Dinâmico PRO (${proPriceLabel}) à sua conta exclusiva.`
         }
         onAuthSuccess={(user) => {
           setClientUser(user);

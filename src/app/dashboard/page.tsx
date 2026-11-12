@@ -33,8 +33,10 @@ import {
 import { DynamicQRRecord, QRConfig } from '@/lib/types';
 import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import Link from 'next/link';
+import { useProPrice } from '@/lib/pro-price';
 
 export default function DashboardPage() {
+  const { proPriceLabel } = useProPrice();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -184,7 +186,7 @@ export default function DashboardPage() {
       setTargetUpgradeSlug(qr.slug);
       setLockFeatureTitle('Edição de Link Dinâmico é Exclusiva do Plano PRO');
       setLockFeatureDescription(
-        `O QR Code /${qr.slug} ainda está na versão gratuita. Para trocar o link de destino sem reimprimir os adesivos de mesa e colocar sua logomarca no centro, ative a versão PRO por apenas R$ 10,90.`
+        `O QR Code /${qr.slug} ainda está na versão gratuita. Para trocar o link de destino sem reimprimir os adesivos de mesa e colocar sua logomarca no centro, ative a versão PRO por apenas ${proPriceLabel}.`
       );
       setIsLockModalOpen(true);
       return;
@@ -595,7 +597,7 @@ export default function DashboardPage() {
                                 className="bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1 transition"
                               >
                                 <Lock className="w-3 h-3 text-amber-400" />
-                                Versão Grátis • Ativar PRO + Logo (R$ 10,90)
+                                Versão Grátis • Ativar PRO + Logo ({proPriceLabel})
                               </button>
                             )}
                           </div>

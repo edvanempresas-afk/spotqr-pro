@@ -3,6 +3,7 @@ import {
   recordPayment,
   getDynamicQRBySlug,
   saveDynamicQR,
+  getDeveloperSettings,
   syncDbFromCloud,
   persistSliceToCloud,
 } from '@/lib/db';
@@ -16,8 +17,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dados insuficientes' }, { status: 400 });
     }
 
+    const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 10.9;
+
     // Mark as approved in DB
-    recordPayment(paymentId, slug, 'approved', 10.90);
+    recordPayment(paymentId, slug, 'approved', livePrice);
 
     const qr = getDynamicQRBySlug(slug);
     if (qr) {

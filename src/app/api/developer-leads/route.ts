@@ -135,7 +135,14 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === 'update_settings') {
-      const updatedSettings = saveDeveloperSettings(body.settings || {});
+      const incoming = { ...(body.settings || {}) };
+      if (incoming.proPriceReais !== undefined) {
+        const parsed = parseFloat(String(incoming.proPriceReais).replace(',', '.'));
+        if (Number.isFinite(parsed) && parsed > 0) {
+          incoming.proPriceReais = parsed;
+        }
+      }
+      const updatedSettings = saveDeveloperSettings(incoming);
       await persistSliceToCloud('settings');
       return NextResponse.json({ success: true, settings: updatedSettings });
     }
@@ -150,12 +157,14 @@ export async function PUT(req: NextRequest) {
     }
 
     if (body.action === 'test_notification') {
+      const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 10.9;
+      const livePriceFormatted = livePrice.toFixed(2).replace('.', ',');
       const testNotif = createDeveloperNotification({
         type: 'subscription_paid',
-        title: '💰 Teste de Alerta Mobile (+ R$ 10,90)',
+        title: `💰 Teste de Alerta Mobile (+ R$ ${livePriceFormatted})`,
         message:
           'Notificações do seu App SpotQR Dev estão ativas e funcionando em tempo real no seu celular!',
-        amount: 10.9,
+        amount: livePrice,
         clientName: 'Teste Desenvolvedor Edvan',
         slug: 'demo-restaurante',
       });

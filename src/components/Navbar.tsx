@@ -14,9 +14,11 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
+import { useProPrice } from '@/lib/pro-price';
 
 export default function Navbar() {
   const router = useRouter();
+  const { proPriceLabel } = useProPrice();
   const [authUser, setAuthUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -93,7 +95,7 @@ export default function Navbar() {
             className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Vantagens PRO (R$ 10,90)</span>
+            <span>Vantagens PRO ({proPriceLabel})</span>
           </Link>
           <Link
             href="/#desenvolvedor"

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Download, Sparkles, X, ExternalLink, Clock, ShieldCheck, Zap } from 'lucide-react';
+import { useProPrice } from '@/lib/pro-price';
 
 interface DownloadAdModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export default function DownloadAdModal({
   onDownloadConfirmed,
   onUpgradeToPro,
 }: DownloadAdModalProps) {
+  const { proPriceLabel } = useProPrice();
   const [secondsLeft, setSecondsLeft] = useState(5);
   const [canDownload, setCanDownload] = useState(false);
 
@@ -154,7 +156,7 @@ export default function DownloadAdModal({
               className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500/10 via-emerald-500/10 to-teal-500/10 border border-amber-500/30 hover:border-amber-400 text-amber-300 text-xs font-bold transition flex items-center justify-center gap-2"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Pular Espera & Remover Todos os Anúncios (R$ 10,90)</span>
+              <span>Pular Espera & Remover Todos os Anúncios ({proPriceLabel})</span>
             </button>
           </div>
         </div>

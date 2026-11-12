@@ -21,6 +21,7 @@ import {
 import TableTentModal from './TableTentModal';
 import DownloadAdModal from './DownloadAdModal';
 import AdBanner from './AdBanner';
+import { useProPrice } from '@/lib/pro-price';
 
 interface QRPreviewProps {
   config: QRConfig;
@@ -33,6 +34,7 @@ export default function QRPreview({
   targetContent,
   onUpgradeToPro,
 }: QRPreviewProps) {
+  const { proPriceLabel } = useProPrice();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [dataUrl, setDataUrl] = useState<string>('');
   const [isTableTentOpen, setIsTableTentOpen] = useState(false);
@@ -276,7 +278,7 @@ export default function QRPreview({
                 <p className="text-[11px] text-slate-400 leading-relaxed mb-2">
                   Na versão grátis o QR é estático e sem logo central. Com o{' '}
                   <strong className="text-amber-300">
-                    Plano PRO (R$ 10,90)
+                    Plano PRO ({proPriceLabel})
                   </strong>
                   , você insere sua logomarca ou imagem no centro e altera o link
                   de destino quando quiser sem reimprimir.
@@ -285,7 +287,7 @@ export default function QRPreview({
                   onClick={onUpgradeToPro}
                   className="text-xs font-bold text-amber-400 hover:text-amber-300 underline underline-offset-4 flex items-center gap-1"
                 >
-                  <span>Desbloquear Logo no Centro + PRO (R$ 10,90)</span>
+                  <span>Desbloquear Logo no Centro + PRO ({proPriceLabel})</span>
                   <span>→</span>
                 </button>
               </div>

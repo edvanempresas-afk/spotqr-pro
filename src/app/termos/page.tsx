@@ -3,6 +3,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
 import { FileText, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import ProPriceLabel from '@/components/ProPriceLabel';
 
 export const metadata = {
   title: 'Termos de Uso | SpotQR Pro',
@@ -70,7 +71,7 @@ export default function TermosPage() {
                 anúncios patrocinados.
               </li>
               <li>
-                <strong>Plano PRO (R$ 10,90):</strong> Desbloqueia logomarca no
+                <strong>Plano PRO (<ProPriceLabel />):</strong> Desbloqueia logomarca no
                 centro do QR Code, link dinâmico com redirecionamento editável a
                 qualquer momento e remoção de 100% dos anúncios.
               </li>

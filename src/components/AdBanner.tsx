@@ -18,6 +18,7 @@ import {
   Award,
 } from 'lucide-react';
 import { shouldShowAds } from '@/lib/permissions';
+import { useProPrice } from '@/lib/pro-price';
 
 export type AdSlotFormat =
   | 'leaderboard'
@@ -119,6 +120,7 @@ export default function AdBanner({
   offerIndexOverride,
   side = 'left',
 }: AdBannerProps) {
+  const { proPriceLabel } = useProPrice();
   const [closed, setClosed] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -461,7 +463,7 @@ export default function AdBanner({
                   onClick={onUpgradeClick}
                   className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline whitespace-nowrap"
                 >
-                  Remover Anúncios em Vídeo (Ativar PRO R$ 10,90)
+                  Remover Anúncios em Vídeo (Ativar PRO {proPriceLabel})
                 </button>
               )}
             </div>
@@ -622,7 +624,7 @@ export default function AdBanner({
                 className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-400 font-bold rounded-lg text-xs transition whitespace-nowrap"
               >
                 <Sparkles className="w-3 h-3 text-amber-400" />
-                <span>Remover Ads (R$ 10,90)</span>
+                <span>Remover Ads ({proPriceLabel})</span>
               </button>
             )}
 

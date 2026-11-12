@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Sparkles, Check, X, ShieldCheck, Lock, ArrowRight } from 'lucide-react';
+import { useProPrice } from '@/lib/pro-price';
 
 interface ProFeatureLockModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export default function ProFeatureLockModal({
   featureTitle = 'Recurso Exclusivo do Plano PRO',
   featureDescription = 'Inserir sua logomarca ou imagem no centro do QR Code e poder alterar o link de destino sem reimprimir adesivos são recursos exclusivos da versão PRO.',
 }: ProFeatureLockModalProps) {
+  const { proPriceLabel } = useProPrice();
   if (!isOpen) return null;
 
   return (
@@ -58,7 +60,7 @@ export default function ProFeatureLockModal({
             <span>Recurso</span>
             <div className="flex gap-8">
               <span className="text-slate-500">Grátis</span>
-              <span className="text-emerald-400">PRO (R$ 10,90)</span>
+              <span className="text-emerald-400">PRO ({proPriceLabel})</span>
             </div>
           </div>
 
@@ -120,7 +122,7 @@ export default function ProFeatureLockModal({
                 Investimento único:
               </span>
               <span className="text-2xl font-extrabold text-white">
-                R$ 10,90
+                {proPriceLabel}
               </span>
             </div>
             <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
@@ -136,7 +138,7 @@ export default function ProFeatureLockModal({
             className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white rounded-xl text-xs font-bold transition shadow-glow flex items-center justify-center gap-2"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Desbloquear Logo no Centro + PRO por R$ 10,90</span>
+            <span>Desbloquear Logo no Centro + PRO por {proPriceLabel}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
