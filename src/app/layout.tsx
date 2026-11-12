@@ -2,29 +2,39 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://spotqr.com.br'),
+  metadataBase: new URL('https://www.spotqr.com.br'),
+  applicationName: 'SpotQR Pro',
   title:
-    'SpotQR Pro | QR Code Dinâmico com Logo, Cardápio & Catálogo Digital',
+    'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
   description:
-    'Crie QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos online para lojas de roupas, artesanato e impressões 3D.',
+    'Crie QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos digitais com pedidos no WhatsApp e PIX para lojas, moda, artesanato e serviços.',
   manifest: '/manifest.json',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'SpotQR Pro | QR Code Dinâmico com Logo & Cardápio Digital',
+    title: 'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
     description:
-      'Crie QR Codes profissionais com sua logomarca e cardápios digitais sem taxas. O segredo dos restaurantes e comércios mais lucrativos.',
-    url: 'https://spotqr.com.br',
-    siteName: 'SpotQR Pro',
+      'Crie QR Codes dinâmicos com sua logomarca, cardápios digitais e catálogos online de produtos sem taxas ou comissões — ideal para restaurantes, lojas, moda, artesanato e comércios.',
+    url: 'https://www.spotqr.com.br',
+    siteName: 'SpotQR Pro — QR Codes, Cardápios & Catálogos Digitais',
     locale: 'pt_BR',
     type: 'website',
+    images: [
+      {
+        url: '/catalogo/cover-loja.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'SpotQR Pro — QR Code Dinâmico com Logo, Cardápio e Catálogo Digital',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SpotQR Pro | QR Code Dinâmico com Logo & Cardápio Digital',
+    title: 'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
     description:
-      'Crie displays sofisticados para mesas, balcões, PIX e Wi-Fi. Mude preços e links quando quiser.',
+      'Crie QR Codes profissionais com logo no centro, cardápios digitais e catálogos online com carrinho, PIX e WhatsApp sem comissões.',
+    images: ['/catalogo/cover-loja.jpg'],
   },
   appleWebApp: {
     capable: true,
@@ -35,12 +45,19 @@ export const metadata: Metadata = {
     'gerador de qr code',
     'qr code com logo no centro',
     'qr code dinamico',
+    'catalogo digital',
+    'catalogo digital gratis',
+    'catalogo online para loja',
+    'criar catalogo whatsapp',
+    'vitrine digital de produtos',
+    'catalogo sem comissoes',
     'cardapio digital para restaurante',
     'cardapio digital sem taxas',
     'qr code mesa restaurante',
     'qr code pix oficial',
     'gerador de cardapio digital',
-    'sistema para restaurante e barbearia',
+    'gerador de catalogo digital',
+    'sistema para loja restaurante e barbearia',
   ],
   authors: [{ name: 'SpotQR Pro Tecnologia' }],
   verification: {
@@ -58,18 +75,19 @@ export const viewport: Viewport = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'SpotQR Pro',
-  url: 'https://spotqr.com.br',
+  name: 'SpotQR Pro — QR Codes, Cardápios & Catálogos Digitais',
+  url: 'https://www.spotqr.com.br',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'All',
   offers: {
     '@type': 'Offer',
     price: '10.90',
     priceCurrency: 'BRL',
-    description: 'Assinatura SpotQR PRO com QR Dinâmico e Logomarca no Centro',
+    description:
+      'Assinatura SpotQR PRO com QR Dinâmico, Logomarca no Centro, Cardápio e Catálogo Digital',
   },
   description:
-    'Gerador de QR Code dinâmico com logomarca no centro e sistema de cardápio digital para mesas e delivery.',
+    'Plataforma completa para criar QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos digitais de produtos com pedidos via WhatsApp e PIX sem taxas.',
 };
 
 export default function RootLayout({

@@ -10,6 +10,8 @@ import MenuEditorModal from '@/components/MenuEditorModal';
 import TableTentModal from '@/components/TableTentModal';
 import ClientAuthModal from '@/components/ClientAuthModal';
 import VoucherRedeemBox from '@/components/VoucherRedeemBox';
+import RecurringCardModal from '@/components/RecurringCardModal';
+import FriendlySlugPanel from '@/components/FriendlySlugPanel';
 import {
   QrCode,
   Sparkles,
@@ -31,19 +33,24 @@ import {
   LogIn,
   UserPlus,
   Clock,
+  CreditCard,
+  Link2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { DynamicQRRecord, QRConfig } from '@/lib/types';
 import {
   isProStillValid,
   formatRemainingProTime,
   computeStableStoreCode,
+  getProRenewalAlert,
 } from '@/lib/pro-status';
 import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import Link from 'next/link';
 import { useProPrice } from '@/lib/pro-price';
 
 export default function DashboardPage() {
-  const { proPriceLabel } = useProPrice();
+  const { proPrice, proPriceLabel } = useProPrice();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -80,6 +87,13 @@ export default function DashboardPage() {
   const [targetUpgradeSlug, setTargetUpgradeSlug] = useState<string>('');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [friendlySlugEditing, setFriendlySlugEditing] = useState<string | null>(
+    null
+  );
+  const [recurringCardTarget, setRecurringCardTarget] = useState<{
+    qr: DynamicQRRecord;
+    chargeNow?: boolean;
+  } | null>(null);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const expiredSyncTriggeredRef = useRef<Set<string>>(new Set());
 
@@ -366,6 +380,15 @@ export default function DashboardPage() {
   const hasAnyFreeQR = qrs.some((q) => !isProStillValid(q, nowMs));
   const activeProCount = qrs.filter((q) => isProStillValid(q, nowMs)).length;
   const totalScans = qrs.reduce((acc, q) => acc + (q.scansCount || 0), 0);
+  const renewalAlerts = qrs
+    .map((q) => ({ qr: q, alert: getProRenewalAlert(q, nowMs) }))
+    .filter(
+      (entry): entry is { qr: DynamicQRRecord; alert: NonNullable<ReturnType<typeof getProRenewalAlert>> } =>
+        Boolean(entry.alert)
+    );
+  const expiredDowngradedQRs = qrs.filter(
+    (q) => q.hadProExpired && !isProStillValid(q, nowMs)
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0b0f17] pb-16">
@@ -515,6 +538,123 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* PRO Expiration Warning (<= 10 days) & Auto-Renew Grace Alerts */}
+            {renewalAlerts.length > 0 && (
+              <div className="space-y-3 mb-6">
+                {renewalAlerts.map(({ qr, alert }) => (
+                  <div
+                    key={`renew-${qr.slug}`}
+                    className={`rounded-2xl p-4 sm:p-5 border-2 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-lg ${
+                      alert.kind === 'past_due'
+                        ? 'bg-red-950/40 border-red-500/60'
+                        : 'bg-amber-950/30 border-amber-500/60'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                          alert.kind === 'past_due'
+                            ? 'bg-red-500/20 border-red-500/40 text-red-400'
+                            : 'bg-amber-500/20 border-amber-500/40 text-amber-400'
+                        }`}
+                      >
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+                          {qr.title} • Plano PRO
+                        </div>
+                        <h2 className="text-sm sm:text-base font-extrabold text-white">
+                          {alert.headline}
+                        </h2>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {alert.subtext}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerProCheckout(qr.slug)}
+                        className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow transition flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Renovar Agora Mesmo</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRecurringCardTarget({ qr, chargeNow: true })
+                        }
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-sky-500/40 text-sky-300 font-bold text-xs transition flex items-center gap-1.5"
+                      >
+                        <CreditCard className="w-3.5 h-3.5 text-sky-400" />
+                        <span>
+                          {qr.autoRenew?.enabled
+                            ? 'Gerenciar Cartão Salvo'
+                            : 'Cartão Recorrente (Mensal)'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Notice when a store reverted to Free due to expiration / 5 failed billing days */}
+            {expiredDowngradedQRs.length > 0 && (
+              <div className="space-y-3 mb-6">
+                {expiredDowngradedQRs.map((qr) => (
+                  <div
+                    key={`expired-${qr.slug}`}
+                    className="rounded-2xl p-4 sm:p-5 bg-slate-900/90 border-2 border-rose-500/50 flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                        <Lock className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-extrabold text-white">
+                          O Plano PRO de {qr.title} expirou e voltou para o Free
+                        </h3>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Os benefícios PRO foram bloqueados automaticamente: o
+                          vídeo animado voltou a ser foto estática, os anúncios
+                          retornaram, a logo central do QR foi removida e qualquer
+                          link amigável voltou ao endereço anterior (
+                          <span className="font-mono text-rose-300">
+                            /{qr.type === 'catalog' ? 'catalogo' : 'cardapio'}/
+                            {qr.slug}
+                          </span>
+                          ).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerProCheckout(qr.slug)}
+                        className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider transition"
+                      >
+                        Renovar PRO Agora
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRecurringCardTarget({ qr, chargeNow: true })
+                        }
+                        className="px-4 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-300 font-bold text-xs transition flex items-center gap-1.5"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Assinar com Cartão</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="bg-[#121929] border border-slate-800 rounded-2xl p-5 relative overflow-hidden">
@@ -653,7 +793,46 @@ export default function DashboardPage() {
                                 </span>
                               </span>
                             )}
+                            {qr.autoRenew?.enabled && (
+                              <span
+                                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border flex items-center gap-1 ${
+                                  qr.autoRenew.status === 'past_due'
+                                    ? 'bg-red-500/15 border-red-500/40 text-red-300'
+                                    : 'bg-sky-500/15 border-sky-500/35 text-sky-300'
+                                }`}
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                                <span>
+                                  {qr.autoRenew.status === 'past_due'
+                                    ? `Tentativa Cartão (${qr.autoRenew.retryCount}/10)`
+                                    : `Cartão Salvo (•••• ${qr.autoRenew.cardLast4 || '****'})`}
+                                </span>
+                              </span>
+                            )}
                           </div>
+
+                          {/* Friendly PRO link invite bar when PRO still has random suffix */}
+                          {effectivePaid &&
+                            (qr.type === 'menu' || qr.type === 'catalog' || qr.linkedMenuId) &&
+                            !qr.customSlug &&
+                            friendlySlugEditing !== qr.slug && (
+                              <div className="flex flex-wrap items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/25 rounded-xl px-3 py-2 text-[11px] text-emerald-200">
+                                <span>
+                                  ✨ <strong>Você é PRO!</strong> Seu link agora tem
+                                  possibilidade de ficar mais curto e confortável (sem código final).
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingSlug(null);
+                                    setFriendlySlugEditing(qr.slug);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[10px] uppercase transition shrink-0"
+                                >
+                                  Personalizar Link
+                                </button>
+                              </div>
+                            )}
 
                           {/* Links Info */}
                           <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -783,6 +962,68 @@ export default function DashboardPage() {
                             </span>
                           </button>
 
+                          {/* Edit Friendly Link Button */}
+                          {(qr.type === 'menu' || qr.type === 'catalog' || qr.linkedMenuId) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!effectivePaid) {
+                                  setTargetUpgradeSlug(qr.slug);
+                                  setLockFeatureTitle(
+                                    'Link Amigável Personalizado é Exclusivo PRO'
+                                  );
+                                  setLockFeatureDescription(
+                                    `Transforme seu endereço em um link curto e fácil de lembrar (ex: /${
+                                      qr.type === 'catalog' ? 'catalogo' : 'cardapio'
+                                    }/${qr.slug.replace(/-[a-z0-9]{2,4}$/, '')}) ativando o Plano PRO por ${proPriceLabel}/mês.`
+                                  );
+                                  setIsLockModalOpen(true);
+                                  return;
+                                }
+                                setEditingSlug(null);
+                                setFriendlySlugEditing(
+                                  friendlySlugEditing === qr.slug ? null : qr.slug
+                                );
+                              }}
+                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                                effectivePaid
+                                  ? 'bg-violet-500/15 hover:bg-violet-500/25 text-violet-300 border border-violet-500/35'
+                                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+                              }`}
+                            >
+                              {effectivePaid ? (
+                                <Link2 className="w-3.5 h-3.5 text-violet-400" />
+                              ) : (
+                                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                              )}
+                              <span>Link Amigável</span>
+                            </button>
+                          )}
+
+                          {/* Recurring Auto-Renew Saved Card Button */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRecurringCardTarget({
+                                qr,
+                                chargeNow: !effectivePaid,
+                              })
+                            }
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                              qr.autoRenew?.enabled
+                                ? 'bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                            }`}
+                            title="Salvar cartão para renovação automática mensal"
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-sky-400" />
+                            <span>
+                              {qr.autoRenew?.enabled
+                                ? 'Cartão Salvo'
+                                : 'Renovação Auto'}
+                            </span>
+                          </button>
+
                           {/* Edit Destination Button */}
                           <button
                             onClick={() => handleStartEdit(qr)}
@@ -806,6 +1047,21 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </div>
+
+                      {/* Inline PRO Friendly Slug Customizer */}
+                      {friendlySlugEditing === qr.slug && effectivePaid && (
+                        <FriendlySlugPanel
+                          currentSlug={qr.slug}
+                          originalSlug={qr.originalSlug}
+                          storeTitle={qr.title}
+                          mode={qr.type === 'catalog' ? 'catalog' : 'menu'}
+                          onUpdated={() => {
+                            setFriendlySlugEditing(null);
+                            fetchQRs();
+                          }}
+                          onClose={() => setFriendlySlugEditing(null)}
+                        />
+                      )}
 
                       {/* Inline Edit Form for PRO users */}
                       {isEditing && effectivePaid && (
@@ -896,7 +1152,32 @@ export default function DashboardPage() {
           setIsCheckoutOpen(false);
           fetchQRs();
         }}
+        onOpenRecurringCard={() => {
+          const matched = qrs.find((q) => q.slug === targetUpgradeSlug) || qrs[0];
+          if (matched) {
+            setRecurringCardTarget({ qr: matched, chargeNow: true });
+          }
+        }}
       />
+
+      {/* Recurring Monthly Card Modal */}
+      {recurringCardTarget && (
+        <RecurringCardModal
+          isOpen={Boolean(recurringCardTarget)}
+          onClose={() => setRecurringCardTarget(null)}
+          slug={recurringCardTarget.qr.slug}
+          storeTitle={recurringCardTarget.qr.title}
+          isCurrentlyPro={isProStillValid(recurringCardTarget.qr, nowMs)}
+          proExpiresAt={recurringCardTarget.qr.proExpiresAt}
+          currentAutoRenew={recurringCardTarget.qr.autoRenew}
+          proPriceReais={proPrice}
+          defaultChargeNow={Boolean(recurringCardTarget.chargeNow)}
+          onSuccess={() => {
+            setRecurringCardTarget(null);
+            fetchQRs();
+          }}
+        />
+      )}
 
       {/* Menu / Catalog Editor Modal */}
       {menuEditorSlug && (

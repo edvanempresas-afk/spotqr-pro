@@ -22,6 +22,7 @@ interface PixCheckoutModalProps {
   slug: string;
   paymentData: PixPaymentResponse | null;
   onPaymentSuccess: () => void;
+  onOpenRecurringCard?: () => void;
 }
 
 export default function PixCheckoutModal({
@@ -30,6 +31,7 @@ export default function PixCheckoutModal({
   slug,
   paymentData,
   onPaymentSuccess,
+  onOpenRecurringCard,
 }: PixCheckoutModalProps) {
   const [paymentTab, setPaymentTab] = useState<'pix' | 'mercadolivre'>('pix');
   const [copied, setCopied] = useState(false);
@@ -310,12 +312,32 @@ export default function PixCheckoutModal({
                   </div>
                 </div>
 
+                {onOpenRecurringCard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenRecurringCard();
+                    }}
+                    className="w-full py-3.5 px-5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>
+                      Pagar com Cartão Salvo (Renovação Automática Mensal)
+                    </span>
+                  </button>
+                )}
+
                 {paymentData.checkoutProUrl || paymentData.ticketUrl ? (
                   <a
                     href={paymentData.checkoutProUrl || paymentData.ticketUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full py-3.5 px-5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2 whitespace-nowrap"
+                    className={`w-full py-3.5 px-5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-lg transition flex items-center justify-center gap-2 whitespace-nowrap ${
+                      onOpenRecurringCard
+                        ? 'bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-200'
+                        : 'bg-sky-500 hover:bg-sky-400 text-slate-950'
+                    }`}
                   >
                     <span>Pagar no Ambiente Seguro Mercado Pago</span>
                     <ExternalLink className="w-4 h-4" />

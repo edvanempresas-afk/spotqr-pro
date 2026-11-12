@@ -15,11 +15,13 @@ import {
 } from './types';
 import { DEMO_PAYMENTS } from './payments';
 import { computeStableStoreCode, isProStillValid } from './pro-status';
+import { isValidFriendlySlugFormat, normalizeFriendlySlug } from './slugs';
 
 interface DatabaseSchema {
   dynamicQRs: Record<string, DynamicQRRecord>;
   menus: Record<string, RestaurantMenu>;
   payments: Record<string, PaymentRecord>;
+  slugRedirects?: Record<string, string>;
   developerLeads?: Record<string, DeveloperLead>;
   developerSettings?: DeveloperSettings;
   developerNotifications?: Record<string, DeveloperNotification>;
@@ -468,6 +470,11 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
+    if (!parsed.slugRedirects) {
+      parsed.slugRedirects = {};
+      modified = true;
+    }
+
     if (modified) {
       saveDb(parsed);
     }
@@ -506,6 +513,7 @@ export type CloudSliceKey =
   | 'users'
   | 'qrs'
   | 'payments'
+  | 'redirects'
   | 'leads'
   | 'notifications'
   | 'settings'
@@ -519,6 +527,7 @@ const CLOUD_KEYS: CloudSliceKey[] = [
   'notifications',
   'settings',
   'vouchers',
+  'redirects',
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
@@ -658,6 +667,12 @@ export async function syncDbFromCloud(): Promise<void> {
     changed = true;
   }
 
+  const cloudRedirects = parseSlice<Record<string, string>>(results[7]);
+  if (cloudRedirects) {
+    db.slugRedirects = cloudRedirects;
+    changed = true;
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -716,6 +731,13 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
         cloudQRs = {};
       }
     }
+    const deletedSet = globalThis.__spotqrDeletedQRSlugs;
+    if (deletedSet && deletedSet.size > 0) {
+      for (const delSlug of Array.from(deletedSet)) {
+        delete cloudQRs[delSlug];
+      }
+      deletedSet.clear();
+    }
     const merged = {
       ...cloudQRs,
       ...(db.dynamicQRs || {}),
@@ -730,6 +752,7 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     users: db.users || {},
     qrs: db.dynamicQRs || {},
     payments: db.payments || {},
+    redirects: db.slugRedirects || {},
     leads: db.developerLeads || {},
     notifications: db.developerNotifications || {},
     settings: db.developerSettings || initialData.developerSettings,
@@ -741,6 +764,64 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
 export async function persistMenuToCloud(menu: RestaurantMenu): Promise<void> {
   if (!menu?.slug || !getCloudKVConfig()) return;
   await kvRequest(['SET', `spotqr:menu:${menu.slug}`, JSON.stringify(menu)]);
+}
+
+export async function deleteCloudMenu(slug: string): Promise<void> {
+  if (!slug || !getCloudKVConfig()) return;
+  await kvRequest(['DEL', `spotqr:menu:${slug}`]);
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __spotqrPendingMenuMoves: Array<{ from: string; to: string }> | undefined;
+  // eslint-disable-next-line no-var
+  var __spotqrDeletedQRSlugs: Set<string> | undefined;
+}
+
+function markDeletedQRSlug(slug: string) {
+  if (!slug) return;
+  if (!globalThis.__spotqrDeletedQRSlugs) {
+    globalThis.__spotqrDeletedQRSlugs = new Set<string>();
+  }
+  globalThis.__spotqrDeletedQRSlugs.add(slug);
+}
+
+function queueCloudMenuMove(from: string, to: string) {
+  if (!from || !to || from === to) return;
+  const list = globalThis.__spotqrPendingMenuMoves || [];
+  list.push({ from, to });
+  globalThis.__spotqrPendingMenuMoves = list;
+}
+
+export async function reconcileCloudSlugMigrations(): Promise<void> {
+  const list = globalThis.__spotqrPendingMenuMoves || [];
+  if (list.length === 0) return;
+  globalThis.__spotqrPendingMenuMoves = [];
+  const db = ensureDb();
+  for (const { from, to } of list) {
+    if (!db.menus[to]) {
+      await syncMenuFromCloud(from);
+      const loaded = db.menus[from];
+      if (loaded) {
+        db.menus[to] = {
+          ...loaded,
+          id: to,
+          slug: to,
+          updatedAt: new Date().toISOString(),
+        };
+        delete db.menus[from];
+        saveDb(db);
+      }
+    }
+    if (db.menus[to]) {
+      await persistMenuToCloud(db.menus[to]);
+    }
+    await deleteCloudMenu(from);
+  }
+  await Promise.all([
+    persistSliceToCloud('qrs'),
+    persistSliceToCloud('redirects'),
+  ]);
 }
 
 function assignUniqueStoreCode(
@@ -762,13 +843,222 @@ function assignUniqueStoreCode(
   return candidate;
 }
 
+function moveShowcaseSlugInDb(
+  db: DatabaseSchema,
+  fromSlug: string,
+  toSlug: string,
+  nowIso: string
+) {
+  const existingQR = db.dynamicQRs[fromSlug];
+  if (!existingQR || fromSlug === toSlug) return;
+
+  const isCatalog = existingQR.type === 'catalog';
+  const expectedPrefix = isCatalog ? `/catalogo/${fromSlug}` : `/cardapio/${fromSlug}`;
+  const altPrefix = isCatalog ? `/cardapio/${fromSlug}` : `/catalogo/${fromSlug}`;
+  let nextTargetUrl = existingQR.targetUrl;
+  if (
+    !nextTargetUrl ||
+    nextTargetUrl === expectedPrefix ||
+    nextTargetUrl === altPrefix ||
+    nextTargetUrl.endsWith(`/${fromSlug}`)
+  ) {
+    nextTargetUrl = `/${isCatalog ? 'catalogo' : 'cardapio'}/${toSlug}`;
+  }
+
+  delete db.dynamicQRs[fromSlug];
+  markDeletedQRSlug(fromSlug);
+  if (globalThis.__spotqrDeletedQRSlugs) {
+    globalThis.__spotqrDeletedQRSlugs.delete(toSlug);
+  }
+
+  const movedQR: DynamicQRRecord = {
+    ...existingQR,
+    slug: toSlug,
+    targetUrl: nextTargetUrl,
+    linkedMenuId: toSlug,
+    updatedAt: nowIso,
+  };
+  db.dynamicQRs[toSlug] = movedQR;
+
+  // Move menu in memory if present
+  const existingMenu = db.menus[fromSlug];
+  if (existingMenu) {
+    delete db.menus[fromSlug];
+    db.menus[toSlug] = {
+      ...existingMenu,
+      id: toSlug,
+      slug: toSlug,
+      originalSlug: existingQR.originalSlug || existingMenu.originalSlug,
+      updatedAt: nowIso,
+    };
+  }
+  queueCloudMenuMove(fromSlug, toSlug);
+}
+
+/**
+ * Reverts an expired/unrenewed PRO store back to Free:
+ * - Clears isPaid / proExpiresAt / proGrantType
+ * - Blocks PRO features automatically (ads back, coverVideo hidden -> static coverImage)
+ * - If a custom friendly link was configured while PRO, reverts slug back to originalSlug
+ */
+export function applyFreeDowngradeInDb(
+  db: DatabaseSchema,
+  qr: DynamicQRRecord,
+  nowMs: number = Date.now(),
+  markSuspendedFree: boolean = false
+): DynamicQRRecord {
+  const nowIso = new Date(nowMs).toISOString();
+  const currentSlug = qr.slug;
+
+  qr.isPaid = false;
+  qr.proExpiresAt = null;
+  qr.proGrantType = undefined;
+  qr.proGrantedHours = undefined;
+  qr.proVoucherCode = undefined;
+  qr.hadProExpired = true;
+  qr.updatedAt = nowIso;
+
+  if (qr.autoRenew) {
+    qr.autoRenew = {
+      ...qr.autoRenew,
+      enabled: false,
+      status: markSuspendedFree ? 'suspended_free' : qr.autoRenew.status,
+      graceStartedAt: null,
+      graceEndsAt: null,
+    };
+  }
+
+  // Revert custom friendly PRO slug back to previous originalSlug
+  if (qr.originalSlug && qr.originalSlug !== currentSlug) {
+    const original = qr.originalSlug;
+    qr.customSlug = undefined;
+    if (db.slugRedirects) {
+      delete db.slugRedirects[original];
+    }
+    db.dynamicQRs[currentSlug] = qr;
+    moveShowcaseSlugInDb(db, currentSlug, original, nowIso);
+    return db.dynamicQRs[original];
+  }
+
+  db.dynamicQRs[currentSlug] = qr;
+  return qr;
+}
+
+export function resolveEffectiveSlug(slug: string): string {
+  const db = ensureDb();
+  if (db.dynamicQRs[slug]) return slug;
+  const redirected = db.slugRedirects?.[slug];
+  if (redirected && db.dynamicQRs[redirected]) {
+    return redirected;
+  }
+  return slug;
+}
+
+export function isFriendlySlugAvailable(
+  rawCandidate: string,
+  currentStoreSlug?: string
+): { available: boolean; normalized: string; reason?: string } {
+  const normalized = normalizeFriendlySlug(rawCandidate);
+  const check = isValidFriendlySlugFormat(normalized);
+  if (!check.valid) {
+    return { available: false, normalized, reason: check.reason };
+  }
+  if (currentStoreSlug && normalized === currentStoreSlug) {
+    return { available: true, normalized };
+  }
+
+  const db = ensureDb();
+  if (db.dynamicQRs[normalized]) {
+    return {
+      available: false,
+      normalized,
+      reason: 'Este link já está em uso por outro usuário. Escolha outra opção.',
+    };
+  }
+
+  for (const qr of Object.values(db.dynamicQRs || {})) {
+    if (qr.slug === currentStoreSlug) continue;
+    if (qr.originalSlug === normalized || qr.customSlug === normalized) {
+      return {
+        available: false,
+        normalized,
+        reason: 'Este link está reservado por outra loja.',
+      };
+    }
+  }
+
+  const redirectOwner = db.slugRedirects?.[normalized];
+  if (redirectOwner && redirectOwner !== currentStoreSlug) {
+    return {
+      available: false,
+      normalized,
+      reason: 'Este link já pertence a outra loja ativa.',
+    };
+  }
+
+  return { available: true, normalized };
+}
+
+export function updateFriendlySlugForQR(
+  currentSlug: string,
+  requestedNewSlug: string
+): { ok: boolean; error?: string; qr?: DynamicQRRecord; previousSlug?: string } {
+  expireDueQRsIfAny();
+  const db = ensureDb();
+  const qr = db.dynamicQRs[currentSlug];
+  if (!qr) {
+    return { ok: false, error: 'Loja / QR Code não encontrado.' };
+  }
+  if (!isProStillValid(qr)) {
+    return {
+      ok: false,
+      error: 'A personalização de link amigável é exclusiva do Plano PRO.',
+    };
+  }
+
+  const availability = isFriendlySlugAvailable(requestedNewSlug, currentSlug);
+  if (!availability.available) {
+    return {
+      ok: false,
+      error: availability.reason || 'Este link não está disponível.',
+    };
+  }
+
+  const nextSlug = availability.normalized;
+  if (nextSlug === currentSlug) {
+    return { ok: true, qr, previousSlug: currentSlug };
+  }
+
+  const nowIso = new Date().toISOString();
+  const originalSlug = qr.originalSlug || currentSlug;
+  qr.originalSlug = originalSlug;
+  qr.customSlug = nextSlug;
+  if (!db.slugRedirects) db.slugRedirects = {};
+  // Keep previous free URL redirecting seamlessly to the new PRO friendly URL while PRO is active
+  if (originalSlug !== nextSlug) {
+    db.slugRedirects[originalSlug] = nextSlug;
+  }
+  if (currentSlug !== originalSlug) {
+    delete db.slugRedirects[currentSlug];
+  }
+
+  db.dynamicQRs[currentSlug] = qr;
+  moveShowcaseSlugInDb(db, currentSlug, nextSlug, nowIso);
+  saveDb(db);
+
+  return {
+    ok: true,
+    qr: db.dynamicQRs[nextSlug],
+    previousSlug: currentSlug,
+  };
+}
+
 /**
  * Checks all non-demo QRs and automatically reverts expired temporary/voucher PRO plans back to Free.
  * Returns true if any record changed so callers can persist updated QR state to cloud.
  */
-export function expireDueQRsIfAny(): boolean {
+export function expireDueQRsIfAny(nowMs: number = Date.now()): boolean {
   const db = ensureDb();
-  const nowMs = Date.now();
   let changed = false;
 
   for (const slug of Object.keys(db.dynamicQRs || {})) {
@@ -781,12 +1071,8 @@ export function expireDueQRsIfAny(): boolean {
       changed = true;
     }
 
-    if (qr.isPaid && qr.proExpiresAt && !isProStillValid(qr, nowMs)) {
-      qr.isPaid = false;
-      qr.proExpiresAt = null;
-      qr.proGrantType = undefined;
-      qr.proGrantedHours = undefined;
-      qr.updatedAt = new Date(nowMs).toISOString();
+    if (qr.isPaid && !isProStillValid(qr, nowMs)) {
+      applyFreeDowngradeInDb(db, qr, nowMs, Boolean(qr.autoRenew?.enabled));
       changed = true;
     }
   }
@@ -862,6 +1148,11 @@ export function incrementQRScan(slug: string): void {
 }
 
 // RESTAURANT MENU & STORE CATALOG CRUD
+export function peekExistingMenuBySlug(slug: string): RestaurantMenu | null {
+  const db = ensureDb();
+  return db.menus[slug] || null;
+}
+
 export function getMenuBySlug(
   slug: string,
   defaultMode: 'menu' | 'catalog' = 'menu',
@@ -1027,10 +1318,37 @@ export function recordPayment(
   };
 
   if (status === 'approved' && db.dynamicQRs[slug]) {
-    db.dynamicQRs[slug].isPaid = true;
-    db.dynamicQRs[slug].proGrantType = 'paid';
-    db.dynamicQRs[slug].proExpiresAt = null;
-    db.dynamicQRs[slug].paymentId = paymentId;
+    const qr = db.dynamicQRs[slug];
+    const nowMs = Date.now();
+    const existingExpMs = qr.proExpiresAt
+      ? new Date(qr.proExpiresAt).getTime()
+      : 0;
+    const baseMs =
+      qr.isPaid && Number.isFinite(existingExpMs) && existingExpMs > nowMs
+        ? existingExpMs
+        : nowMs;
+    const newExpiresIso = new Date(
+      baseMs + 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    qr.isPaid = true;
+    qr.hadProExpired = false;
+    qr.proGrantType = 'paid';
+    qr.proExpiresAt = newExpiresIso;
+    qr.paymentId = paymentId;
+    qr.updatedAt = now;
+    if (qr.autoRenew) {
+      qr.autoRenew = {
+        ...qr.autoRenew,
+        status: qr.autoRenew.enabled ? 'active' : qr.autoRenew.status,
+        nextBillingAt: newExpiresIso,
+        graceStartedAt: null,
+        graceEndsAt: null,
+        retryCount: 0,
+        executedSlots: [],
+        lastError: null,
+      };
+    }
   }
   saveDb(db);
 
@@ -1435,12 +1753,16 @@ export function grantProToQR(input: {
   }
 
   qr.isPaid = true;
+  qr.hadProExpired = false;
   qr.proGrantType = input.mode;
   qr.proExpiresAt = expiresAt;
   qr.proGrantedAt = nowIso;
   qr.proGrantedHours = grantedHours;
   qr.proVoucherCode = undefined;
   qr.updatedAt = nowIso;
+  if (qr.autoRenew?.enabled && expiresAt) {
+    qr.autoRenew.nextBillingAt = expiresAt;
+  }
   if (!qr.storeCode) {
     qr.storeCode = assignUniqueStoreCode(db, qr);
   }
@@ -1455,16 +1777,40 @@ export function revokeProFromQR(slug: string): DynamicQRRecord | null {
   const qr = db.dynamicQRs[slug];
   if (!qr) return null;
 
-  qr.isPaid = false;
-  qr.proExpiresAt = null;
-  qr.proGrantType = undefined;
-  qr.proGrantedHours = undefined;
-  qr.proVoucherCode = undefined;
-  qr.updatedAt = new Date().toISOString();
+  const updated = applyFreeDowngradeInDb(db, qr, Date.now(), false);
+  saveDb(db);
+  return updated;
+}
 
+export function updateQRAutoRenew(
+  slug: string,
+  autoRenew: DynamicQRRecord['autoRenew']
+): DynamicQRRecord | null {
+  const db = ensureDb();
+  const qr = db.dynamicQRs[slug];
+  if (!qr) return null;
+  qr.autoRenew = autoRenew;
+  qr.updatedAt = new Date().toISOString();
   db.dynamicQRs[slug] = qr;
   saveDb(db);
   return qr;
+}
+
+export function downgradeQRToFreePublic(
+  slug: string,
+  markSuspendedFree: boolean = false
+): DynamicQRRecord | null {
+  const db = ensureDb();
+  const qr = db.dynamicQRs[slug];
+  if (!qr) return null;
+  const updated = applyFreeDowngradeInDb(
+    db,
+    qr,
+    Date.now(),
+    markSuspendedFree
+  );
+  saveDb(db);
+  return updated;
 }
 
 // PRO VOUCHERS CRUD & REDEMPTION
@@ -1636,12 +1982,16 @@ export function redeemProVoucher(input: {
   let creditOnly = false;
   if (targetQR) {
     targetQR.isPaid = true;
+    targetQR.hadProExpired = false;
     targetQR.proGrantType = 'voucher';
     targetQR.proExpiresAt = expiresIso;
     targetQR.proGrantedAt = nowIso;
     targetQR.proGrantedHours = undefined;
     targetQR.proVoucherCode = voucher.code;
     targetQR.updatedAt = nowIso;
+    if (targetQR.autoRenew?.enabled) {
+      targetQR.autoRenew.nextBillingAt = expiresIso;
+    }
     if (!targetQR.storeCode) {
       targetQR.storeCode = assignUniqueStoreCode(db, targetQR);
     }

@@ -6,6 +6,7 @@ import {
   saveDynamicQR,
   getMenuBySlug,
   expireDueQRsIfAny,
+  reconcileCloudSlugMigrations,
   consumeUserProCreditIfActive,
   syncDbFromCloud,
   persistSliceToCloud,
@@ -21,6 +22,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   await syncDbFromCloud();
   if (expireDueQRsIfAny()) {
+    await reconcileCloudSlugMigrations();
     await persistSliceToCloud('qrs');
   }
   const { searchParams } = new URL(request.url);

@@ -96,6 +96,16 @@ export default function ProFeatureLockModal({
               pro: 'Tempo Real',
             },
             {
+              name: 'Banner em Vídeo Animado',
+              free: 'Apenas Foto 🔒',
+              pro: 'Vídeo Curto (Loop)',
+            },
+            {
+              name: 'Link Amigável da Loja',
+              free: 'Código Aleatório 🔒',
+              pro: '/catalogo/sua-loja',
+            },
+            {
               name: 'Tempo de Download',
               free: 'Espera 5s',
               pro: 'Download Instantâneo',

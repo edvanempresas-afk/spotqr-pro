@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import {
   getDynamicQRBySlug,
+  resolveEffectiveSlug,
   incrementQRScan,
+  expireDueQRsIfAny,
+  reconcileCloudSlugMigrations,
   syncDbFromCloud,
   persistSliceToCloud,
 } from '@/lib/db';
@@ -13,8 +16,13 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   await syncDbFromCloud();
+  if (expireDueQRsIfAny()) {
+    await reconcileCloudSlugMigrations();
+    await persistSliceToCloud('qrs');
+  }
   const { slug } = params;
-  const qr = getDynamicQRBySlug(slug);
+  const resolvedSlug = resolveEffectiveSlug(slug);
+  const qr = getDynamicQRBySlug(resolvedSlug);
 
   if (!qr) {
     return new Response(
@@ -43,7 +51,7 @@ export async function GET(
   }
 
   // Count scan
-  incrementQRScan(slug);
+  incrementQRScan(resolvedSlug);
   await persistSliceToCloud('qrs');
 
   // If not yet paid (in demo or pending activation), we can still allow or show notice
@@ -51,10 +59,10 @@ export async function GET(
 
   if (qr.type === 'catalog') {
     const origin = new URL(request.url).origin;
-    destination = `${origin}/catalogo/${slug}`;
+    destination = `${origin}/catalogo/${resolvedSlug}`;
   } else if (qr.type === 'menu' || qr.linkedMenuId) {
     const origin = new URL(request.url).origin;
-    destination = `${origin}/cardapio/${slug}`;
+    destination = `${origin}/cardapio/${resolvedSlug}`;
   }
 
   // If destination is relative, prefix with origin

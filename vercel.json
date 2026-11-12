@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/billing?slot=10",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/billing?slot=18",
+      "schedule": "0 21 * * *"
+    }
+  ]
+}

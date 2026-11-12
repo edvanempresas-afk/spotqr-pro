@@ -98,6 +98,7 @@ export interface MenuCategory {
 export interface RestaurantMenu {
   id: string;
   slug: string;
+  originalSlug?: string;
   mode?: 'menu' | 'catalog';
   title: string;
   description: string;
@@ -107,6 +108,7 @@ export interface RestaurantMenu {
   themeColor: string;
   themeMode?: ShowcaseThemeMode;
   coverImage?: string;
+  coverVideo?: string;
   logoImage?: string;
   categories: MenuCategory[];
   items: MenuItem[];
@@ -126,10 +128,43 @@ export interface RestaurantMenu {
   updatedAt: string;
 }
 
+export interface AutoRenewAttempt {
+  timestamp: string;
+  slotLabel: string;
+  status: 'approved' | 'failed';
+  paymentId?: string;
+  reason?: string;
+  amount: number;
+}
+
+export interface AutoRenewConfig {
+  enabled: boolean;
+  provider: 'mercadopago_card';
+  mpCustomerId?: string;
+  mpCardId?: string;
+  mpPaymentMethodId?: string;
+  cardBrand?: string;
+  cardLast4?: string;
+  holderName?: string;
+  expiryMonth?: string;
+  expiryYear?: string;
+  status: 'active' | 'past_due' | 'canceled' | 'suspended_free';
+  nextBillingAt: string;
+  graceStartedAt?: string | null;
+  graceEndsAt?: string | null;
+  retryCount: number;
+  executedSlots: string[];
+  lastAttemptAt?: string | null;
+  lastError?: string | null;
+  history?: AutoRenewAttempt[];
+}
+
 export interface DynamicQRRecord {
   id: string;
   storeCode?: string;
   slug: string;
+  originalSlug?: string;
+  customSlug?: string;
   title: string;
   targetUrl: string;
   type: QRType;
@@ -138,12 +173,14 @@ export interface DynamicQRRecord {
   scansCount: number;
   lastScannedAt?: string;
   isPaid: boolean;
+  hadProExpired?: boolean;
   proGrantType?: 'paid' | 'indeterminate' | 'days_30' | 'hours' | 'voucher';
   proExpiresAt?: string | null;
   proGrantedAt?: string;
   proGrantedHours?: number;
   proVoucherCode?: string;
   paymentId?: string;
+  autoRenew?: AutoRenewConfig | null;
   qrConfig: Partial<QRConfig>;
   linkedMenuId?: string;
   ownerId?: string;

@@ -96,6 +96,11 @@ export default function DigitalShowcasePage({
   // Product photo zoom / lightbox
   const [zoomedItem, setZoomedItem] = useState<MenuItem | null>(null);
   const [photoZoomScale, setPhotoZoomScale] = useState<number>(1);
+  const [videoCoverFailed, setVideoCoverFailed] = useState(false);
+
+  useEffect(() => {
+    setVideoCoverFailed(false);
+  }, [menu?.coverVideo]);
 
   const openPhotoZoom = (item: MenuItem) => {
     setZoomedItem(item);
@@ -847,15 +852,32 @@ export default function DigitalShowcasePage({
 
   return (
     <div className={`min-h-screen pb-28 transition-colors ${pageBgClass}`}>
-      {/* Cover Banner */}
+      {/* Cover Banner (PRO animated video when enabled & valid, or static image fallback) */}
       <div className="relative w-full h-44 sm:h-56 bg-slate-900 overflow-hidden">
-        <img
-          src={menu.coverImage || fallbackCover}
-          alt={menu.title}
-          className={`w-full h-full object-cover ${
-            isLight ? 'opacity-85' : 'opacity-60'
-          }`}
-        />
+        {isPro && menu.coverVideo && !videoCoverFailed ? (
+          <video
+            key={menu.coverVideo}
+            src={menu.coverVideo}
+            poster={menu.coverImage || fallbackCover}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            onError={() => setVideoCoverFailed(true)}
+            className={`w-full h-full object-cover pointer-events-none ${
+              isLight ? 'opacity-85' : 'opacity-60'
+            }`}
+          />
+        ) : (
+          <img
+            src={menu.coverImage || fallbackCover}
+            alt={menu.title}
+            className={`w-full h-full object-cover ${
+              isLight ? 'opacity-85' : 'opacity-60'
+            }`}
+          />
+        )}
         <div
           className="absolute inset-0"
           style={{

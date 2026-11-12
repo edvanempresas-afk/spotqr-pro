@@ -3,8 +3,10 @@ import {
   getMenuBySlug,
   saveMenu,
   getDynamicQRBySlug,
+  resolveEffectiveSlug,
   saveDynamicQR,
   expireDueQRsIfAny,
+  reconcileCloudSlugMigrations,
   consumeUserProCreditIfActive,
   syncDbFromCloud,
   syncMenuFromCloud,
@@ -30,11 +32,13 @@ export async function GET(request: NextRequest) {
 
   await syncDbFromCloud();
   if (expireDueQRsIfAny()) {
+    await reconcileCloudSlugMigrations();
     await persistSliceToCloud('qrs');
   }
-  await syncMenuFromCloud(slug);
+  const effectiveSlug = resolveEffectiveSlug(slug);
+  await syncMenuFromCloud(effectiveSlug);
 
-  const menu = getMenuBySlug(slug, modeParam, titleParam);
+  const menu = getMenuBySlug(effectiveSlug, modeParam, titleParam);
   if (!menu) {
     return NextResponse.json(
       { error: 'Cardápio ou catálogo não encontrado' },
@@ -42,17 +46,29 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const qr = getDynamicQRBySlug(slug);
+  const qr = getDynamicQRBySlug(effectiveSlug);
   const isPaid = Boolean(
-    isProStillValid(qr) || slug === 'demo-restaurante' || slug === 'demo-catalogo'
+    isProStillValid(qr) ||
+      effectiveSlug === 'demo-restaurante' ||
+      effectiveSlug === 'demo-catalogo'
   );
 
   return NextResponse.json(
     {
       ...menu,
+      coverVideo: isPaid ? menu.coverVideo : undefined,
       isPaid,
       proGrantType: isPaid ? qr?.proGrantType || null : null,
       proExpiresAt: isPaid ? qr?.proExpiresAt || null : null,
+      autoRenewSummary: qr?.autoRenew
+        ? {
+            enabled: qr.autoRenew.enabled,
+            status: qr.autoRenew.status,
+            graceEndsAt: qr.autoRenew.graceEndsAt || null,
+            retryCount: qr.autoRenew.retryCount || 0,
+            lastError: qr.autoRenew.lastError || null,
+          }
+        : null,
     },
     {
       headers: {
@@ -94,10 +110,42 @@ export async function POST(request: NextRequest) {
       .replace(/[^a-z0-9_-]/g, '-');
 
     await syncMenuFromCloud(cleanSlug);
+    expireDueQRsIfAny();
+    const existingMenu = getMenuBySlug(
+      cleanSlug,
+      body.mode === 'catalog' ? 'catalog' : 'menu',
+      body.title
+    );
+    const existingQRBeforeSave = getDynamicQRBySlug(cleanSlug);
+    const isEffectivePro = Boolean(
+      (existingQRBeforeSave && isProStillValid(existingQRBeforeSave)) ||
+        cleanSlug === 'demo-restaurante' ||
+        cleanSlug === 'demo-catalogo'
+    );
+
+    const incomingCoverVideo =
+      typeof body.coverVideo === 'string' ? body.coverVideo.trim() : '';
+    const existingCoverVideo = existingMenu?.coverVideo || '';
+    if (
+      !isEffectivePro &&
+      incomingCoverVideo &&
+      incomingCoverVideo !== existingCoverVideo
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'O Banner em Vídeo Curto Animado é um recurso exclusivo do Plano PRO.',
+        },
+        { status: 403 }
+      );
+    }
 
     const isCatalog = body.mode === 'catalog';
     const updatedMenu: RestaurantMenu = {
       ...body,
+      coverVideo: isEffectivePro
+        ? incomingCoverVideo || undefined
+        : existingCoverVideo || undefined,
       mode: isCatalog ? 'catalog' : 'menu',
       slug: cleanSlug,
       ownerId: clientUser?.id || body.ownerId,

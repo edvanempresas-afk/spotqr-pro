@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   expireDueQRsIfAny,
+  reconcileCloudSlugMigrations,
   getAdminStoresList,
   grantProToQR,
   revokeProFromQR,
@@ -23,7 +24,11 @@ export async function GET(req: NextRequest) {
 
     const expiredAny = expireDueQRsIfAny();
     if (expiredAny) {
-      await persistSliceToCloud('qrs');
+      await reconcileCloudSlugMigrations();
+      await Promise.all([
+        persistSliceToCloud('qrs'),
+        persistSliceToCloud('redirects'),
+      ]);
     }
 
     const stores = getAdminStoresList();
@@ -65,7 +70,11 @@ export async function POST(req: NextRequest) {
           { status: 404 }
         );
       }
-      await persistSliceToCloud('qrs');
+      await reconcileCloudSlugMigrations();
+      await Promise.all([
+        persistSliceToCloud('qrs'),
+        persistSliceToCloud('redirects'),
+      ]);
       return NextResponse.json({
         success: true,
         qr: updated,
@@ -128,3 +137,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+

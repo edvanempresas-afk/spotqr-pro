@@ -239,3 +239,292 @@ export async function checkPaymentStatus(
 
   return { status: 'pending' };
 }
+
+export function isValidCpf(rawCpf: string): boolean {
+  const cpf = (rawCpf || '').replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(cpf[i]) * (10 - i);
+  let rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== Number(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i);
+  rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  return rev === Number(cpf[10]);
+}
+
+export async function getOrCreateMercadoPagoCustomer(
+  email: string,
+  fullName: string
+): Promise<{ ok: boolean; customerId?: string; error?: string }> {
+  const { accessToken, isLive } = getActiveMercadoPagoConfig();
+  if (!isLive) {
+    return {
+      ok: false,
+      error: 'Credenciais do Mercado Pago não configuradas no ambiente.',
+    };
+  }
+
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { ok: false, error: 'E-mail inválido para cadastro do cliente.' };
+  }
+
+  try {
+    const searchRes = await fetch(
+      `https://api.mercadopago.com/v1/customers/search?email=${encodeURIComponent(
+        cleanEmail
+      )}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    if (searchRes.ok) {
+      const searchData = await searchRes.json();
+      if (Array.isArray(searchData.results) && searchData.results.length > 0) {
+        return { ok: true, customerId: String(searchData.results[0].id) };
+      }
+    }
+
+    const parts = (fullName || 'Cliente SpotQR').trim().split(/\s+/);
+    const firstName = parts[0] || 'Cliente';
+    const lastName = parts.slice(1).join(' ') || 'SpotQR';
+
+    const createRes = await fetch('https://api.mercadopago.com/v1/customers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        email: cleanEmail,
+        first_name: firstName,
+        last_name: lastName,
+      }),
+    });
+
+    const createData = await createRes.json().catch(() => ({}));
+    if (createRes.ok && createData.id) {
+      return { ok: true, customerId: String(createData.id) };
+    }
+    return {
+      ok: false,
+      error:
+        createData.message ||
+        'Não foi possível criar o cadastro de assinatura no Mercado Pago.',
+    };
+  } catch (err) {
+    console.error('MP Customer error:', err);
+    return { ok: false, error: 'Falha de comunicação com Mercado Pago.' };
+  }
+}
+
+export async function saveCustomerCardOnMercadoPago(
+  customerId: string,
+  cardToken: string
+): Promise<{
+  ok: boolean;
+  cardId?: string;
+  brand?: string;
+  last4?: string;
+  expiryMonth?: string;
+  expiryYear?: string;
+  paymentMethodId?: string;
+  error?: string;
+}> {
+  const { accessToken, isLive } = getActiveMercadoPagoConfig();
+  if (!isLive) {
+    return { ok: false, error: 'Mercado Pago não configurado.' };
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.mercadopago.com/v1/customers/${encodeURIComponent(
+        customerId
+      )}/cards`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ token: cardToken }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.id) {
+      return {
+        ok: false,
+        error:
+          data.message ||
+          'Cartão não aceito para salvamento recorrente. Verifique os dados.',
+      };
+    }
+
+    return {
+      ok: true,
+      cardId: String(data.id),
+      brand: data.payment_method?.name || data.payment_method?.id || 'Cartão',
+      paymentMethodId: data.payment_method?.id,
+      last4: data.last_four_digits ? String(data.last_four_digits) : undefined,
+      expiryMonth: data.expiration_month
+        ? String(data.expiration_month).padStart(2, '0')
+        : undefined,
+      expiryYear: data.expiration_year
+        ? String(data.expiration_year)
+        : undefined,
+    };
+  } catch (err) {
+    console.error('MP save card error:', err);
+    return { ok: false, error: 'Erro ao salvar cartão no Mercado Pago.' };
+  }
+}
+
+export async function createSavedCardTokenOnMercadoPago(
+  cardId: string
+): Promise<{ ok: boolean; token?: string; error?: string }> {
+  const { accessToken, publicKey, isLive } = getActiveMercadoPagoConfig();
+  if (!isLive) {
+    return { ok: false, error: 'Mercado Pago não configurado.' };
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.mercadopago.com/v1/card_tokens?public_key=${encodeURIComponent(
+        publicKey
+      )}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ card_id: cardId }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.id) {
+      return {
+        ok: false,
+        error:
+          data.message ||
+          'Não foi possível gerar token de cobrança do cartão salvo.',
+      };
+    }
+    return { ok: true, token: String(data.id) };
+  } catch (err) {
+    console.error('MP saved card token error:', err);
+    return {
+      ok: false,
+      error: 'Falha ao autorizar cobrança automática do cartão salvo.',
+    };
+  }
+}
+
+export async function chargeMercadoPagoCard(input: {
+  slug: string;
+  amount: number;
+  email: string;
+  fullName: string;
+  cpf?: string;
+  cardToken: string;
+  paymentMethodId?: string;
+  customerId?: string;
+  description?: string;
+}): Promise<{
+  ok: boolean;
+  status: 'approved' | 'pending' | 'rejected';
+  paymentId?: string;
+  error?: string;
+}> {
+  const { accessToken, isLive } = getActiveMercadoPagoConfig();
+  if (!isLive) {
+    return {
+      ok: false,
+      status: 'rejected',
+      error: 'Mercado Pago não configurado.',
+    };
+  }
+
+  const parts = (input.fullName || 'Cliente SpotQR').trim().split(/\s+/);
+  const firstName = parts[0] || 'Cliente';
+  const lastName = parts.slice(1).join(' ') || 'SpotQR';
+  const cleanCpf = (input.cpf || '').replace(/\D/g, '');
+  const idempotencyKey = `card_${input.slug}_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 6)}`;
+
+  const payer: Record<string, unknown> = input.customerId
+    ? { type: 'customer', id: input.customerId }
+    : {
+        email: input.email,
+        first_name: firstName,
+        last_name: lastName,
+        ...(cleanCpf.length === 11
+          ? { identification: { type: 'CPF', number: cleanCpf } }
+          : {}),
+      };
+
+  const payload: Record<string, unknown> = {
+    transaction_amount: Number(input.amount) || 10.9,
+    token: input.cardToken,
+    description:
+      input.description || `SpotQR PRO Mensalidade (${input.slug})`,
+    installments: 1,
+    external_reference: input.slug,
+    statement_descriptor: 'SPOTQR PRO',
+    payer,
+  };
+  if (input.paymentMethodId) {
+    payload.payment_method_id = input.paymentMethodId;
+  }
+
+  try {
+    const res = await fetch('https://api.mercadopago.com/v1/payments', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+        'X-Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: 'rejected',
+        error:
+          data.message ||
+          'Pagamento no cartão recusado pela operadora.',
+      };
+    }
+
+    const mappedStatus: 'approved' | 'pending' | 'rejected' =
+      data.status === 'approved'
+        ? 'approved'
+        : data.status === 'rejected' || data.status === 'cancelled'
+        ? 'rejected'
+        : 'pending';
+
+    return {
+      ok: mappedStatus === 'approved',
+      status: mappedStatus,
+      paymentId: data.id ? String(data.id) : undefined,
+      error:
+        mappedStatus === 'rejected'
+          ? data.status_detail || 'Cobrança não autorizada pela operadora.'
+          : undefined,
+    };
+  } catch (err) {
+    console.error('MP card payment error:', err);
+    return {
+      ok: false,
+      status: 'rejected',
+      error: 'Erro de conexão ao cobrar o cartão no Mercado Pago.',
+    };
+  }
+}

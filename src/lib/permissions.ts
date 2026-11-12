@@ -95,6 +95,24 @@ export const FEATURES_MATRIX: FeatureRule[] = [
     freeLimitText: 'Com marca SpotQR Grátis',
     proLimitText: 'Arte Limpa White-Label 100%',
   },
+  {
+    id: 'video_cover',
+    name: 'Vídeo Curto Animado no Banner do Topo',
+    description: 'Use um vídeo curto em loop automático atrás da vitrine no lugar da foto parada.',
+    freeAccess: false,
+    proAccess: true,
+    freeLimitText: 'Apenas Imagem Estática',
+    proLimitText: 'Liberado (Vídeo em Loop)',
+  },
+  {
+    id: 'friendly_slug',
+    name: 'Link Amigável Personalizado (/catalogo/sua-loja)',
+    description: 'Edite o final do endereço público para um nome limpo e fácil de lembrar enquanto for PRO.',
+    freeAccess: false,
+    proAccess: true,
+    freeLimitText: 'Endereço Aleatório Automático',
+    proLimitText: 'Liberado + 3 Sugestões',
+  },
 ];
 
 export function canUseCenterLogo(isPro: boolean): boolean {

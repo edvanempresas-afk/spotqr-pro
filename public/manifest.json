@@ -1,7 +1,7 @@
 {
   "name": "SpotQR Pro — Painel & Alertas Mobile",
   "short_name": "SpotQR App",
-  "description": "Aplicativo oficial SpotQR Pro para acompanhar assinaturas do mês, valores faturados, propostas de clientes e gerenciar cardápios e QR Codes.",
+  "description": "Aplicativo oficial SpotQR Pro para criar e gerenciar QR Codes dinâmicos com logo, cardápios digitais e catálogos digitais de produtos.",
   "start_url": "/admin",
   "scope": "/",
   "display": "standalone",

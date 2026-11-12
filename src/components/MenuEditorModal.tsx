@@ -30,6 +30,9 @@ import {
   Moon,
   Palette,
   ShoppingCart,
+  Video,
+  Lock,
+  Loader2,
 } from 'lucide-react';
 import {
   RestaurantMenu,
@@ -40,8 +43,9 @@ import {
   QRConfig,
 } from '@/lib/types';
 import { ImageUploadPreset } from '@/lib/image-upload';
+import { processCoverVideoFile } from '@/lib/video-upload';
 import { getItemStockInfo } from '@/lib/stock';
-import { isProStillValid } from '@/lib/pro-status';
+import { isProStillValid, getProRenewalAlert } from '@/lib/pro-status';
 import {
   SHOWCASE_PAYMENT_OPTIONS,
   getAcceptedPaymentsList,
@@ -125,6 +129,8 @@ export default function MenuEditorModal({
   const [openingPreview, setOpeningPreview] = useState(false);
   const [downloadingQR, setDownloadingQR] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     'info' | 'categories' | 'items' | 'branding'
   >('items');
@@ -205,6 +211,39 @@ export default function MenuEditorModal({
 
   if (!isOpen) return null;
 
+  const proMeta = menu as
+    | (RestaurantMenu & {
+        isPaid?: boolean;
+        proExpiresAt?: string | null;
+        autoRenewSummary?: {
+          enabled: boolean;
+          status: 'active' | 'past_due' | 'canceled' | 'suspended_free';
+          graceEndsAt?: string | null;
+          retryCount: number;
+          lastError?: string | null;
+        } | null;
+      })
+    | null;
+  const isProShowcase = Boolean(
+    proMeta &&
+      (isProStillValid({
+        slug,
+        isPaid: proMeta.isPaid,
+        proExpiresAt: proMeta.proExpiresAt,
+        autoRenew: proMeta.autoRenewSummary || undefined,
+      }) ||
+        slug === 'demo-restaurante' ||
+        slug === 'demo-catalogo')
+  );
+  const editorRenewalAlert = proMeta
+    ? getProRenewalAlert({
+        slug,
+        isPaid: proMeta.isPaid,
+        proExpiresAt: proMeta.proExpiresAt,
+        autoRenew: proMeta.autoRenewSummary || undefined,
+      })
+    : null;
+
   const buildCurrentPayload = (source: RestaurantMenu): RestaurantMenu => ({
     ...source,
     mode: source.mode || mode,
@@ -283,17 +322,6 @@ export default function MenuEditorModal({
       const qrType = isCatalog ? 'catalog' : 'menu';
       const frames = getDefaultFrameTexts(qrType);
       const targetUrl = `${origin}/r/${slug}`;
-      const proMeta = menu as RestaurantMenu & {
-        isPaid?: boolean;
-        proExpiresAt?: string | null;
-      };
-      const isProShowcase = Boolean(
-        isProStillValid({
-          slug,
-          isPaid: proMeta.isPaid,
-          proExpiresAt: proMeta.proExpiresAt,
-        })
-      );
       const fallbackConfig: QRConfig = {
         type: qrType,
         url: targetUrl,
@@ -472,6 +500,35 @@ export default function MenuEditorModal({
     });
   };
 
+  const handleCoverVideoUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !menu) return;
+    if (!isProShowcase) {
+      setVideoError(
+        'O vídeo curto animado no banner é um recurso exclusivo do Plano PRO.'
+      );
+      return;
+    }
+
+    setVideoError(null);
+    setUploadingVideo(true);
+    try {
+      const videoDataUrl = await processCoverVideoFile(file);
+      setMenu((prev) => (prev ? { ...prev, coverVideo: videoDataUrl } : prev));
+    } catch (err: unknown) {
+      setVideoError(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível processar o vídeo escolhido.'
+      );
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   const handleCloseCrop = () => {
     if (cropSession?.isObjectUrl) {
       URL.revokeObjectURL(cropSession.src);
@@ -573,6 +630,19 @@ export default function MenuEditorModal({
             </button>
           </div>
         </div>
+
+        {/* Expiration Alert Banner inside Editor (<= 10 days or past_due) */}
+        {editorRenewalAlert && (
+          <div
+            className={`px-6 py-2.5 border-b text-xs font-semibold flex flex-wrap items-center justify-between gap-2 ${
+              editorRenewalAlert.kind === 'past_due'
+                ? 'bg-red-950/50 border-red-500/40 text-red-200'
+                : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+            }`}
+          >
+            <span>⏳ {editorRenewalAlert.headline} — renove no Painel para manter o vídeo animado e link personalizado ativos.</span>
+          </div>
+        )}
 
         {/* Navigation Sub-Tabs */}
         <div className="shrink-0 flex sm:flex-wrap items-center border-b border-slate-800 px-4 sm:px-6 bg-slate-900/60 gap-2 sm:gap-5 overflow-x-auto sm:overflow-visible">
@@ -1646,15 +1716,15 @@ export default function MenuEditorModal({
                         )}
                       </div>
 
-                      {/* Cover Background Image Card */}
+                      {/* Cover Background Image & PRO Video Card */}
                       <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
                         <div>
                           <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
                             <ImageIcon className="w-4 h-4 text-amber-400" />
-                            <span>Imagem de Fundo (Banner Topo)</span>
+                            <span>Banner de Fundo (Topo da Loja)</span>
                           </h4>
                           <p className="text-[11px] text-slate-400 mt-0.5">
-                            Foto ampla exibida no topo atrás do cartão da loja.
+                            Foto ampla exibida no topo atrás do cartão da loja (também usada como capa de espera se houver vídeo).
                           </p>
                         </div>
 
@@ -1754,6 +1824,152 @@ export default function MenuEditorModal({
                               />
                             </div>
                           )}
+
+                          {/* PRO Animated Video Banner */}
+                          <div className="pt-3 mt-3 border-t border-slate-800 space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <h5 className="text-[11px] font-extrabold text-white flex items-center gap-1.5">
+                                  <Video className="w-3.5 h-3.5 text-violet-400" />
+                                  <span>Vídeo Curto Animado no Topo</span>
+                                </h5>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Roda mudo em loop contínuo atrás da loja no lugar da foto estática.
+                                </p>
+                              </div>
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
+                                  isProShowcase
+                                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                    : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                                }`}
+                              >
+                                {isProShowcase ? (
+                                  <>
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    <span>PRO Liberado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Lock className="w-2.5 h-2.5" />
+                                    <span>Exclusivo PRO</span>
+                                  </>
+                                )}
+                              </span>
+                            </div>
+
+                            {isProShowcase ? (
+                              <div className="space-y-2">
+                                {menu.coverVideo && (
+                                  <div className="relative h-24 rounded-xl overflow-hidden border border-violet-500/40 bg-slate-950">
+                                    <video
+                                      key={menu.coverVideo}
+                                      src={menu.coverVideo}
+                                      poster={menu.coverImage || defaultCover}
+                                      autoPlay
+                                      loop
+                                      muted
+                                      playsInline
+                                      className="w-full h-full object-cover opacity-80"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 px-2.5 py-1 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-transparent flex items-center justify-between text-[10px]">
+                                      <span className="text-violet-200 font-bold flex items-center gap-1">
+                                        <Video className="w-3 h-3 text-violet-400" />
+                                        Vídeo animado ativo
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setVideoError(null);
+                                          setMenu({
+                                            ...menu,
+                                            coverVideo: undefined,
+                                          });
+                                        }}
+                                        className="text-rose-300 hover:text-rose-200 font-bold flex items-center gap-0.5"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>Remover Vídeo</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                <label
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition shadow-sm ${
+                                    uploadingVideo
+                                      ? 'bg-violet-500/30 text-violet-200 cursor-wait'
+                                      : 'bg-violet-500 hover:bg-violet-400 text-white cursor-pointer'
+                                  }`}
+                                >
+                                  {uploadingVideo ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Otimizando vídeo curto...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Upload className="w-3.5 h-3.5" />
+                                      <span>
+                                        {menu.coverVideo
+                                          ? 'Trocar Vídeo Curto (MP4 / WebM)'
+                                          : 'Enviar Vídeo Curto (MP4 / WebM)'}
+                                      </span>
+                                    </>
+                                  )}
+                                  <input
+                                    type="file"
+                                    accept="video/mp4,video/webm,video/quicktime,video/*"
+                                    disabled={uploadingVideo}
+                                    onChange={handleCoverVideoUpload}
+                                    className="hidden"
+                                  />
+                                </label>
+
+                                <div>
+                                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                    Ou cole URL direta do Vídeo (.mp4 / .webm):
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={
+                                      menu.coverVideo?.startsWith('data:')
+                                        ? ''
+                                        : menu.coverVideo || ''
+                                    }
+                                    onChange={(e) => {
+                                      setVideoError(null);
+                                      setMenu({
+                                        ...menu,
+                                        coverVideo:
+                                          e.target.value.trim() || undefined,
+                                      });
+                                    }}
+                                    placeholder="https://.../banner-animado.mp4"
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono"
+                                  />
+                                </div>
+
+                                {videoError && (
+                                  <div className="px-3 py-2 rounded-xl bg-rose-500/15 border border-rose-500/40 text-[11px] text-rose-200">
+                                    ⚠️ {videoError}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-1.5">
+                                <p className="text-[11px] text-amber-200 font-semibold flex items-center gap-1.5">
+                                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                  <span>
+                                    Recurso exclusivo para lojas no Plano PRO.
+                                  </span>
+                                </p>
+                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                  Ative o Plano PRO ou digite seu código voucher para enviar um vídeo curto em movimento no topo da sua loja. Enquanto estiver no Free, será exibida apenas a imagem de fundo estática.
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
