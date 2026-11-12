@@ -22,8 +22,22 @@ import {
   isCloudPersistenceConfigured,
 } from '@/lib/db';
 import { isProStillValid } from '@/lib/pro-status';
+import {
+  checkAndConsumeRateLimit,
+  clearRateLimit,
+  isTimestampActiveFuture,
+} from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
+
+function sanitizeClientUser<T extends { passwordHash?: string; recoveryCodeHash?: string }>(
+  user: T
+) {
+  const { passwordHash, recoveryCodeHash, ...safeUser } = user;
+  void passwordHash;
+  void recoveryCodeHash;
+  return safeUser;
+}
 
 export async function GET(req: NextRequest) {
   await syncDbFromCloud();
@@ -35,17 +49,46 @@ export async function GET(req: NextRequest) {
   const cloudPersistenceEnabled = isCloudPersistenceConfigured();
 
   if (clientUser) {
-    const { passwordHash, ...safeUser } = clientUser;
+    const safeUser = sanitizeClientUser(clientUser);
+    const hasBackupRecoveryCode = Boolean(clientUser.recoveryCodeHash);
     const userQRs = getDynamicQRsByOwner(clientUser.id, clientUser.email).filter(
       (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
     );
+    const userStores = (
+      await Promise.all(
+        userQRs.map(async (q) => {
+          await syncMenuFromCloud(q.slug);
+          const m = peekExistingMenuBySlug(q.slug);
+          const storeType: 'menu' | 'catalog' =
+            m?.mode === 'catalog' || q.type === 'catalog' ? 'catalog' : 'menu';
+          return {
+            slug: q.slug,
+            type: storeType,
+            title: m?.title || q.title || safeUser.businessName || q.slug,
+            whatsappPhone:
+              m?.whatsappNumber ||
+              q.qrConfig?.whatsappPhone ||
+              safeUser.whatsapp ||
+              '',
+            pixKey: m?.pixKey || q.qrConfig?.pixKey || '',
+            pixKeyType: q.qrConfig?.pixKeyType || 'email',
+            logoUrl: m?.logoImage || q.qrConfig?.logoUrl || '',
+            isPro: isProStillValid(q),
+            proExpiresAt: q.proExpiresAt || null,
+            updatedAt: m?.updatedAt || q.updatedAt,
+          };
+        })
+      )
+    ).sort((a, b) => {
+      if (a.isPro !== b.isPro) return a.isPro ? -1 : 1;
+      return (
+        new Date(b.updatedAt || 0).getTime() -
+        new Date(a.updatedAt || 0).getTime()
+      );
+    });
     const activeProQR = userQRs.find((q) => isProStillValid(q)) || null;
     const primaryQR = activeProQR || userQRs[0] || null;
-    let activeMenu = null;
-    if (primaryQR?.slug) {
-      await syncMenuFromCloud(primaryQR.slug);
-      activeMenu = peekExistingMenuBySlug(primaryQR.slug);
-    }
+    const primaryStore = userStores[0] || null;
     const creditExpMs = safeUser.proCreditExpiresAt
       ? new Date(safeUser.proCreditExpiresAt).getTime()
       : 0;
@@ -63,17 +106,27 @@ export async function GET(req: NextRequest) {
         cloudPersistenceEnabled,
         hasActivePro,
         activeProSlug: activeProQR?.slug || primaryQR?.slug || null,
-        activeProType: activeProQR?.type || primaryQR?.type || null,
-        activeProTitle: activeProQR?.title || activeMenu?.title || null,
+        activeProType:
+          primaryStore?.type || activeProQR?.type || primaryQR?.type || null,
+        activeProTitle:
+          primaryStore?.title || activeProQR?.title || null,
         activeProLogoUrl:
+          primaryStore?.logoUrl ||
           activeProQR?.qrConfig?.logoUrl ||
-          activeMenu?.logoImage ||
           primaryQR?.qrConfig?.logoUrl ||
           null,
         activeProExpiresAt:
           activeProQR?.proExpiresAt ||
           (hasAccountCredit ? safeUser.proCreditExpiresAt : null) ||
           null,
+        userStores,
+        security: {
+          isPixLocked: isTimestampActiveFuture(clientUser.pixLockedUntil),
+          pixLockedUntil: clientUser.pixLockedUntil || null,
+          hasBackupRecoveryCode,
+          recoveryCodeHint: clientUser.recoveryCodeHint || null,
+          lastPasswordResetAt: clientUser.lastPasswordResetAt || null,
+        },
         user: safeUser,
       },
       {
@@ -144,26 +197,28 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const newUser = createClientUser({
+        const created = createClientUser({
           name: String(name),
           businessName: String(businessName || name),
           email: String(email),
           whatsapp: String(whatsapp || ''),
           passwordPlain: String(password),
-        });
+        }) as ReturnType<typeof createClientUser> & { plainBackupCode?: string };
 
         await Promise.all([
           persistSliceToCloud('users'),
           persistSliceToCloud('notifications'),
         ]);
 
-        const token = createClientSessionToken(newUser);
-        const { passwordHash, ...safeUser } = newUser;
+        const token = createClientSessionToken(created);
+        const { plainBackupCode, ...userRecord } = created;
+        const safeUser = sanitizeClientUser(userRecord);
 
         const res = NextResponse.json({
           authenticated: true,
           role: 'client',
           user: safeUser,
+          backupRecoveryCode: plainBackupCode || null,
           redirectUrl: '/dashboard',
         });
 
@@ -191,8 +246,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const cleanLoginEmail = String(email).trim().toLowerCase();
+    const rateKey = `login:${cleanLoginEmail}`;
+    const rate = checkAndConsumeRateLimit(rateKey, 5, 15 * 60 * 1000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        {
+          error: `Muitas tentativas inválidas. Aguarde ${Math.ceil(
+            rate.retryAfterSeconds / 60
+          )} min ou use "Esqueci minha senha".`,
+        },
+        { status: 429 }
+      );
+    }
+
     // 1. Check if logging in as Developer Admin
     if (verifyCredentials(String(email), String(password))) {
+      clearRateLimit(rateKey);
       const adminToken = createAdminSessionToken();
       const res = NextResponse.json({
         authenticated: true,
@@ -223,14 +293,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'E-mail/login ou senha incorretos. Se ainda não tem conta, clique em "Criar Minha Conta".',
+            'E-mail/login ou senha incorretos. Se esqueceu a senha, clique em "Esqueci minha senha?".',
         },
         { status: 401 }
       );
     }
 
+    clearRateLimit(rateKey);
     const token = createClientSessionToken(clientUser);
-    const { passwordHash, ...safeUser } = clientUser;
+    const safeUser = sanitizeClientUser(clientUser);
 
     const res = NextResponse.json({
       authenticated: true,

@@ -12,10 +12,21 @@ import {
   PaymentRecord,
   ProVoucher,
   AdminStoreSummary,
+  PasswordResetRequest,
 } from './types';
 import { DEMO_PAYMENTS } from './payments';
 import { computeStableStoreCode, isProStillValid } from './pro-status';
 import { isValidFriendlySlugFormat, normalizeFriendlySlug } from './slugs';
+import {
+  computeLegacyHmacHash,
+  generateFormattedSecurityCode,
+  hashPasswordSecure,
+  isTimestampActiveFuture,
+  normalizePixKeyForCompare,
+  phonesMatch,
+  verifyPasswordSecure,
+  verifySecurityToken,
+} from './security';
 
 interface DatabaseSchema {
   dynamicQRs: Record<string, DynamicQRRecord>;
@@ -27,13 +38,11 @@ interface DatabaseSchema {
   developerNotifications?: Record<string, DeveloperNotification>;
   users?: Record<string, ClientUser>;
   vouchers?: Record<string, ProVoucher>;
+  passwordResets?: Record<string, PasswordResetRequest>;
 }
 
 export function hashClientPassword(password: string): string {
-  return crypto
-    .createHmac('sha256', 'spotqr-client-salt-2026')
-    .update(password)
-    .digest('hex');
+  return computeLegacyHmacHash(password);
 }
 
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -475,6 +484,11 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
+    if (!parsed.passwordResets) {
+      parsed.passwordResets = {};
+      modified = true;
+    }
+
     if (modified) {
       saveDb(parsed);
     }
@@ -517,7 +531,8 @@ export type CloudSliceKey =
   | 'leads'
   | 'notifications'
   | 'settings'
-  | 'vouchers';
+  | 'vouchers'
+  | 'resets';
 
 const CLOUD_KEYS: CloudSliceKey[] = [
   'users',
@@ -528,6 +543,7 @@ const CLOUD_KEYS: CloudSliceKey[] = [
   'settings',
   'vouchers',
   'redirects',
+  'resets',
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
@@ -673,6 +689,14 @@ export async function syncDbFromCloud(): Promise<void> {
     changed = true;
   }
 
+  const cloudResets = parseSlice<Record<string, PasswordResetRequest>>(
+    results[8]
+  );
+  if (cloudResets) {
+    db.passwordResets = cloudResets;
+    changed = true;
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -757,6 +781,7 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     notifications: db.developerNotifications || {},
     settings: db.developerSettings || initialData.developerSettings,
     vouchers: db.vouchers || {},
+    resets: db.passwordResets || {},
   };
   await kvRequest(['SET', `spotqr:${slice}`, JSON.stringify(map[slice])]);
 }
@@ -1615,13 +1640,17 @@ export function createClientUser(input: {
   const id =
     stub?.id ||
     `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const initialRecovery = generateFormattedSecurityCode('SPOT-REC');
   const user: ClientUser = {
     id,
     name: input.name.trim(),
     businessName: (input.businessName || input.name).trim(),
     email: cleanEmail,
     whatsapp: (input.whatsapp || '').trim(),
-    passwordHash: hashClientPassword(input.passwordPlain),
+    passwordHash: hashPasswordSecure(input.passwordPlain),
+    sessionVersion: (stub?.sessionVersion ?? 0) + 1,
+    recoveryCodeHash: initialRecovery.hash,
+    recoveryCodeHint: initialRecovery.hint,
     createdAt: stub?.createdAt || new Date().toISOString(),
   };
 
@@ -1638,7 +1667,9 @@ export function createClientUser(input: {
     contact: user.whatsapp || user.email,
   });
 
-  return user;
+  return { ...user, plainBackupCode: initialRecovery.plain } as ClientUser & {
+    plainBackupCode: string;
+  };
 }
 
 export function restoreClientUserFromSession(
@@ -2036,6 +2067,396 @@ export function redeemProVoucher(input: {
     proExpiresAt: expiresIso,
     creditOnly,
   };
+}
+
+// --- SECURITY, PASSWORD RECOVERY & ANTI-PIX-HIJACK HELPERS ---
+
+export function verifyUserPassword(user: ClientUser, plain: string): boolean {
+  if (!user || user.isSuspended || !user.passwordHash) return false;
+  return verifyPasswordSecure(plain, user.passwordHash);
+}
+
+export function changeUserPassword(input: {
+  userId: string;
+  currentPassword: string;
+  newPassword: string;
+}): ClientUser {
+  const db = ensureDb();
+  const user = db.users?.[input.userId];
+  if (!user || user.isSuspended) {
+    throw new Error('Conta de cliente não encontrada ou suspensa.');
+  }
+  if (!verifyUserPassword(user, input.currentPassword)) {
+    throw new Error('A senha atual informada está incorreta.');
+  }
+  if ((input.newPassword || '').length < 6) {
+    throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
+  }
+  user.passwordHash = hashPasswordSecure(input.newPassword);
+  user.sessionVersion = (user.sessionVersion ?? 1) + 1;
+  user.lastPasswordResetAt = new Date().toISOString();
+  db.users![user.id] = user;
+  saveDb(db);
+  return user;
+}
+
+export function regenerateBackupRecoveryCodeForUser(input: {
+  userId: string;
+  currentPassword: string;
+}): { code: string; hint: string; user: ClientUser } {
+  const db = ensureDb();
+  const user = db.users?.[input.userId];
+  if (!user || user.isSuspended) {
+    throw new Error('Conta de cliente não encontrada ou suspensa.');
+  }
+  if (!verifyUserPassword(user, input.currentPassword)) {
+    throw new Error('Confirme sua senha atual para gerar um novo código secreto.');
+  }
+  const generated = generateFormattedSecurityCode('SPOT-REC');
+  user.recoveryCodeHash = generated.hash;
+  user.recoveryCodeHint = generated.hint;
+  db.users![user.id] = user;
+  saveDb(db);
+  return { code: generated.plain, hint: generated.hint, user };
+}
+
+export async function createPasswordResetRequest(input: {
+  email: string;
+  providedWhatsapp: string;
+  providedStoreHint?: string;
+  providedPixHint?: string;
+}): Promise<{
+  created: boolean;
+  request?: PasswordResetRequest;
+  whatsappMatched?: boolean;
+}> {
+  const db = ensureDb();
+  if (!db.passwordResets) db.passwordResets = {};
+
+  const cleanEmail = (input.email || '').trim().toLowerCase();
+  const user = getClientUserByEmail(cleanEmail);
+  if (!user || !user.passwordHash) {
+    return { created: false };
+  }
+
+  const ownedQRs = getDynamicQRsByOwner(user.id, user.email).filter(
+    (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
+  );
+  let pixHintMatched = false;
+  const cleanPixHint = normalizePixKeyForCompare(input.providedPixHint);
+  if (cleanPixHint) {
+    for (const q of ownedQRs) {
+      await syncMenuFromCloud(q.slug);
+      const m = db.menus[q.slug];
+      if (
+        normalizePixKeyForCompare(m?.pixKey) === cleanPixHint ||
+        normalizePixKeyForCompare(q.qrConfig?.pixKey) === cleanPixHint
+      ) {
+        pixHintMatched = true;
+        break;
+      }
+    }
+  }
+
+  const whatsappMatched = phonesMatch(user.whatsapp, input.providedWhatsapp);
+  const now = Date.now();
+  const id = `rst-${now}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const reqRecord: PasswordResetRequest = {
+    id,
+    userId: user.id,
+    email: user.email,
+    businessName: user.businessName || user.name,
+    registeredWhatsapp: user.whatsapp || '',
+    providedWhatsapp: (input.providedWhatsapp || '').trim(),
+    whatsappMatched,
+    providedStoreHint: (input.providedStoreHint || '').trim() || undefined,
+    providedPixHint: (input.providedPixHint || '').trim() || undefined,
+    pixHintMatched,
+    status: 'pending_admin',
+    expiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(now).toISOString(),
+    attempts: 0,
+  };
+
+  db.passwordResets[id] = reqRecord;
+  saveDb(db);
+
+  createDeveloperNotification({
+    type: 'security_alert',
+    title: `🔐 Recuperação de Senha: ${reqRecord.businessName}`,
+    message: `${user.email} solicitou recuperação. WhatsApp informado: ${
+      reqRecord.providedWhatsapp || 'vazio'
+    } (${whatsappMatched ? 'CONFERE com cadastro' : '🚨 DIVERGENTE DO CADASTRO!'}). Confirme no WhatsApp oficial antes de liberar.`,
+    clientName: reqRecord.businessName,
+    contact: user.whatsapp || user.email,
+  });
+
+  return { created: true, request: reqRecord, whatsappMatched };
+}
+
+export function approvePasswordResetByAdmin(requestId: string): {
+  request: PasswordResetRequest;
+  plainCode: string;
+} {
+  const db = ensureDb();
+  if (!db.passwordResets) db.passwordResets = {};
+  const reqRecord = db.passwordResets[requestId];
+  if (!reqRecord) {
+    throw new Error('Solicitação de recuperação não encontrada.');
+  }
+  if (reqRecord.status === 'used' || reqRecord.status === 'rejected') {
+    throw new Error('Esta solicitação já foi finalizada anteriormente.');
+  }
+
+  const generated = generateFormattedSecurityCode('REC');
+  const now = Date.now();
+  reqRecord.tokenHash = generated.hash;
+  reqRecord.status = 'approved_ready';
+  reqRecord.approvedAt = new Date(now).toISOString();
+  reqRecord.expiresAt = new Date(now + 30 * 60 * 1000).toISOString();
+  reqRecord.attempts = 0;
+
+  db.passwordResets[requestId] = reqRecord;
+  saveDb(db);
+
+  return { request: reqRecord, plainCode: generated.plain };
+}
+
+export function rejectPasswordResetByAdmin(
+  requestId: string
+): PasswordResetRequest {
+  const db = ensureDb();
+  if (!db.passwordResets) db.passwordResets = {};
+  const reqRecord = db.passwordResets[requestId];
+  if (!reqRecord) {
+    throw new Error('Solicitação não encontrada.');
+  }
+  reqRecord.status = 'rejected';
+  reqRecord.tokenHash = undefined;
+  db.passwordResets[requestId] = reqRecord;
+  saveDb(db);
+  return reqRecord;
+}
+
+export function completePasswordResetWithCode(input: {
+  email: string;
+  code: string;
+  newPassword: string;
+}): { user: ClientUser; mode: 'backup_code' | 'admin_code' } {
+  const db = ensureDb();
+  if (!db.passwordResets) db.passwordResets = {};
+
+  const cleanEmail = (input.email || '').trim().toLowerCase();
+  const user = getClientUserByEmail(cleanEmail);
+  if (!user || user.isSuspended || !user.passwordHash) {
+    throw new Error('Código inválido, expirado ou dados não conferem.');
+  }
+
+  if ((input.newPassword || '').length < 6) {
+    throw new Error('A nova senha deve ter pelo menos 6 caracteres.');
+  }
+
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+
+  // Path 1: User's personal offline Backup Recovery Code
+  if (user.recoveryCodeHash && verifySecurityToken(input.code, user.recoveryCodeHash)) {
+    user.passwordHash = hashPasswordSecure(input.newPassword);
+    user.sessionVersion = (user.sessionVersion ?? 1) + 1;
+    user.lastPasswordResetAt = nowIso;
+    // Rotate backup code so a leaked backup code cannot be reused twice
+    const rotated = generateFormattedSecurityCode('SPOT-REC');
+    user.recoveryCodeHash = rotated.hash;
+    user.recoveryCodeHint = rotated.hint;
+    // Apply 24h anti-PIX-hijack protection after any recovery
+    user.pixLockedUntil = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString();
+
+    db.users![user.id] = user;
+    saveDb(db);
+
+    createDeveloperNotification({
+      type: 'security_alert',
+      title: `🛡️ Senha Redefinida (Código Pessoal): ${user.businessName}`,
+      message: `${user.email} redefiniu a senha com código de backup. Todas as sessões antigas foram encerradas e troca de PIX travada por 24h.`,
+      clientName: user.businessName,
+      contact: user.whatsapp || user.email,
+    });
+
+    return { user, mode: 'backup_code' };
+  }
+
+  // Path 2: Single-use 30-min code generated after identity check in /admin
+  const candidateReqs = Object.values(db.passwordResets)
+    .filter(
+      (r) =>
+        r.userId === user.id &&
+        r.status === 'approved_ready' &&
+        Boolean(r.tokenHash)
+    )
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+  for (const reqRecord of candidateReqs) {
+    const expMs = new Date(reqRecord.expiresAt).getTime();
+    if (!Number.isFinite(expMs) || nowMs > expMs) {
+      reqRecord.status = 'expired';
+      reqRecord.tokenHash = undefined;
+      db.passwordResets[reqRecord.id] = reqRecord;
+      saveDb(db);
+      continue;
+    }
+
+    if ((reqRecord.attempts || 0) >= 5) {
+      reqRecord.status = 'rejected';
+      reqRecord.tokenHash = undefined;
+      db.passwordResets[reqRecord.id] = reqRecord;
+      saveDb(db);
+      continue;
+    }
+
+    if (verifySecurityToken(input.code, reqRecord.tokenHash)) {
+      reqRecord.status = 'used';
+      reqRecord.usedAt = nowIso;
+      reqRecord.tokenHash = undefined;
+      db.passwordResets[reqRecord.id] = reqRecord;
+
+      user.passwordHash = hashPasswordSecure(input.newPassword);
+      user.sessionVersion = (user.sessionVersion ?? 1) + 1;
+      user.lastPasswordResetAt = nowIso;
+      // 24h anti-PIX-hijack quarantine after recovery
+      user.pixLockedUntil = new Date(nowMs + 24 * 60 * 60 * 1000).toISOString();
+      db.users![user.id] = user;
+
+      saveDb(db);
+
+      createDeveloperNotification({
+        type: 'security_alert',
+        title: `🛡️ Senha Redefinida via Verificação: ${user.businessName}`,
+        message: `${user.email} concluiu a troca de senha. Sessões anteriores encerradas e alteração de Chave PIX bloqueada por 24h por segurança.`,
+        clientName: user.businessName,
+        contact: user.whatsapp || user.email,
+      });
+
+      return { user, mode: 'admin_code' };
+    }
+
+    reqRecord.attempts = (reqRecord.attempts || 0) + 1;
+    if (reqRecord.attempts >= 5) {
+      reqRecord.status = 'rejected';
+      reqRecord.tokenHash = undefined;
+    }
+    db.passwordResets[reqRecord.id] = reqRecord;
+    saveDb(db);
+  }
+
+  throw new Error('Código de recuperação inválido, expirado ou já utilizado.');
+}
+
+export function adminSetUserPixLock(
+  userId: string,
+  locked: boolean
+): ClientUser {
+  const db = ensureDb();
+  const user = db.users?.[userId];
+  if (!user) throw new Error('Cliente não encontrado.');
+  user.pixLockedUntil = locked
+    ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    : null;
+  db.users![user.id] = user;
+  saveDb(db);
+  return user;
+}
+
+export function adminSetUserSuspended(
+  userId: string,
+  suspended: boolean
+): ClientUser {
+  const db = ensureDb();
+  const user = db.users?.[userId];
+  if (!user) throw new Error('Cliente não encontrado.');
+  user.isSuspended = suspended;
+  if (suspended) {
+    user.sessionVersion = (user.sessionVersion ?? 1) + 1;
+  }
+  db.users![user.id] = user;
+  saveDb(db);
+  return user;
+}
+
+export function getAdminSecurityOverview(): {
+  resetRequests: PasswordResetRequest[];
+  usersSecurity: Array<{
+    id: string;
+    name: string;
+    businessName: string;
+    email: string;
+    whatsapp: string;
+    lastPasswordResetAt?: string;
+    pixLockedUntil?: string | null;
+    isPixLocked: boolean;
+    isSuspended: boolean;
+    hasBackupCode: boolean;
+    stores: Array<{ slug: string; storeCode: string; title: string; pixKey: string }>;
+  }>;
+} {
+  const db = ensureDb();
+  const nowMs = Date.now();
+  let modified = false;
+
+  const resetRequests = Object.values(db.passwordResets || {})
+    .map((r) => {
+      if (
+        (r.status === 'pending_admin' || r.status === 'approved_ready') &&
+        nowMs > new Date(r.expiresAt).getTime()
+      ) {
+        r.status = 'expired';
+        r.tokenHash = undefined;
+        modified = true;
+      }
+      return r;
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+  if (modified) saveDb(db);
+
+  const usersSecurity = Object.values(db.users || {})
+    .filter((u) => Boolean(u.passwordHash))
+    .map((u) => {
+      const qrs = getDynamicQRsByOwner(u.id, u.email).filter(
+        (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
+      );
+      return {
+        id: u.id,
+        name: u.name,
+        businessName: u.businessName,
+        email: u.email,
+        whatsapp: u.whatsapp,
+        lastPasswordResetAt: u.lastPasswordResetAt,
+        pixLockedUntil: u.pixLockedUntil || null,
+        isPixLocked: isTimestampActiveFuture(u.pixLockedUntil),
+        isSuspended: Boolean(u.isSuspended),
+        hasBackupCode: Boolean(u.recoveryCodeHash),
+        stores: qrs.map((q) => ({
+          slug: q.slug,
+          storeCode: q.storeCode || computeStableStoreCode({ id: q.id, slug: q.slug, storeCode: q.storeCode }),
+          title: q.title || q.slug,
+          pixKey: db.menus[q.slug]?.pixKey || q.qrConfig?.pixKey || '',
+        })),
+      };
+    })
+    .sort((a, b) => {
+      if (a.isSuspended !== b.isSuspended) return a.isSuspended ? -1 : 1;
+      if (a.isPixLocked !== b.isPixLocked) return a.isPixLocked ? -1 : 1;
+      return a.businessName.localeCompare(b.businessName, 'pt-BR');
+    });
+
+  return { resetRequests, usersSecurity };
 }
 
 

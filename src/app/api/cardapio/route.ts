@@ -12,8 +12,12 @@ import {
   syncMenuFromCloud,
   persistMenuToCloud,
   persistSliceToCloud,
+  peekExistingMenuBySlug,
+  verifyUserPassword,
+  createDeveloperNotification,
 } from '@/lib/db';
 import { isProStillValid } from '@/lib/pro-status';
+import { isTimestampActiveFuture, normalizePixKeyForCompare } from '@/lib/security';
 import { RestaurantMenu, DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
@@ -95,7 +99,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body: RestaurantMenu = await request.json();
+    const body: RestaurantMenu & { pixPasswordConfirmation?: string } =
+      await request.json();
 
     if (!body.slug || !body.title) {
       return NextResponse.json(
@@ -111,12 +116,93 @@ export async function POST(request: NextRequest) {
 
     await syncMenuFromCloud(cleanSlug);
     expireDueQRsIfAny();
+    const persistedExistingMenu = peekExistingMenuBySlug(cleanSlug);
     const existingMenu = getMenuBySlug(
       cleanSlug,
       body.mode === 'catalog' ? 'catalog' : 'menu',
       body.title
     );
     const existingQRBeforeSave = getDynamicQRBySlug(cleanSlug);
+
+    // 1. Strict Ownership Authorization Check (prevents another account overwriting this store or its PIX)
+    if (!isAdmin) {
+      const storeOwnerId =
+        existingQRBeforeSave?.ownerId || persistedExistingMenu?.ownerId;
+      const storeOwnerEmail =
+        existingQRBeforeSave?.ownerEmail || persistedExistingMenu?.ownerEmail;
+      const isDemoSlug =
+        cleanSlug === 'demo-restaurante' || cleanSlug === 'demo-catalogo';
+
+      if (isDemoSlug) {
+        return NextResponse.json(
+          {
+            error:
+              'Os modelos de demonstração são apenas para visualização. Salve no seu próprio catálogo/cardápio.',
+          },
+          { status: 403 }
+        );
+      }
+
+      const matchesOwnerId = Boolean(
+        storeOwnerId && clientUser && storeOwnerId === clientUser.id
+      );
+      const matchesOwnerEmail = Boolean(
+        storeOwnerEmail &&
+          clientUser &&
+          storeOwnerEmail.toLowerCase() === clientUser.email.toLowerCase()
+      );
+      if ((storeOwnerId || storeOwnerEmail) && !matchesOwnerId && !matchesOwnerEmail) {
+        return NextResponse.json(
+          {
+            error:
+              'Você não tem permissão para alterar a loja de outro anunciante.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 2. Anti-PIX-Hijack Protection: changing an existing PIX key requires password verification
+    //    and respects 24h post-recovery security lock.
+    const previousPix = (
+      persistedExistingMenu?.pixKey ||
+      existingQRBeforeSave?.qrConfig?.pixKey ||
+      ''
+    ).trim();
+    const nextPix = typeof body.pixKey === 'string' ? body.pixKey.trim() : '';
+    const isChangingExistingPix =
+      Boolean(previousPix) &&
+      normalizePixKeyForCompare(previousPix) !==
+        normalizePixKeyForCompare(nextPix);
+
+    if (isChangingExistingPix && !isAdmin && clientUser) {
+      if (isTimestampActiveFuture(clientUser.pixLockedUntil)) {
+        return NextResponse.json(
+          {
+            code: 'PIX_SECURITY_LOCK',
+            error:
+              '🔒 Proteção Anti-Golpe ativa: por segurança, a alteração da Chave PIX fica bloqueada por 24 horas após recuperação de senha. Caso seja o titular e precise liberar antes, solicite ao suporte oficial.',
+          },
+          { status: 403 }
+        );
+      }
+
+      const pwdConfirm =
+        typeof body.pixPasswordConfirmation === 'string'
+          ? body.pixPasswordConfirmation
+          : '';
+      if (!pwdConfirm || !verifyUserPassword(clientUser, pwdConfirm)) {
+        return NextResponse.json(
+          {
+            code: 'PIX_PASSWORD_REQUIRED',
+            error:
+              '🔐 Por segurança, digite sua senha de acesso para confirmar a alteração da Chave PIX da loja.',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const isEffectivePro = Boolean(
       (existingQRBeforeSave && isProStillValid(existingQRBeforeSave)) ||
         cleanSlug === 'demo-restaurante' ||
@@ -141,8 +227,10 @@ export async function POST(request: NextRequest) {
     }
 
     const isCatalog = body.mode === 'catalog';
+    const { pixPasswordConfirmation: _ignoredConfirm, ...cleanMenuBody } = body;
+    void _ignoredConfirm;
     const updatedMenu: RestaurantMenu = {
-      ...body,
+      ...cleanMenuBody,
       coverVideo: isEffectivePro
         ? incomingCoverVideo || undefined
         : existingCoverVideo || undefined,
@@ -154,6 +242,19 @@ export async function POST(request: NextRequest) {
     };
 
     saveMenu(updatedMenu);
+
+    if (isChangingExistingPix) {
+      createDeveloperNotification({
+        type: 'security_alert',
+        title: `💳 Alteração de Chave PIX: ${updatedMenu.title}`,
+        message: `Chave PIX de /${cleanSlug} alterada por ${
+          isAdmin ? 'Admin' : clientUser?.email || 'cliente'
+        }. Anterior: "${previousPix}" → Nova: "${nextPix || '(removida)'}".`,
+        clientName: updatedMenu.title,
+        contact: clientUser?.whatsapp || clientUser?.email,
+        slug: cleanSlug,
+      });
+    }
 
     // Ensure a corresponding DynamicQRRecord exists and is linked to this client!
     expireDueQRsIfAny();
@@ -205,6 +306,7 @@ export async function POST(request: NextRequest) {
       persistMenuToCloud(updatedMenu),
       persistSliceToCloud('qrs'),
       ...(credit.isPaid ? [persistSliceToCloud('users')] : []),
+      ...(isChangingExistingPix ? [persistSliceToCloud('notifications')] : []),
     ]);
 
     return NextResponse.json({ success: true, menu: updatedMenu });

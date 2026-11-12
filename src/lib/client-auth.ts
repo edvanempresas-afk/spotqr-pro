@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import {
   getClientUserById,
   getClientUserByEmail,
-  hashClientPassword,
+  verifyUserPassword,
   restoreClientUserFromSession,
 } from './db';
 import { ClientUser } from './types';
@@ -14,7 +14,10 @@ const CLIENT_SECRET =
   process.env.CLIENT_SESSION_SECRET ||
   'spotqr-client-session-secret-key-2026';
 
-type SessionProfilePayload = Omit<ClientUser, 'passwordHash'>;
+type SessionProfilePayload = Omit<
+  ClientUser,
+  'passwordHash' | 'recoveryCodeHash'
+>;
 
 function signString(payload: string): string {
   return crypto
@@ -38,6 +41,7 @@ export function createClientSessionToken(
     email: userOrId.email,
     whatsapp: userOrId.whatsapp,
     createdAt: userOrId.createdAt,
+    sessionVersion: userOrId.sessionVersion ?? 1,
   };
   const encoded = Buffer.from(JSON.stringify(safeProfile), 'utf-8').toString(
     'base64url'
@@ -88,10 +92,24 @@ export function getAuthenticatedClientUser(
   if (!verified) return null;
 
   const byId = getClientUserById(verified.userId);
-  if (byId) return byId;
+  if (byId) {
+    if (byId.isSuspended) return null;
+    if (
+      verified.profile &&
+      (byId.sessionVersion ?? 1) !== (verified.profile.sessionVersion ?? 1)
+    ) {
+      return null;
+    }
+    return byId;
+  }
 
   if (verified.profile) {
-    return restoreClientUserFromSession(verified.profile);
+    const restored = restoreClientUserFromSession(verified.profile);
+    if (restored.isSuspended) return null;
+    if ((restored.sessionVersion ?? 1) !== (verified.profile.sessionVersion ?? 1)) {
+      return null;
+    }
+    return restored;
   }
   return null;
 }
@@ -101,9 +119,8 @@ export function verifyClientCredentials(
   passwordPlain: string
 ): ClientUser | null {
   const user = getClientUserByEmail(email);
-  if (!user || !user.passwordHash) return null;
-  const hashed = hashClientPassword(passwordPlain);
-  if (user.passwordHash === hashed) {
+  if (!user || user.isSuspended || !user.passwordHash) return null;
+  if (verifyUserPassword(user, passwordPlain)) {
     return user;
   }
   return null;

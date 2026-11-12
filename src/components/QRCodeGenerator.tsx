@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Link as LinkIcon,
   MessageCircle,
@@ -22,10 +22,15 @@ import {
   Lock,
   Check,
   ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { QRConfig, QRType, QRStyle, FrameStyle } from '@/lib/types';
 import { generatePixPayload } from '@/lib/pix-brcode';
 import { getDefaultFrameTexts } from '@/lib/qr-canvas';
+import {
+  DEMO_SHOWCASE_SLUGS,
+  getDemoDataWarning,
+} from '@/lib/qr-demo-check';
 import QRPreview from './QRPreview';
 import PixCheckoutModal from './PixCheckoutModal';
 import MenuEditorModal from './MenuEditorModal';
@@ -115,14 +120,72 @@ const PRESET_THEMES = [
   },
 ];
 
+interface RegisteredStoreSummary {
+  slug: string;
+  type: 'menu' | 'catalog';
+  title: string;
+  whatsappPhone: string;
+  pixKey: string;
+  pixKeyType: string;
+  logoUrl: string;
+  isPro: boolean;
+  proExpiresAt: string | null;
+}
+
+const findRegisteredStoreForType = (
+  stores: RegisteredStoreSummary[],
+  targetType: 'menu' | 'catalog'
+): RegisteredStoreSummary | undefined =>
+  stores.find((s) => s.type === targetType && s.isPro) ||
+  stores.find((s) => s.type === targetType);
+
+const applyRegisteredStoreToConfig = (
+  store: RegisteredStoreSummary,
+  prev: QRConfig,
+  fallbackUser?: { businessName?: string; whatsapp?: string } | null
+): QRConfig => {
+  const defaults = getDefaultFrameTexts(store.type);
+  const cleanPrevPhone = (prev.whatsappPhone || '').replace(/\D/g, '');
+  const isDemoPixKey =
+    !prev.pixKey || prev.pixKey === 'financeiro@seurestaurante.com.br';
+  const isDemoPixName =
+    !prev.pixName || prev.pixName === 'Smash & Grill Burger';
+
+  return {
+    ...prev,
+    type: store.type,
+    dynamicSlug: store.slug,
+    title: store.title || fallbackUser?.businessName || prev.title,
+    whatsappPhone:
+      store.whatsappPhone ||
+      (cleanPrevPhone === '5511999998888' && fallbackUser?.whatsapp
+        ? fallbackUser.whatsapp
+        : prev.whatsappPhone),
+    whatsappMessage:
+      store.type === 'catalog'
+        ? 'Olá! Gostaria de ver os produtos e fazer um pedido.'
+        : 'Olá! Gostaria de ver o cardápio e fazer um pedido.',
+    pixKey: isDemoPixKey && store.pixKey ? store.pixKey : prev.pixKey,
+    pixName: isDemoPixName
+      ? store.title || fallbackUser?.businessName || prev.pixName
+      : prev.pixName,
+    logoUrl: prev.logoUrl || store.logoUrl || '',
+    isDynamic: prev.isDynamic || store.isPro,
+    frameTopText: defaults.topText,
+    frameText: defaults.bottomText,
+  };
+};
+
 export default function QRCodeGenerator() {
   const router = useRouter();
   const { proPriceLabel } = useProPrice();
+  const contentPanelRef = useRef<HTMLDivElement | null>(null);
 
   // Avoid SSR Hydration mismatch by updating origin inside useEffect
   const [baseOrigin, setBaseOrigin] = useState<string>('https://spotqr.pro');
   const [isProPurchased, setIsProPurchased] = useState<boolean>(false);
   const [clientUser, setClientUser] = useState<any>(null);
+  const [userStores, setUserStores] = useState<RegisteredStoreSummary[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [pendingAuthAction, setPendingAuthAction] = useState<
     'menu' | 'checkout' | null
@@ -140,19 +203,67 @@ export default function QRCodeGenerator() {
       const data = await res.json();
       if (data.authenticated && data.user) {
         setClientUser(data.user);
+        const stores: RegisteredStoreSummary[] = Array.isArray(data.userStores)
+          ? data.userStores
+          : [];
+        setUserStores(stores);
+
         if (data.hasActivePro) {
           setIsProPurchased(true);
           setProExpiresAt(data.activeProExpiresAt || null);
           if (data.activeProLogoUrl) {
             setActiveStoreLogoUrl(data.activeProLogoUrl);
-            setConfig((prev) =>
-              prev.logoUrl ? prev : { ...prev, logoUrl: data.activeProLogoUrl }
-            );
           }
           if (data.activeProTitle) {
             setActiveStoreTitle(data.activeProTitle);
           }
         }
+
+        // Auto-populate registered catalog/menu info (slug, title, WhatsApp, PIX, logo)
+        // when the form is still at untouched demo defaults.
+        const preferredStore =
+          stores.find((s) => s.isPro) || stores[0] || null;
+
+        setConfig((prev) => {
+          let next = prev;
+          const isDemoSlug =
+            !prev.dynamicSlug || DEMO_SHOWCASE_SLUGS.has(prev.dynamicSlug);
+
+          if (
+            preferredStore &&
+            (prev.type === 'menu' || prev.type === 'catalog') &&
+            isDemoSlug
+          ) {
+            next = applyRegisteredStoreToConfig(
+              preferredStore,
+              prev,
+              data.user
+            );
+          } else {
+            const cleanWhatsapp = (prev.whatsappPhone || '').replace(/\D/g, '');
+            const isDemoPhone =
+              !cleanWhatsapp || cleanWhatsapp === '5511999998888';
+            const isDemoPixName =
+              !prev.pixName || prev.pixName === 'Smash & Grill Burger';
+
+            next = {
+              ...prev,
+              whatsappPhone:
+                isDemoPhone && data.user?.whatsapp
+                  ? data.user.whatsapp
+                  : prev.whatsappPhone,
+              pixName:
+                isDemoPixName && data.user?.businessName
+                  ? data.user.businessName
+                  : prev.pixName,
+            };
+          }
+
+          if (data.hasActivePro && data.activeProLogoUrl && !next.logoUrl) {
+            next = { ...next, logoUrl: data.activeProLogoUrl };
+          }
+          return next;
+        });
       }
     } catch {
       // ignore network transient errors
@@ -237,6 +348,8 @@ export default function QRCodeGenerator() {
   const [lockModalDesc, setLockModalDesc] = useState('');
   const [paymentData, setPaymentData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const demoWarning = useMemo(() => getDemoDataWarning(config), [config]);
 
   // Compute actual payload string based on current type (SSR Hydration safe)
   const targetContent = useMemo(() => {
@@ -457,7 +570,10 @@ export default function QRCodeGenerator() {
         {/* Studio Grid: Controls (Order 1 Mobile / Left Top Desktop) + Live Preview (Order 2 Mobile / Right Sticky Desktop) + PRO & Video Ad (Order 3 Mobile / Left Bottom Desktop) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* BLOCK 1: Main Controls Card */}
-          <div className="order-1 lg:col-span-7 lg:col-start-1 lg:row-start-1">
+          <div
+            ref={contentPanelRef}
+            className="order-1 lg:col-span-7 lg:col-start-1 lg:row-start-1 scroll-mt-24"
+          >
             <div className="bg-[#101726]/90 border border-slate-700/80 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-xl">
               {/* Top QR Type Selector (9 Types including Catálogo Não-Alimentício!) */}
               <div className="mb-6">
@@ -521,25 +637,65 @@ export default function QRCodeGenerator() {
                           const nextType = item.id as QRType;
                           const defaults = getDefaultFrameTexts(nextType);
                           setConfig((prev) => {
+                            if (
+                              nextType === 'catalog' ||
+                              nextType === 'menu'
+                            ) {
+                              const registeredMatch = findRegisteredStoreForType(
+                                userStores,
+                                nextType
+                              );
+                              if (registeredMatch) {
+                                return applyRegisteredStoreToConfig(
+                                  registeredMatch,
+                                  { ...prev, type: nextType },
+                                  clientUser
+                                );
+                              }
+                            }
+
                             let nextSlug = prev.dynamicSlug;
                             let nextTitle = prev.title;
                             let nextWhatsappMsg = prev.whatsappMessage;
+                            const isFromOtherStore = userStores.some(
+                              (s) => s.slug === prev.dynamicSlug && s.type !== nextType
+                            );
 
                             if (nextType === 'catalog') {
-                              if (!nextSlug || nextSlug === 'demo-restaurante') {
+                              if (
+                                !nextSlug ||
+                                nextSlug === 'demo-restaurante' ||
+                                isFromOtherStore
+                              ) {
                                 nextSlug = 'demo-catalogo';
                               }
-                              if (!nextTitle || nextTitle === 'Smash & Grill Burger') {
-                                nextTitle = 'Studio Criativo & Loja';
+                              if (
+                                !nextTitle ||
+                                nextTitle === 'Smash & Grill Burger' ||
+                                isFromOtherStore
+                              ) {
+                                nextTitle =
+                                  clientUser?.businessName ||
+                                  'Studio Criativo & Loja';
                               }
                               nextWhatsappMsg =
                                 'Olá! Gostaria de ver os produtos e fazer um pedido.';
                             } else if (nextType === 'menu') {
-                              if (!nextSlug || nextSlug === 'demo-catalogo') {
+                              if (
+                                !nextSlug ||
+                                nextSlug === 'demo-catalogo' ||
+                                isFromOtherStore
+                              ) {
                                 nextSlug = 'demo-restaurante';
                               }
-                              if (!nextTitle || nextTitle === 'Studio Criativo & Loja') {
-                                nextTitle = 'Smash & Grill Burger';
+                              if (
+                                !nextTitle ||
+                                nextTitle === 'Studio Criativo & Loja' ||
+                                isFromOtherStore
+                              ) {
+                                nextTitle =
+                                  clientUser?.businessName ||
+                                  'Smash & Grill Burger';
                               }
                               nextWhatsappMsg =
                                 'Olá! Gostaria de ver o cardápio e fazer um pedido.';
@@ -645,6 +801,24 @@ export default function QRCodeGenerator() {
               {/* TAB 1: Content Fields */}
               {activeTab === 'content' && (
                 <div className="space-y-4 animate-fade-in">
+                  {demoWarning.isUsingDemoData && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-start gap-2.5 text-xs text-amber-100">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-amber-300">
+                          ⚠️ Lembrete antes de gerar ou baixar o QR Code:
+                        </p>
+                        <p className="text-amber-100/90 leading-relaxed">
+                          {demoWarning.reason} Altere{' '}
+                          <strong className="text-white">
+                            {demoWarning.fieldHint}
+                          </strong>{' '}
+                          abaixo para não direcionar seus clientes para o exemplo da plataforma.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {(config.type === 'menu' || config.type === 'catalog') && (() => {
                     const isCatalog = config.type === 'catalog';
                     const currentSlug =
@@ -652,9 +826,68 @@ export default function QRCodeGenerator() {
                       (isCatalog ? 'demo-catalogo' : 'demo-restaurante');
                     const routeSeg = isCatalog ? 'catalogo' : 'cardapio';
                     const livePath = `/${routeSeg}/${currentSlug}`;
+                    const isDemoSlugSelected =
+                      DEMO_SHOWCASE_SLUGS.has(currentSlug);
+                    const matchingRegisteredStore = userStores.find(
+                      (s) => s.slug === currentSlug
+                    );
 
                     return (
                       <div className="space-y-4">
+                        {userStores.length > 0 && (
+                          <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-700/80 space-y-2">
+                            <p className="text-[11px] font-semibold text-slate-300 flex items-center gap-1.5">
+                              {matchingRegisteredStore ? (
+                                <>
+                                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  <span>
+                                    Dados carregados automaticamente da sua loja:{' '}
+                                    <strong className="text-emerald-400">
+                                      {matchingRegisteredStore.title}
+                                    </strong>
+                                  </span>
+                                </>
+                              ) : (
+                                <span>
+                                  Suas lojas cadastradas (clique para preencher automaticamente no QR):
+                                </span>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {userStores.map((store) => {
+                                const isActiveStore = store.slug === currentSlug;
+                                return (
+                                  <button
+                                    key={store.slug}
+                                    type="button"
+                                    onClick={() =>
+                                      setConfig((prev) =>
+                                        applyRegisteredStoreToConfig(
+                                          store,
+                                          prev,
+                                          clientUser
+                                        )
+                                      )
+                                    }
+                                    className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition flex items-center gap-1.5 ${
+                                      isActiveStore
+                                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
+                                        : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-emerald-500/60 hover:text-white'
+                                    }`}
+                                  >
+                                    <span>
+                                      {store.type === 'catalog' ? '🛍️' : '🍽️'}
+                                    </span>
+                                    <span>{store.title}</span>
+                                    <span className="font-mono text-[10px] opacity-75">
+                                      /{store.slug}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                           <div className="text-xs text-slate-300">
                             <p className="font-bold text-emerald-400 mb-0.5">
@@ -745,7 +978,13 @@ export default function QRCodeGenerator() {
                               ? 'Endereço Personalizado do Catálogo:'
                               : 'Endereço Personalizado do Cardápio:'}
                           </label>
-                          <div className="flex items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-400">
+                          <div
+                            className={`flex items-center bg-slate-900 border rounded-xl px-3 py-2 text-sm text-slate-400 ${
+                              isDemoSlugSelected
+                                ? 'border-amber-500/70 ring-1 ring-amber-500/30'
+                                : 'border-slate-700'
+                            }`}
+                          >
                             <span className="text-xs text-slate-500 mr-1 shrink-0">
                               spotqr.com.br/{routeSeg}/
                             </span>
@@ -1541,6 +1780,13 @@ export default function QRCodeGenerator() {
               onUpgradeToPro={() => {
                 handleInitiateProCheckout();
               }}
+              onEditContent={() => {
+                setActiveTab('content');
+                contentPanelRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              }}
             />
           </div>
 
@@ -1697,7 +1943,10 @@ export default function QRCodeGenerator() {
       {/* Visual Menu / Catalog Editor Modal */}
       <MenuEditorModal
         isOpen={isMenuEditorOpen}
-        onClose={() => setIsMenuEditorOpen(false)}
+        onClose={() => {
+          setIsMenuEditorOpen(false);
+          refreshAuthProStatus();
+        }}
         slug={
           config.dynamicSlug ||
           (config.type === 'catalog' ? 'demo-catalogo' : 'demo-restaurante')

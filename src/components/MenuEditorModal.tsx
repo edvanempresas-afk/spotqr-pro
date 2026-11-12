@@ -176,6 +176,12 @@ export default function MenuEditorModal({
   const [openingPreview, setOpeningPreview] = useState(false);
   const [downloadingQR, setDownloadingQR] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+  const [originalPixKey, setOriginalPixKey] = useState<string>('');
+  const [pixPasswordConfirmation, setPixPasswordConfirmation] =
+    useState<string>('');
+  const [isPixLocked, setIsPixLocked] = useState<boolean>(false);
+  const [pixLockedUntil, setPixLockedUntil] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
@@ -222,6 +228,20 @@ export default function MenuEditorModal({
     const titleQuery = defaultTitle
       ? `&title=${encodeURIComponent(defaultTitle)}`
       : '';
+    setSaveErrorMsg(null);
+    setPixPasswordConfirmation('');
+    fetch('/api/auth', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((authData) => {
+        if (authData?.security) {
+          setIsPixLocked(Boolean(authData.security.isPixLocked));
+          setPixLockedUntil(authData.security.pixLockedUntil || null);
+        } else {
+          setIsPixLocked(false);
+          setPixLockedUntil(null);
+        }
+      })
+      .catch(() => {});
     fetch(
       `/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${mode}${titleQuery}&t=${Date.now()}`,
       { cache: 'no-store' }
@@ -249,6 +269,7 @@ export default function MenuEditorModal({
               // Ignore localStorage parse failures
             }
           }
+          setOriginalPixKey((data.pixKey || '').trim());
           setMenu({
             ...resolved,
             items: Array.isArray(resolved.items)
@@ -317,30 +338,56 @@ export default function MenuEditorModal({
 
   const persistShowcase = async (): Promise<boolean> => {
     if (!menu) return false;
+    setSaveErrorMsg(null);
     const payload = buildCurrentPayload(menu);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(
-          `spotqr_live_showcase_${slug}`,
-          JSON.stringify(payload)
-        );
-      } catch {
-        // Ignore quota exceeded on private browsing
-      }
+    const isPixBeingChanged =
+      Boolean(originalPixKey) &&
+      originalPixKey.toLowerCase() !== (payload.pixKey || '').trim().toLowerCase();
+
+    if (isPixBeingChanged && !isPixLocked && !pixPasswordConfirmation.trim()) {
+      setActiveTab('info');
+      setSaveErrorMsg(
+        '🔐 Para proteger sua loja contra troca indevida de PIX, digite sua senha de acesso abaixo do campo Chave PIX antes de salvar.'
+      );
+      return false;
     }
+
     try {
       const res = await fetch('/api/cardapio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          pixPasswordConfirmation: pixPasswordConfirmation || undefined,
+        }),
       });
       if (res.ok) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(
+              `spotqr_live_showcase_${slug}`,
+              JSON.stringify(payload)
+            );
+          } catch {
+            // Ignore quota exceeded on private browsing
+          }
+        }
+        setOriginalPixKey((payload.pixKey || '').trim());
+        setPixPasswordConfirmation('');
         setMenu(payload);
         if (onSaved) onSaved();
         return true;
       }
+      const errData = await res.json().catch(() => null);
+      if (errData?.code === 'PIX_PASSWORD_REQUIRED' || errData?.code === 'PIX_SECURITY_LOCK') {
+        setActiveTab('info');
+      }
+      setSaveErrorMsg(
+        errData?.error || 'Não foi possível salvar as alterações no servidor.'
+      );
     } catch (err) {
       console.error('Error saving showcase:', err);
+      setSaveErrorMsg('Erro de conexão ao tentar salvar.');
     }
     return false;
   };
@@ -755,6 +802,19 @@ export default function MenuEditorModal({
                   ? 'Baixar QR do Catálogo (PNG)'
                   : 'Baixar QR do Cardápio (PNG)'}
               </span>
+            </button>
+          </div>
+        )}
+
+        {saveErrorMsg && (
+          <div className="px-6 py-3 bg-rose-500/15 border-b border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3 shrink-0">
+            <span>{saveErrorMsg}</span>
+            <button
+              type="button"
+              onClick={() => setSaveErrorMsg(null)}
+              className="text-rose-300 hover:text-white font-bold shrink-0"
+            >
+              Fechar
             </button>
           </div>
         )}
@@ -2224,8 +2284,8 @@ export default function MenuEditorModal({
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 block">
                       Chave PIX (Gerada com valor exato somente após fechar pedido):
                     </label>
                     <input
@@ -2233,8 +2293,40 @@ export default function MenuEditorModal({
                       value={menu.pixKey || ''}
                       onChange={(e) => setMenu({ ...menu, pixKey: e.target.value })}
                       placeholder="CNPJ, E-mail ou Celular"
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white"
+                      disabled={isPixLocked}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white disabled:opacity-60"
                     />
+                    {isPixLocked ? (
+                      <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-[11px] text-amber-200 leading-relaxed">
+                        🔒 <strong>Proteção Anti-Golpe (Quarentena 24h):</strong>{' '}
+                        alterações na Chave PIX foram temporariamente travadas
+                        {pixLockedUntil
+                          ? ` até ${new Date(pixLockedUntil).toLocaleString('pt-BR')}`
+                          : ''}{' '}
+                        após recuperação de senha.
+                      </div>
+                    ) : originalPixKey &&
+                      originalPixKey.toLowerCase() !==
+                        (menu.pixKey || '').trim().toLowerCase() ? (
+                      <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 space-y-1.5">
+                        <label className="text-[11px] font-bold text-amber-300 block">
+                          🔐 Confirme a senha da sua conta para autorizar a troca da Chave PIX *
+                        </label>
+                        <input
+                          type="password"
+                          value={pixPasswordConfirmation}
+                          onChange={(e) =>
+                            setPixPasswordConfirmation(e.target.value)
+                          }
+                          placeholder="Digite sua senha atual..."
+                          className="w-full bg-slate-950 border border-amber-500/50 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    ) : originalPixKey ? (
+                      <p className="text-[11px] text-emerald-400/90">
+                        🛡️ Chave PIX protegida por senha (alterações exigem sua senha atual e geram alerta de segurança).
+                      </p>
+                    ) : null}
                   </div>
 
                   <div>

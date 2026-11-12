@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Sparkles,
 } from 'lucide-react';
+import PasswordRecoveryModal from './PasswordRecoveryModal';
 
 interface ClientAuthModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export default function ClientAuthModal({
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -257,11 +259,22 @@ export default function ClientAuthModal({
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-300 mb-1">
-              {tab === 'register'
-                ? 'Crie uma Senha de Acesso *'
-                : 'Sua Senha *'}
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-slate-300">
+                {tab === 'register'
+                  ? 'Crie uma Senha de Acesso *'
+                  : 'Sua Senha *'}
+              </label>
+              {tab === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => setIsRecoveryOpen(true)}
+                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2"
+                >
+                  Esqueci minha senha?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <KeyRound className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -309,6 +322,16 @@ export default function ClientAuthModal({
           </span>
         </div>
       </div>
+
+      <PasswordRecoveryModal
+        isOpen={isRecoveryOpen}
+        onClose={() => setIsRecoveryOpen(false)}
+        initialEmail={email}
+        onRecoverySuccess={() => {
+          setIsRecoveryOpen(false);
+          window.location.href = '/dashboard';
+        }}
+      />
     </div>
   );
 }

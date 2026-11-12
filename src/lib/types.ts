@@ -195,9 +195,35 @@ export interface ClientUser {
   whatsapp: string;
   passwordHash: string;
   createdAt: string;
+  sessionVersion?: number;
+  recoveryCodeHash?: string;
+  recoveryCodeHint?: string;
+  lastPasswordResetAt?: string;
+  pixLockedUntil?: string | null;
+  isSuspended?: boolean;
   proCreditExpiresAt?: string | null;
   proCreditVoucherCode?: string;
   proCreditDays?: number;
+}
+
+export interface PasswordResetRequest {
+  id: string;
+  userId: string;
+  email: string;
+  businessName: string;
+  registeredWhatsapp: string;
+  providedWhatsapp: string;
+  whatsappMatched: boolean;
+  providedStoreHint?: string;
+  providedPixHint?: string;
+  pixHintMatched: boolean;
+  status: 'pending_admin' | 'approved_ready' | 'used' | 'rejected' | 'expired';
+  tokenHash?: string;
+  expiresAt: string;
+  createdAt: string;
+  approvedAt?: string;
+  usedAt?: string;
+  attempts: number;
 }
 
 export interface ProVoucher {
@@ -304,7 +330,8 @@ export type DeveloperNotificationType =
   | 'subscription_pending'
   | 'new_lead'
   | 'new_client'
-  | 'voucher_redeemed';
+  | 'voucher_redeemed'
+  | 'security_alert';
 
 export interface DeveloperNotification {
   id: string;

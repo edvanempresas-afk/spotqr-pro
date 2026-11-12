@@ -22,12 +22,14 @@ import TableTentModal from './TableTentModal';
 import DownloadAdModal from './DownloadAdModal';
 import AdBanner from './AdBanner';
 import { useProPrice } from '@/lib/pro-price';
+import { getDemoDataWarning } from '@/lib/qr-demo-check';
 
 interface QRPreviewProps {
   config: QRConfig;
   targetContent: string;
   isPro?: boolean;
   onUpgradeToPro?: () => void;
+  onEditContent?: () => void;
 }
 
 export default function QRPreview({
@@ -35,6 +37,7 @@ export default function QRPreview({
   targetContent,
   isPro = false,
   onUpgradeToPro,
+  onEditContent,
 }: QRPreviewProps) {
   const effectivePro = Boolean(isPro || config.isDynamic);
   const { proPriceLabel } = useProPrice();
@@ -43,7 +46,12 @@ export default function QRPreview({
   const [isTableTentOpen, setIsTableTentOpen] = useState(false);
   const [isDownloadAdOpen, setIsDownloadAdOpen] = useState(false);
   const [pendingFormat, setPendingFormat] = useState<'png' | 'svg'>('png');
+  const [pendingDemoAction, setPendingDemoAction] = useState<
+    'png' | 'svg' | 'table_tent' | null
+  >(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const demoWarning = useMemo(() => getDemoDataWarning(config), [config]);
 
   const contrastInfo = useMemo(
     () => evaluateQRContrast(config.fgColor, config.bgColor),
@@ -91,14 +99,34 @@ export default function QRPreview({
     a.click();
   };
 
-  // Click on Download button (FREE -> Interstitial Ad with 5s countdown; PRO -> Instant)
-  const handleDownloadClick = (format: 'png' | 'svg' = 'png') => {
-    setPendingFormat(format);
+  const proceedConfirmedAction = (action: 'png' | 'svg' | 'table_tent') => {
+    if (action === 'table_tent') {
+      setIsTableTentOpen(true);
+      return;
+    }
+    setPendingFormat(action);
     if (effectivePro) {
-      executeDownload(format);
+      executeDownload(action);
     } else {
       setIsDownloadAdOpen(true);
     }
+  };
+
+  // Click on Download button (guards against accidental download of demo data)
+  const handleDownloadClick = (format: 'png' | 'svg' = 'png') => {
+    if (demoWarning.isUsingDemoData) {
+      setPendingDemoAction(format);
+      return;
+    }
+    proceedConfirmedAction(format);
+  };
+
+  const handleOpenTableTent = () => {
+    if (demoWarning.isUsingDemoData) {
+      setPendingDemoAction('table_tent');
+      return;
+    }
+    setIsTableTentOpen(true);
   };
 
   const handleCopyLink = () => {
@@ -129,7 +157,7 @@ export default function QRPreview({
           )}
 
           <button
-            onClick={() => setIsTableTentOpen(true)}
+            onClick={handleOpenTableTent}
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 px-2.5 py-1 rounded-lg border border-slate-700 transition"
           >
             <Printer className="w-3.5 h-3.5 text-emerald-400" />
@@ -162,7 +190,7 @@ export default function QRPreview({
               <span>Baixar PNG</span>
             </button>
             <button
-              onClick={() => setIsTableTentOpen(true)}
+              onClick={handleOpenTableTent}
               className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-slate-700 transition"
               title="Imprimir Plaquinha de Mesa"
             >
@@ -191,6 +219,30 @@ export default function QRPreview({
             {contrastInfo.label}
           </span>
         </div>
+
+        {/* Reminder Banner when QR still points to Demo / Sample Data */}
+        {demoWarning.isUsingDemoData && (
+          <div className="w-full mt-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-left space-y-1.5">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-[11px] text-amber-100 leading-relaxed">
+                <p className="font-bold text-amber-300">
+                  Atenção: QR ainda com dados de demonstração!
+                </p>
+                <p className="text-amber-200/90 mt-0.5">{demoWarning.reason}</p>
+              </div>
+            </div>
+            {onEditContent && (
+              <button
+                type="button"
+                onClick={onEditContent}
+                className="text-[11px] font-bold text-amber-300 hover:text-amber-200 underline underline-offset-2"
+              >
+                ✏️ Alterar &quot;{demoWarning.fieldHint}&quot; antes de baixar →
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Target URL Preview */}
         <div className="w-full mt-3 bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between text-xs">
@@ -261,7 +313,7 @@ export default function QRPreview({
 
             <button
               type="button"
-              onClick={() => setIsTableTentOpen(true)}
+              onClick={handleOpenTableTent}
               className="py-2.5 px-3 rounded-xl font-semibold text-xs text-slate-200 bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition flex items-center justify-center gap-1.5"
             >
               <Printer className="w-3.5 h-3.5 text-amber-400" />
@@ -327,6 +379,56 @@ export default function QRPreview({
         isPro={effectivePro}
         onUpgradeToPro={onUpgradeToPro}
       />
+
+      {/* Pre-download / Pre-print Demo Data Warning Modal */}
+      {pendingDemoAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-[#111827] border border-amber-500/40 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-extrabold text-white">
+                  Confira o endereço antes de baixar!
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {demoWarning.reason} Se você baixar ou imprimir agora, seus clientes serão direcionados para o exemplo da plataforma em vez da sua loja.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 break-all">
+              <strong className="text-slate-300 block mb-0.5">Destino atual no QR:</strong>
+              <span className="font-mono text-amber-300">{targetContent}</span>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingDemoAction(null);
+                  onEditContent?.();
+                }}
+                className="w-full py-3 px-4 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-glow transition"
+              >
+                ✏️ Alterar Informações Agora ({demoWarning.fieldHint})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = pendingDemoAction;
+                  setPendingDemoAction(null);
+                  if (action) proceedConfirmedAction(action);
+                }}
+                className="w-full py-2 px-3 rounded-xl font-semibold text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition"
+              >
+                Baixar mesmo assim (somente para teste)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

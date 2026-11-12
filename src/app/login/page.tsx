@@ -22,6 +22,7 @@ import {
   QrCode,
 } from 'lucide-react';
 import Link from 'next/link';
+import PasswordRecoveryModal from '@/components/PasswordRecoveryModal';
 
 export default function ClientLoginPage() {
   const router = useRouter();
@@ -35,8 +36,21 @@ export default function ClientLoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
+  const [recoveryPrefillCode, setRecoveryPrefillCode] = useState('');
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      const recCode = sp.get('recovery');
+      const recEmail = sp.get('email');
+      if (recEmail) setEmail(recEmail);
+      if (recCode) {
+        setRecoveryPrefillCode(recCode);
+        setIsRecoveryOpen(true);
+      }
+    }
+
     // Check if already logged in
     fetch('/api/auth')
       .then((res) => res.json())
@@ -317,9 +331,20 @@ export default function ClientLoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  {tab === 'register' ? 'Crie sua Senha *' : 'Sua Senha *'}
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300">
+                    {tab === 'register' ? 'Crie sua Senha *' : 'Sua Senha *'}
+                  </label>
+                  {tab === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsRecoveryOpen(true)}
+                      className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline underline-offset-2"
+                    >
+                      Esqueci minha senha?
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -364,6 +389,17 @@ export default function ClientLoginPage() {
       </main>
 
       <Footer />
+
+      <PasswordRecoveryModal
+        isOpen={isRecoveryOpen}
+        onClose={() => setIsRecoveryOpen(false)}
+        initialEmail={email}
+        initialCode={recoveryPrefillCode}
+        onRecoverySuccess={() => {
+          setIsRecoveryOpen(false);
+          router.push('/dashboard');
+        }}
+      />
     </div>
   );
 }

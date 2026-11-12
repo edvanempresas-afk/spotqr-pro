@@ -12,6 +12,7 @@ import ClientAuthModal from '@/components/ClientAuthModal';
 import VoucherRedeemBox from '@/components/VoucherRedeemBox';
 import RecurringCardModal from '@/components/RecurringCardModal';
 import FriendlySlugPanel from '@/components/FriendlySlugPanel';
+import ClientSecurityModal from '@/components/ClientSecurityModal';
 import {
   QrCode,
   Sparkles,
@@ -92,6 +93,14 @@ export default function DashboardPage() {
   const [friendlySlugEditing, setFriendlySlugEditing] = useState<string | null>(
     null
   );
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [securitySummary, setSecuritySummary] = useState<{
+    isPixLocked?: boolean;
+    pixLockedUntil?: string | null;
+    hasBackupRecoveryCode?: boolean;
+    recoveryCodeHint?: string | null;
+    lastPasswordResetAt?: string | null;
+  } | null>(null);
   const [recurringCardTarget, setRecurringCardTarget] = useState<{
     qr: DynamicQRRecord;
     chargeNow?: boolean;
@@ -171,13 +180,15 @@ export default function DashboardPage() {
   async function checkAuthAndLoad() {
     setCheckingAuth(true);
     try {
-      const authRes = await fetch('/api/auth');
+      const authRes = await fetch('/api/auth', { cache: 'no-store' });
       const authData = await authRes.json();
       if (authData.authenticated && authData.user) {
         setCurrentUser(authData.user);
+        setSecuritySummary(authData.security || null);
         await fetchQRs();
       } else {
         setCurrentUser(null);
+        setSecuritySummary(null);
         setLoading(false);
       }
     } catch (err) {
@@ -695,6 +706,19 @@ export default function DashboardPage() {
                   <PlusCircle className="w-4 h-4 text-emerald-500" />
                   <span>Gerador de QR Code</span>
                 </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setIsSecurityModalOpen(true)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2.5 border rounded-xl text-xs font-bold transition ${
+                    isLight
+                      ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-800'
+                      : 'bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30 text-emerald-300'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Segurança &amp; PIX</span>
+                </button>
 
                 <button
                   type="button"
@@ -1644,6 +1668,13 @@ export default function DashboardPage() {
           }}
         />
       )}
+
+      <ClientSecurityModal
+        isOpen={isSecurityModalOpen}
+        onClose={() => setIsSecurityModalOpen(false)}
+        security={securitySummary}
+        onUpdated={() => checkAuthAndLoad()}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from '@/lib/types';
 import AdminStoresProPanel from '@/components/AdminStoresProPanel';
 import AdminVouchersPanel from '@/components/AdminVouchersPanel';
+import AdminSecurityPanel from '@/components/AdminSecurityPanel';
 import {
   Inbox,
   MessageCircle,
@@ -117,6 +118,7 @@ export default function DeveloperAdminDashboard() {
     | 'overview'
     | 'stores'
     | 'vouchers'
+    | 'security'
     | 'subscriptions'
     | 'proposals'
     | 'notifications'
@@ -969,7 +971,7 @@ export default function DeveloperAdminDashboard() {
           </div>
 
           {/* APP NAVIGATION TABS (Desktop Pills + Mobile Bottom Bar) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
@@ -1007,6 +1009,19 @@ export default function DeveloperAdminDashboard() {
             >
               <Ticket className="w-4 h-4 shrink-0" />
               <span>🎟️ Vouchers ({vouchers.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('security')}
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+                activeAppSection === 'security'
+                  ? 'bg-emerald-500 text-slate-950 shadow-glow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              <span>🔐 Segurança &amp; PIX</span>
             </button>
 
             <button
@@ -1479,6 +1494,10 @@ export default function DeveloperAdminDashboard() {
               onVouchersUpdated={setVouchers}
             />
           )}
+
+          {/* SECTION: SECURITY, PASSWORD RECOVERY & ANTI-PIX-HIJACK */}
+          {(activeAppSection === 'security' ||
+            activeAppSection === 'overview') && <AdminSecurityPanel />}
 
           {/* SECTION: SUBSCRIPTIONS & MONTHLY REVENUE BREAKDOWN */}
           {(activeAppSection === 'subscriptions' ||
@@ -2126,7 +2145,7 @@ export default function DeveloperAdminDashboard() {
           )}
 
           {/* FIXED BOTTOM NAVIGATION BAR FOR SMARTPHONES (Native Mobile App Feel) */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-1.5 py-2 grid grid-cols-6 gap-1">
+          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-1 py-2 grid grid-cols-7 gap-0.5">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
@@ -2164,6 +2183,19 @@ export default function DeveloperAdminDashboard() {
             >
               <Ticket className="w-4 h-4 mb-0.5" />
               <span>Vouchers</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('security')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
+                activeAppSection === 'security'
+                  ? 'text-emerald-400 bg-emerald-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4 mb-0.5" />
+              <span>Segurança</span>
             </button>
 
             <button
