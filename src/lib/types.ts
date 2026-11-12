@@ -128,6 +128,41 @@ export interface RestaurantMenu {
   updatedAt: string;
 }
 
+export type StoreOrderStatus = 'pending' | 'confirmed' | 'cancelled';
+
+export interface StoreOrderItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  stockMode?: ProductStockMode;
+  stockDeducted: number;
+}
+
+export interface StoreOrder {
+  id: string;
+  slug: string;
+  storeTitle: string;
+  storeOwnerId?: string;
+  storeOwnerEmail?: string;
+  customerName: string;
+  customerPhone?: string;
+  orderMode: 'table' | 'delivery' | 'pickup' | 'direct';
+  tableNumber?: string;
+  deliveryAddress?: string;
+  paymentMethod: string;
+  items: StoreOrderItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  status: StoreOrderStatus;
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt?: string;
+  cancelledAt?: string;
+  notes?: string;
+}
+
 export interface AutoRenewAttempt {
   timestamp: string;
   slotLabel: string;

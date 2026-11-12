@@ -13,6 +13,7 @@ import VoucherRedeemBox from '@/components/VoucherRedeemBox';
 import RecurringCardModal from '@/components/RecurringCardModal';
 import FriendlySlugPanel from '@/components/FriendlySlugPanel';
 import ClientSecurityModal from '@/components/ClientSecurityModal';
+import { StoreOrdersModal } from '@/components/StoreOrdersModal';
 import {
   QrCode,
   Sparkles,
@@ -24,6 +25,7 @@ import {
   ArrowRight,
   Utensils,
   ShoppingBag,
+  Package,
   PlusCircle,
   Copy,
   Lock,
@@ -105,6 +107,14 @@ export default function DashboardPage() {
     qr: DynamicQRRecord;
     chargeNow?: boolean;
   } | null>(null);
+  const [ordersModalTarget, setOrdersModalTarget] = useState<{
+    slug: string;
+    title: string;
+    mode?: 'menu' | 'catalog';
+  } | null>(null);
+  const [ordersOverview, setOrdersOverview] = useState<
+    Record<string, { total: number; pending: number }>
+  >({});
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [clientTheme, setClientTheme] = useState<'dark' | 'light'>('dark');
   const expiredSyncTriggeredRef = useRef<Set<string>>(new Set());
@@ -212,6 +222,16 @@ export default function DashboardPage() {
         const data = await res.json();
         setQrs(data);
       }
+
+      // Fetch pending orders & stock overview
+      fetch('/api/cardapio/orders?overview=1')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.success && data?.overview) {
+            setOrdersOverview(data.overview);
+          }
+        })
+        .catch(() => {});
     } catch (err) {
       console.error('Error fetching QRs:', err);
     } finally {
@@ -987,6 +1007,44 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* Pending Orders & Stock Reservation Alert Banner */}
+            {(() => {
+              const totalPending = Object.values(ordersOverview).reduce(
+                (acc, cur) => acc + (cur.pending || 0),
+                0
+              );
+              if (totalPending <= 0) return null;
+              return (
+                <div
+                  className={`p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-3 shadow-md animate-fade-in ${
+                    isLight
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
+                      <Package className="w-5 h-5 animate-pulse" />
+                    </div>
+                    <div>
+                      <strong className="text-sm font-bold block">
+                        Você tem {totalPending}{' '}
+                        {totalPending === 1
+                          ? 'pedido aguardando'
+                          : 'pedidos aguardando'}{' '}
+                        confirmação de venda!
+                      </strong>
+                      <span className="text-[11px] opacity-90">
+                        O estoque destes itens foi reservado automaticamente no catálogo.
+                        Se o cliente realizou o pagamento, confirme a venda; caso ele não pague,
+                        cancele o pedido para devolver os itens ao estoque e colocar o anúncio no ar novamente.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Voucher Redeem Option (Visible for both Free and PRO accounts) */}
             <VoucherRedeemBox
               stores={qrs}
@@ -1312,6 +1370,52 @@ export default function DashboardPage() {
                                   </span>
                                   <ExternalLink className="w-3 h-3 text-emerald-500" />
                                 </Link>
+
+                                {/* Orders & Real-time Stock Management Button */}
+                                {(() => {
+                                  const stats = ordersOverview[qr.slug] || {
+                                    total: 0,
+                                    pending: 0,
+                                  };
+                                  const hasPending = stats.pending > 0;
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setOrdersModalTarget({
+                                          slug: qr.slug,
+                                          title: qr.title || qr.slug,
+                                          mode:
+                                            qr.type === 'catalog'
+                                              ? 'catalog'
+                                              : 'menu',
+                                        })
+                                      }
+                                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                                        hasPending
+                                          ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/50 shadow-sm animate-pulse'
+                                          : isLight
+                                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                                      }`}
+                                      title="Ver pedidos e controlar estoque automático"
+                                    >
+                                      <Package
+                                        className={`w-3.5 h-3.5 ${
+                                          hasPending
+                                            ? 'text-amber-400'
+                                            : 'text-amber-500'
+                                        }`}
+                                      />
+                                      <span>Pedidos & Estoque</span>
+                                      {hasPending && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                                          {stats.pending}
+                                        </span>
+                                      )}
+                                    </button>
+                                  );
+                                })()}
                               </>
                             );
                           })()}
@@ -1675,6 +1779,20 @@ export default function DashboardPage() {
         security={securitySummary}
         onUpdated={() => checkAuthAndLoad()}
       />
+
+      {ordersModalTarget && (
+        <StoreOrdersModal
+          isOpen={Boolean(ordersModalTarget)}
+          onClose={() => setOrdersModalTarget(null)}
+          storeSlug={ordersModalTarget.slug}
+          storeTitle={ordersModalTarget.title}
+          storeMode={ordersModalTarget.mode}
+          themeMode={clientTheme}
+          onOrderUpdated={() => {
+            fetchQRs();
+          }}
+        />
+      )}
     </div>
   );
 }

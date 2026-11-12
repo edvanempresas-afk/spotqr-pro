@@ -13,7 +13,12 @@ import {
   ProVoucher,
   AdminStoreSummary,
   PasswordResetRequest,
+  MenuItem,
+  StoreOrder,
+  StoreOrderItem,
+  StoreOrderStatus,
 } from './types';
+import { getItemStockInfo } from './stock';
 import { DEMO_PAYMENTS } from './payments';
 import { computeStableStoreCode, isProStillValid } from './pro-status';
 import { isValidFriendlySlugFormat, normalizeFriendlySlug } from './slugs';
@@ -39,6 +44,7 @@ interface DatabaseSchema {
   users?: Record<string, ClientUser>;
   vouchers?: Record<string, ProVoucher>;
   passwordResets?: Record<string, PasswordResetRequest>;
+  orders?: Record<string, StoreOrder>;
 }
 
 export function hashClientPassword(password: string): string {
@@ -380,6 +386,7 @@ const initialData: DatabaseSchema = {
   developerLeads: {},
   developerNotifications: {},
   users: {},
+  orders: {},
 };
 
 function ensureDb(): DatabaseSchema {
@@ -489,6 +496,11 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
+    if (!parsed.orders) {
+      parsed.orders = {};
+      modified = true;
+    }
+
     if (modified) {
       saveDb(parsed);
     }
@@ -532,7 +544,8 @@ export type CloudSliceKey =
   | 'notifications'
   | 'settings'
   | 'vouchers'
-  | 'resets';
+  | 'resets'
+  | 'orders';
 
 const CLOUD_KEYS: CloudSliceKey[] = [
   'users',
@@ -544,6 +557,7 @@ const CLOUD_KEYS: CloudSliceKey[] = [
   'vouchers',
   'redirects',
   'resets',
+  'orders',
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
@@ -697,6 +711,12 @@ export async function syncDbFromCloud(): Promise<void> {
     changed = true;
   }
 
+  const cloudOrders = parseSlice<Record<string, StoreOrder>>(results[9]);
+  if (cloudOrders) {
+    db.orders = { ...(db.orders || {}), ...cloudOrders };
+    changed = true;
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -782,6 +802,7 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     settings: db.developerSettings || initialData.developerSettings,
     vouchers: db.vouchers || {},
     resets: db.passwordResets || {},
+    orders: db.orders || {},
   };
   await kvRequest(['SET', `spotqr:${slice}`, JSON.stringify(map[slice])]);
 }
@@ -2458,5 +2479,397 @@ export function getAdminSecurityOverview(): {
 
   return { resetRequests, usersSecurity };
 }
+
+// ==========================================
+// STORE ORDERS & REAL-TIME STOCK INVENTORY
+// ==========================================
+
+export interface CreateOrderParams {
+  slug: string;
+  customerName: string;
+  customerPhone?: string;
+  orderMode?: 'table' | 'delivery' | 'pickup' | 'direct';
+  tableNumber?: string;
+  deliveryAddress?: string;
+  paymentMethod?: string;
+  items: { id: string; quantity: number }[];
+  deliveryFee?: number;
+  notes?: string;
+}
+
+export interface CreateOrderResult {
+  success: boolean;
+  error?: string;
+  order?: StoreOrder;
+  updatedItems?: MenuItem[];
+}
+
+export async function createStoreOrder(
+  params: CreateOrderParams
+): Promise<CreateOrderResult> {
+  await syncDbFromCloud();
+  const db = ensureDb();
+  const slug = String(params.slug || '').trim();
+  if (!slug) {
+    return { success: false, error: 'Identificador da loja não informado.' };
+  }
+
+  await syncMenuFromCloud(slug);
+  const menu = db.menus[slug];
+  if (!menu) {
+    return { success: false, error: 'Catálogo ou cardápio não encontrado.' };
+  }
+
+  if (!Array.isArray(params.items) || params.items.length === 0) {
+    return { success: false, error: 'Seu carrinho está vazio.' };
+  }
+
+  // 1. Pre-validate stock for limited and unique items
+  for (const reqItem of params.items) {
+    const target = menu.items.find((i) => i.id === reqItem.id);
+    if (!target) continue;
+    const reqQty = Math.max(1, Math.floor(reqItem.quantity || 1));
+    const stockInfo = getItemStockInfo(target);
+
+    if (stockInfo.stockMode === 'unique') {
+      if (
+        !target.isAvailable ||
+        (typeof target.stockQuantity === 'number' && target.stockQuantity <= 0)
+      ) {
+        return {
+          success: false,
+          error: `A peça única "${target.name}" acabou de ser reservada ou esgotou. Atualize seu pedido.`,
+        };
+      }
+    } else if (stockInfo.stockMode === 'limited') {
+      const currentStock =
+        typeof target.stockQuantity === 'number' ? target.stockQuantity : 0;
+      if (currentStock <= 0 || !target.isAvailable) {
+        return {
+          success: false,
+          error: `O produto "${target.name}" acabou de esgotar.`,
+        };
+      }
+      if (currentStock < reqQty) {
+        return {
+          success: false,
+          error: `Restam apenas ${currentStock} unidade(s) de "${target.name}". Ajuste a quantidade no carrinho.`,
+        };
+      }
+    }
+  }
+
+  // 2. Deduct stock and compile order items
+  const orderItems: StoreOrderItem[] = [];
+  let subtotal = 0;
+  let stockChanged = false;
+
+  for (const reqItem of params.items) {
+    const target = menu.items.find((i) => i.id === reqItem.id);
+    if (!target) continue;
+    const reqQty = Math.max(1, Math.floor(reqItem.quantity || 1));
+    let stockDeducted = 0;
+
+    if (target.stockMode === 'unique') {
+      stockDeducted = 1;
+      target.stockQuantity = 0;
+      target.isAvailable = false; // Announcement immediately leaves storefront / marked out of stock
+      stockChanged = true;
+    } else if (target.stockMode === 'limited') {
+      const currentStock =
+        typeof target.stockQuantity === 'number' ? target.stockQuantity : 0;
+      stockDeducted = Math.min(currentStock, reqQty);
+      const newStock = Math.max(0, currentStock - reqQty);
+      target.stockQuantity = newStock;
+      if (newStock === 0) {
+        target.isAvailable = false; // Announcement immediately leaves storefront / marked out of stock
+      }
+      stockChanged = true;
+    }
+
+    const itemPrice = typeof target.price === 'number' ? target.price : 0;
+    subtotal += itemPrice * reqQty;
+
+    orderItems.push({
+      id: target.id,
+      name: target.name,
+      price: itemPrice,
+      quantity: reqQty,
+      stockMode: target.stockMode || 'unlimited',
+      stockDeducted,
+    });
+  }
+
+  if (stockChanged) {
+    menu.updatedAt = new Date().toISOString();
+    saveMenu(menu);
+    await persistMenuToCloud(menu);
+  }
+
+  const orderId = `PED-${Date.now().toString().slice(-6)}`;
+  const nowIso = new Date().toISOString();
+  const rawDeliveryFee =
+    typeof params.deliveryFee === 'number' && params.deliveryFee >= 0
+      ? params.deliveryFee
+      : params.orderMode === 'delivery' && menu.deliveryFee
+      ? menu.deliveryFee
+      : 0;
+  const deliveryFee = Number(rawDeliveryFee.toFixed(2));
+  const total = Number((subtotal + deliveryFee).toFixed(2));
+
+  const order: StoreOrder = {
+    id: orderId,
+    slug: menu.slug,
+    storeTitle: menu.title,
+    storeOwnerId: menu.ownerId,
+    storeOwnerEmail: menu.ownerEmail,
+    customerName: String(params.customerName || '').trim() || 'Cliente WhatsApp',
+    customerPhone: params.customerPhone ? String(params.customerPhone).trim() : undefined,
+    orderMode: params.orderMode || 'direct',
+    tableNumber: params.tableNumber ? String(params.tableNumber).trim() : undefined,
+    deliveryAddress: params.deliveryAddress
+      ? String(params.deliveryAddress).trim()
+      : undefined,
+    paymentMethod:
+      String(params.paymentMethod || '').trim() || 'A combinar pelo WhatsApp',
+    items: orderItems,
+    subtotal: Number(subtotal.toFixed(2)),
+    deliveryFee,
+    total,
+    status: 'pending',
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    notes: params.notes ? String(params.notes).trim() : undefined,
+  };
+
+  db.orders = db.orders || {};
+  db.orders[orderId] = order;
+  saveDb(db);
+  await persistSliceToCloud('orders');
+
+  sendExternalMobilePush(
+    `📦 Novo Pedido #${orderId} - ${menu.title}`,
+    `${order.customerName} fechou um pedido de R$ ${total.toFixed(2)} (${orderItems.length} itens).`,
+    'package,shopping_bags'
+  );
+
+  return {
+    success: true,
+    order,
+    updatedItems: menu.items,
+  };
+}
+
+export async function confirmStoreOrder(params: {
+  orderId: string;
+  user?: ClientUser | null;
+  isAdmin?: boolean;
+}): Promise<{ success: boolean; error?: string; order?: StoreOrder }> {
+  await syncDbFromCloud();
+  const db = ensureDb();
+  db.orders = db.orders || {};
+  const order = db.orders[params.orderId];
+  if (!order) {
+    return { success: false, error: 'Pedido não encontrado.' };
+  }
+
+  if (!params.isAdmin && params.user) {
+    const isOwner =
+      order.storeOwnerId === params.user.id ||
+      order.storeOwnerEmail?.toLowerCase() === params.user.email?.toLowerCase();
+    const isStoreOwnerInMenu =
+      db.menus[order.slug]?.ownerId === params.user.id ||
+      db.menus[order.slug]?.ownerEmail?.toLowerCase() ===
+        params.user.email?.toLowerCase();
+    const isMasterAdmin =
+      params.user.email?.toLowerCase() ===
+      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
+    if (!isOwner && !isStoreOwnerInMenu && !isMasterAdmin) {
+      return {
+        success: false,
+        error: 'Você não tem permissão para confirmar este pedido.',
+      };
+    }
+  }
+
+  order.status = 'confirmed';
+  order.confirmedAt = new Date().toISOString();
+  order.updatedAt = new Date().toISOString();
+  saveDb(db);
+  await persistSliceToCloud('orders');
+
+  return { success: true, order };
+}
+
+export async function cancelStoreOrder(params: {
+  orderId: string;
+  user?: ClientUser | null;
+  isAdmin?: boolean;
+}): Promise<{
+  success: boolean;
+  error?: string;
+  order?: StoreOrder;
+  updatedItems?: MenuItem[];
+}> {
+  await syncDbFromCloud();
+  const db = ensureDb();
+  db.orders = db.orders || {};
+  const order = db.orders[params.orderId];
+  if (!order) {
+    return { success: false, error: 'Pedido não encontrado.' };
+  }
+
+  if (!params.isAdmin && params.user) {
+    const isOwner =
+      order.storeOwnerId === params.user.id ||
+      order.storeOwnerEmail?.toLowerCase() === params.user.email?.toLowerCase();
+    const isStoreOwnerInMenu =
+      db.menus[order.slug]?.ownerId === params.user.id ||
+      db.menus[order.slug]?.ownerEmail?.toLowerCase() ===
+        params.user.email?.toLowerCase();
+    const isMasterAdmin =
+      params.user.email?.toLowerCase() ===
+      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
+    if (!isOwner && !isStoreOwnerInMenu && !isMasterAdmin) {
+      return {
+        success: false,
+        error: 'Você não tem permissão para cancelar este pedido.',
+      };
+    }
+  }
+
+  if (order.status === 'cancelled') {
+    return { success: true, order };
+  }
+
+  order.status = 'cancelled';
+  order.cancelledAt = new Date().toISOString();
+  order.updatedAt = new Date().toISOString();
+
+  // Restore inventory and put product back on air
+  let updatedItems: MenuItem[] | undefined;
+  await syncMenuFromCloud(order.slug);
+  const menu = db.menus[order.slug];
+  if (menu) {
+    let stockRestored = false;
+    for (const ordItem of order.items) {
+      if (
+        typeof ordItem.stockDeducted === 'number' &&
+        ordItem.stockDeducted > 0
+      ) {
+        const target = menu.items.find((i) => i.id === ordItem.id);
+        if (target) {
+          if (target.stockMode === 'unique') {
+            target.stockQuantity = 1;
+            target.isAvailable = true; // Returns to air!
+            stockRestored = true;
+          } else if (target.stockMode === 'limited') {
+            const currentStock =
+              typeof target.stockQuantity === 'number'
+                ? target.stockQuantity
+                : 0;
+            target.stockQuantity = currentStock + ordItem.stockDeducted;
+            if (target.stockQuantity > 0) {
+              target.isAvailable = true; // Returns to air!
+            }
+            stockRestored = true;
+          }
+        }
+      }
+    }
+
+    if (stockRestored) {
+      menu.updatedAt = new Date().toISOString();
+      saveMenu(menu);
+      await persistMenuToCloud(menu);
+      updatedItems = menu.items;
+    }
+  }
+
+  saveDb(db);
+  await persistSliceToCloud('orders');
+
+  return { success: true, order, updatedItems };
+}
+
+export async function getStoreOrders(
+  slug: string,
+  user?: ClientUser | null,
+  isAdmin?: boolean
+): Promise<{
+  success: boolean;
+  error?: string;
+  orders: StoreOrder[];
+  pendingCount: number;
+}> {
+  await syncDbFromCloud();
+  const db = ensureDb();
+  db.orders = db.orders || {};
+
+  const cleanSlug = String(slug || '').trim();
+  const allOrders = Object.values(db.orders).filter(
+    (o) => o.slug === cleanSlug
+  );
+
+  if (!isAdmin && user && allOrders.length > 0) {
+    const first = allOrders[0];
+    const isOwner =
+      first.storeOwnerId === user.id ||
+      first.storeOwnerEmail?.toLowerCase() === user.email?.toLowerCase();
+    const isStoreOwnerInMenu =
+      db.menus[cleanSlug]?.ownerId === user.id ||
+      db.menus[cleanSlug]?.ownerEmail?.toLowerCase() ===
+        user.email?.toLowerCase();
+    const isAdmin =
+      user.email?.toLowerCase() ===
+      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
+    if (!isOwner && !isStoreOwnerInMenu && !isAdmin) {
+      return {
+        success: false,
+        error: 'Acesso negado aos pedidos desta loja.',
+        orders: [],
+        pendingCount: 0,
+      };
+    }
+  }
+
+  const sorted = allOrders.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+  const pendingCount = sorted.filter((o) => o.status === 'pending').length;
+
+  return { success: true, orders: sorted, pendingCount };
+}
+
+export async function getUserOrdersOverview(
+  user: ClientUser
+): Promise<Record<string, { total: number; pending: number }>> {
+  await syncDbFromCloud();
+  const db = ensureDb();
+  db.orders = db.orders || {};
+
+  const result: Record<string, { total: number; pending: number }> = {};
+  const userStores = getDynamicQRsByOwner(user.id, user.email);
+  const userSlugs = new Set(userStores.map((s) => s.slug));
+
+  for (const o of Object.values(db.orders)) {
+    if (
+      userSlugs.has(o.slug) ||
+      o.storeOwnerId === user.id ||
+      o.storeOwnerEmail?.toLowerCase() === user.email?.toLowerCase()
+    ) {
+      if (!result[o.slug]) {
+        result[o.slug] = { total: 0, pending: 0 };
+      }
+      result[o.slug].total += 1;
+      if (o.status === 'pending') {
+        result[o.slug].pending += 1;
+      }
+    }
+  }
+
+  return result;
+}
+
 
 

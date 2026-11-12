@@ -25,6 +25,9 @@ import {
   ZoomIn,
   ZoomOut,
   CreditCard,
+  AlertCircle,
+  ArrowUp,
+  Layers,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
@@ -83,6 +86,8 @@ export default function DigitalShowcasePage({
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   // Quick actions & post-checkout PIX order lock
   const [copiedWifi, setCopiedWifi] = useState(false);
@@ -124,6 +129,45 @@ export default function DigitalShowcasePage({
   }, [zoomedItem]);
 
   // Read ?mesa=XX from URL if customer scanned a numbered table plaque
+  const [isNearBottom, setIsNearBottom] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === 'undefined') return;
+      const scrollY = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+      const nearBottom = scrollY + windowHeight >= docHeight - 380;
+      setIsNearBottom(nearBottom);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToProducts = (catId?: string) => {
+    if (catId !== undefined) {
+      setActiveCategory(catId);
+    }
+    if (typeof document !== 'undefined') {
+      const el = document.getElementById('catalogo-produtos');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 380, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -504,7 +548,7 @@ export default function DigitalShowcasePage({
       `────────────────────\n`;
 
     if (pixTxId) {
-      message += `*Código do Pedido (PIX):* #${pixTxId}\n`;
+      message += `*Código do Pedido:* #${pixTxId}\n`;
     }
 
     if (!activeMode) {
@@ -553,10 +597,77 @@ export default function DigitalShowcasePage({
     return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
   };
 
-  const handleConfirmCheckout = () => {
+  const handleConfirmCheckout = async () => {
+    if (!menu || checkoutSubmitting) return;
+    setCheckoutError(null);
+
+    const itemsList = Object.values(cart);
+    if (itemsList.length === 0) return;
+
+    setCheckoutSubmitting(true);
+    let orderId = `PED${Date.now().toString().slice(-6)}`;
+
+    try {
+      const activeOrderMode = enabledModes.length > 0 ? orderMode : 'direct';
+      const resolvedPaymentText =
+        acceptedPaymentOptions.length > 0
+          ? paymentMethod || acceptedPaymentOptions[0].whatsappLabel
+          : 'A combinar pelo WhatsApp';
+
+      const res = await fetch('/api/cardapio/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          slug: menu.slug,
+          customerName: customerName.trim() || 'Cliente WhatsApp',
+          customerPhone: undefined,
+          orderMode: activeOrderMode,
+          tableNumber:
+            activeOrderMode === 'table' ? tableNumber.trim() : undefined,
+          deliveryAddress:
+            activeOrderMode === 'delivery'
+              ? deliveryAddress.trim()
+              : undefined,
+          paymentMethod: resolvedPaymentText,
+          items: itemsList.map((c) => ({
+            id: c.item.id,
+            quantity: c.quantity,
+          })),
+          deliveryFee: deliveryFee > 0 ? deliveryFee : 0,
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setCheckoutError(
+          data.error || 'Não foi possível registrar o pedido no momento.'
+        );
+        setCheckoutSubmitting(false);
+        return;
+      }
+
+      if (data.orderId) {
+        orderId = data.orderId;
+      }
+
+      if (Array.isArray(data.updatedItems)) {
+        setMenu((prev) =>
+          prev ? { ...prev, items: data.updatedItems } : prev
+        );
+      }
+    } catch (err) {
+      console.warn(
+        'Não foi possível registrar pedido no servidor, prosseguindo com WhatsApp fallback:',
+        err
+      );
+    } finally {
+      setCheckoutSubmitting(false);
+    }
+
     if (canPayPixAtCheckout) {
-      const txId = `PED${Date.now().toString().slice(-6)}`;
-      const whatsappUrl = buildWhatsAppOrderUrl(txId);
+      const whatsappUrl = buildWhatsAppOrderUrl(orderId);
       setCopiedPix(false);
       setIsCartOpen(false);
       setClosedPixOrder({
@@ -564,15 +675,18 @@ export default function DigitalShowcasePage({
         subtotal: Number(subtotalPrice.toFixed(2)),
         deliveryFee: Number(deliveryFee.toFixed(2)),
         itemsCount: totalItems,
-        txId,
+        txId: orderId,
         whatsappUrl,
       });
+      setCart({});
       return;
     }
 
-    const url = buildWhatsAppOrderUrl();
+    const url = buildWhatsAppOrderUrl(orderId);
     if (url) {
       window.open(url, '_blank');
+      setCart({});
+      setIsCartOpen(false);
     }
   };
 
@@ -1182,6 +1296,7 @@ export default function DigitalShowcasePage({
 
           {/* Sticky Category Tabs */}
           <div
+            id="catalogo-produtos"
             className={`sticky top-0 z-30 backdrop-blur-md py-3.5 border-b my-3 flex gap-2 overflow-x-auto no-scrollbar ${
               isLight
                 ? 'bg-slate-50/95 border-slate-200/90'
@@ -1279,6 +1394,27 @@ export default function DigitalShowcasePage({
                             >
                               {item.name}
                             </h3>
+                            {(() => {
+                              const catName =
+                                menu.categories.find(
+                                  (c) =>
+                                    c.id === item.category ||
+                                    c.name === item.category
+                                )?.name || item.category;
+                              return catName ? (
+                                <span
+                                  className={`border text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                    isLight
+                                      ? 'bg-slate-100 border-slate-200 text-slate-700'
+                                      : 'bg-slate-800/80 border-slate-700 text-slate-300'
+                                  }`}
+                                  title={`Categoria: ${catName}`}
+                                >
+                                  <Layers className="w-2.5 h-2.5 opacity-70" />
+                                  <span>{catName}</span>
+                                </span>
+                              ) : null;
+                            })()}
                             {item.badge && stock.canOrder && (
                               <span
                                 className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1394,6 +1530,227 @@ export default function DigitalShowcasePage({
             )}
           </div>
 
+          {/* Bottom Interactive Cart & Category Hub (preenche o espaço vago do rodapé) */}
+          <div
+            className={`mt-10 p-5 sm:p-6 rounded-3xl border shadow-lg space-y-5 ${surfaceCardClass}`}
+          >
+            {/* Carrinho / Sacola Card at Bottom */}
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition ${
+                isLight
+                  ? 'bg-slate-50 border-slate-200/90'
+                  : 'bg-slate-900/60 border-slate-800'
+              }`}
+            >
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div
+                  style={{
+                    backgroundColor: `${theme.accentHex}20`,
+                    borderColor: `${theme.accentHex}40`,
+                    color: theme.accentHex,
+                  }}
+                  className="w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0 shadow-sm"
+                >
+                  <ShoppingCart className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className={`text-sm font-extrabold ${headingTextClass}`}>
+                      {isCatalog
+                        ? 'Seu Carrinho de Compras'
+                        : 'Sua Comanda / Pedido'}
+                    </h3>
+                    <span
+                      style={{
+                        backgroundColor:
+                          totalItems > 0
+                            ? theme.accentHex
+                            : isLight
+                            ? '#e2e8f0'
+                            : '#1e293b',
+                        color:
+                          totalItems > 0
+                            ? theme.accentTextOnSolid
+                            : isLight
+                            ? '#475569'
+                            : '#94a3b8',
+                      }}
+                      className="px-2.5 py-0.5 rounded-full text-[11px] font-black"
+                    >
+                      {totalItems} {totalItems === 1 ? 'item' : 'itens'}
+                    </span>
+                  </div>
+                  <p className={`text-xs mt-1 leading-relaxed ${mutedTextClass}`}>
+                    {totalItems === 0
+                      ? 'Nenhum item adicionado ainda. Escolha seus produtos acima ou selecione uma categoria abaixo para pedir via WhatsApp / PIX.'
+                      : `Total atual: R$ ${totalPrice.toFixed(
+                          2
+                        )} • Toque no botão ao lado para revisar endereço, forma de pagamento e fechar o pedido.`}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCartOpen(true)}
+                style={
+                  totalItems > 0
+                    ? {
+                        backgroundColor: theme.accentHex,
+                        color: theme.accentTextOnSolid,
+                      }
+                    : undefined
+                }
+                className={`px-5 py-3 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2 shrink-0 ${
+                  totalItems > 0
+                    ? 'hover:brightness-105 active:scale-95'
+                    : isLight
+                    ? 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                    : 'bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750'
+                }`}
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>
+                  {totalItems > 0
+                    ? `Fechar Pedido (R$ ${totalPrice.toFixed(2)})`
+                    : 'Abrir Carrinho'}
+                </span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Categorias daquela Página */}
+            {menu.categories.length > 0 && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-emerald-500" />
+                    <h4
+                      className={`text-xs font-bold uppercase tracking-wider ${labelTextClass}`}
+                    >
+                      Categorias deste {isCatalog ? 'Catálogo' : 'Cardápio'}
+                    </h4>
+                  </div>
+                  <span className={`text-[11px] ${mutedTextClass}`}>
+                    Toque para navegar
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => scrollToProducts('all')}
+                    style={
+                      activeCategory === 'all'
+                        ? {
+                            backgroundColor: theme.accentHex,
+                            color: theme.accentTextOnSolid,
+                          }
+                        : undefined
+                    }
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                      activeCategory === 'all'
+                        ? 'shadow-sm'
+                        : isLight
+                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                        : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    }`}
+                  >
+                    <span>Todos os Produtos</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                        activeCategory === 'all'
+                          ? 'bg-black/20 text-current'
+                          : isLight
+                          ? 'bg-slate-200 text-slate-600'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {menu.items.length}
+                    </span>
+                  </button>
+
+                  {menu.categories.map((cat) => {
+                    const catCount = menu.items.filter(
+                      (it) => it.category === cat.id
+                    ).length;
+                    const isSelected = activeCategory === cat.id;
+                    return (
+                      <button
+                        key={`bottom-cat-${cat.id}`}
+                        type="button"
+                        onClick={() => scrollToProducts(cat.id)}
+                        style={
+                          isSelected
+                            ? {
+                                backgroundColor: theme.accentHex,
+                                color: theme.accentTextOnSolid,
+                              }
+                            : undefined
+                        }
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'shadow-sm'
+                            : isLight
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                            : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                        }`}
+                      >
+                        <span>{cat.name}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                            isSelected
+                              ? 'bg-black/20 text-current'
+                              : isLight
+                              ? 'bg-slate-200 text-slate-600'
+                              : 'bg-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {catCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Atalhos: Voltar ao Topo & WhatsApp */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/40 text-xs">
+              <button
+                type="button"
+                onClick={scrollToTop}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold border transition ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800'
+                }`}
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+                <span>Voltar ao Topo</span>
+              </button>
+
+              {menu.whatsappNumber && (
+                <a
+                  href={`https://wa.me/${menu.whatsappNumber.replace(
+                    /\D/g,
+                    ''
+                  )}?text=${encodeURIComponent(
+                    `Olá! Estou olhando o ${
+                      isCatalog ? 'catálogo' : 'cardápio'
+                    } de ${menu.title} e gostaria de tirar uma dúvida.`
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-bold"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Dúvidas? Fale pelo WhatsApp</span>
+                </a>
+              )}
+            </div>
+          </div>
+
           {/* Free watermark at bottom if not PRO */}
           {!isPro && (
             <div
@@ -1432,8 +1789,8 @@ export default function DigitalShowcasePage({
         )}
       </div>
 
-      {/* Floating Bottom Cart Bar */}
-      {totalItems > 0 && (
+      {/* Floating Bottom Cart / Category Navigation Bar */}
+      {totalItems > 0 ? (
         <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-slide-up">
           <button
             onClick={() => setIsCartOpen(true)}
@@ -1469,7 +1826,88 @@ export default function DigitalShowcasePage({
             </div>
           </button>
         </div>
-      )}
+      ) : isNearBottom ? (
+        /* Floating category & cart teaser when reaching end of page with empty cart */
+        <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-slide-up">
+          <div
+            className={`p-2 rounded-2xl shadow-2xl border flex items-center justify-between gap-2 backdrop-blur-lg ${
+              isLight
+                ? 'bg-white/95 border-slate-200 text-slate-800'
+                : 'bg-[#101726]/95 border-slate-700/80 text-white'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition hover:bg-slate-500/10 shrink-0"
+            >
+              <ShoppingCart className="w-4 h-4 text-emerald-500" />
+              <span>Carrinho (0)</span>
+            </button>
+
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+              <button
+                type="button"
+                onClick={() => scrollToProducts('all')}
+                style={
+                  activeCategory === 'all'
+                    ? {
+                        backgroundColor: theme.accentHex,
+                        color: theme.accentTextOnSolid,
+                      }
+                    : undefined
+                }
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                  activeCategory === 'all'
+                    ? 'shadow-sm'
+                    : isLight
+                    ? 'bg-slate-100 text-slate-700'
+                    : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                Todos ({menu.items.length})
+              </button>
+              {menu.categories.slice(0, 3).map((cat) => (
+                <button
+                  key={`dock-cat-${cat.id}`}
+                  type="button"
+                  onClick={() => scrollToProducts(cat.id)}
+                  style={
+                    activeCategory === cat.id
+                      ? {
+                          backgroundColor: theme.accentHex,
+                          color: theme.accentTextOnSolid,
+                        }
+                      : undefined
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${
+                    activeCategory === cat.id
+                      ? 'shadow-sm'
+                      : isLight
+                      ? 'bg-slate-100 text-slate-700'
+                      : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={scrollToTop}
+              title="Voltar ao início"
+              className={`p-2 rounded-xl transition shrink-0 ${
+                isLight
+                  ? 'hover:bg-slate-100 text-slate-600'
+                  : 'hover:bg-slate-800 text-slate-300'
+              }`}
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Post-Checkout PIX Payment Modal (strictly locked to closed cart order total) */}
       {closedPixOrder && closedPixOrder.amount > 0 && pixPayload && (
@@ -2009,15 +2447,32 @@ export default function DigitalShowcasePage({
                 </p>
               )}
 
+              {checkoutError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/35 text-rose-300 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{checkoutError}</span>
+                </div>
+              )}
+
               <button
                 onClick={handleConfirmCheckout}
+                disabled={checkoutSubmitting}
                 style={{
                   backgroundColor: theme.accentHex,
                   color: theme.accentTextOnSolid,
                 }}
-                className="w-full py-3.5 px-4 rounded-xl text-xs font-bold transition shadow-md hover:brightness-105 flex items-center justify-center gap-2"
+                className={`w-full py-3.5 px-4 rounded-xl text-xs font-bold transition shadow-md flex items-center justify-center gap-2 ${
+                  checkoutSubmitting
+                    ? 'opacity-70 cursor-not-allowed'
+                    : 'hover:brightness-105'
+                }`}
               >
-                {canPayPixAtCheckout ? (
+                {checkoutSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <span>Registrando e Baixando Estoque...</span>
+                  </>
+                ) : canPayPixAtCheckout ? (
                   <>
                     <QrCode className="w-4 h-4" />
                     <span>
@@ -2054,11 +2509,33 @@ export default function DigitalShowcasePage({
               className={`shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b ${modalSubBarClass}`}
             >
               <div className="min-w-0 flex-1">
-                <h3
-                  className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
-                >
-                  {zoomedItem.name}
-                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3
+                    className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
+                  >
+                    {zoomedItem.name}
+                  </h3>
+                  {(() => {
+                    const catName =
+                      menu.categories.find(
+                        (c) =>
+                          c.id === zoomedItem.category ||
+                          c.name === zoomedItem.category
+                      )?.name || zoomedItem.category;
+                    return catName ? (
+                      <span
+                        className={`inline-flex items-center gap-1 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          isLight
+                            ? 'bg-slate-100 border-slate-200 text-slate-700'
+                            : 'bg-slate-800/80 border-slate-700 text-slate-300'
+                        }`}
+                      >
+                        <Layers className="w-2.5 h-2.5 opacity-70" />
+                        <span>{catName}</span>
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <p className={`text-[11px] ${mutedTextClass}`}>
                   Clique na foto ou use os botões para aproximar
                 </p>

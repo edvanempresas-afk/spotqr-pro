@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Plus,
@@ -33,7 +33,9 @@ import {
   Video,
   Lock,
   Loader2,
+  Package,
 } from 'lucide-react';
+import { StoreOrdersModal } from './StoreOrdersModal';
 import {
   RestaurantMenu,
   MenuItem,
@@ -184,10 +186,15 @@ export default function MenuEditorModal({
   const [pixLockedUntil, setPixLockedUntil] = useState<string | null>(null);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'info' | 'categories' | 'items' | 'branding'
   >('items');
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [creatingCategoryForItemId, setCreatingCategoryForItemId] = useState<
+    string | null
+  >(null);
+  const [inlineCategoryName, setInlineCategoryName] = useState('');
 
   // Image Crop / Framing Modal state
   const [cropSession, setCropSession] = useState<{
@@ -222,8 +229,8 @@ export default function MenuEditorModal({
     setMenu({ ...menu, acceptedPayments: next });
   };
 
-  useEffect(() => {
-    if (!isOpen || !slug) return;
+  const loadMenuData = useCallback(() => {
+    if (!slug) return;
     setLoading(true);
     const titleQuery = defaultTitle
       ? `&title=${encodeURIComponent(defaultTitle)}`
@@ -280,7 +287,13 @@ export default function MenuEditorModal({
       })
       .catch((err) => console.error('Error loading showcase for editor:', err))
       .finally(() => setLoading(false));
-  }, [isOpen, slug, mode, defaultTitle]);
+  }, [slug, mode, defaultTitle]);
+
+  useEffect(() => {
+    if (isOpen && slug) {
+      loadMenuData();
+    }
+  }, [isOpen, slug, loadMenuData]);
 
   if (!isOpen) return null;
 
@@ -500,6 +513,41 @@ export default function MenuEditorModal({
     setNewCategoryName('');
   };
 
+  const handleCreateCategoryForProduct = (itemId: string, name: string) => {
+    if (!menu) return;
+    const cleanName = name.trim();
+    if (!cleanName) return;
+
+    // Se já existir com esse nome (case-insensitive), reaproveita o ID
+    const existing = menu.categories.find(
+      (c) => c.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+
+    if (existing) {
+      handleUpdateItem(itemId, { category: existing.id });
+      setCreatingCategoryForItemId(null);
+      setInlineCategoryName('');
+      return;
+    }
+
+    // Cria nova categoria e vincula imediatamente ao item
+    const newCat: MenuCategory = {
+      id: `cat-${Date.now()}`,
+      name: cleanName,
+    };
+
+    setMenu({
+      ...menu,
+      categories: [...menu.categories, newCat],
+      items: menu.items.map((it) =>
+        it.id === itemId ? { ...it, category: newCat.id } : it
+      ),
+    });
+
+    setCreatingCategoryForItemId(null);
+    setInlineCategoryName('');
+  };
+
   const handleDeleteCategory = (catId: string) => {
     if (!menu) return;
     if (menu.categories.length <= 1) {
@@ -704,6 +752,16 @@ export default function MenuEditorModal({
             >
               <span>{openingPreview ? 'Abrindo...' : 'Ver ao Vivo'}</span>
               <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsOrdersModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/35 transition"
+              title="Ver pedidos e controle de estoque automático"
+            >
+              <Package className="w-3.5 h-3.5 text-amber-400" />
+              <span>Pedidos & Estoque</span>
             </button>
 
             <button
@@ -1033,6 +1091,20 @@ export default function MenuEditorModal({
                               <span className="text-[11px] font-semibold">
                                 Arraste para reordenar
                               </span>
+                              {(() => {
+                                const catName =
+                                  menu.categories.find(
+                                    (c) =>
+                                      c.id === item.category ||
+                                      c.name === item.category
+                                  )?.name || item.category;
+                                return catName ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 flex items-center gap-1 ml-1">
+                                    <Layers className="w-3 h-3 text-emerald-400" />
+                                    <span className="max-w-[130px] truncate">{catName}</span>
+                                  </span>
+                                ) : null;
+                              })()}
                             </div>
 
                             <div className="flex items-center gap-1">
@@ -1171,22 +1243,106 @@ export default function MenuEditorModal({
                             </div>
 
                             <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Categoria:
-                              </label>
-                              <select
-                                value={item.category}
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, { category: e.target.value })
-                                }
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white"
-                              >
-                                {menu.categories.map((c) => (
-                                  <option key={c.id} value={c.id}>
-                                    {c.name}
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1">
+                                  <span>Categoria:</span>
+                                </label>
+                                {creatingCategoryForItemId !== item.id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setCreatingCategoryForItemId(item.id);
+                                      setInlineCategoryName('');
+                                    }}
+                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline transition"
+                                    title="Criar nova categoria sem sair deste produto"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                    <span>Nova Categoria</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {creatingCategoryForItemId === item.id ? (
+                                <div className="p-2 bg-slate-950 border border-emerald-500/60 rounded-xl space-y-1.5 shadow-lg animate-fade-in">
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      placeholder="Nome da categoria..."
+                                      value={inlineCategoryName}
+                                      onChange={(e) => setInlineCategoryName(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleCreateCategoryForProduct(item.id, inlineCategoryName);
+                                        } else if (e.key === 'Escape') {
+                                          setCreatingCategoryForItemId(null);
+                                          setInlineCategoryName('');
+                                        }
+                                      }}
+                                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleCreateCategoryForProduct(item.id, inlineCategoryName)
+                                      }
+                                      disabled={!inlineCategoryName.trim()}
+                                      className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold rounded-lg transition shrink-0"
+                                    >
+                                      Criar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCreatingCategoryForItemId(null);
+                                        setInlineCategoryName('');
+                                      }}
+                                      className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition shrink-0"
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <p className="text-[10px] text-emerald-400 font-medium">
+                                    ✓ Cria a categoria e vincula imediatamente a este item.
+                                  </p>
+                                </div>
+                              ) : (
+                                <select
+                                  value={item.category}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__CREATE_NEW_CAT__') {
+                                      setCreatingCategoryForItemId(item.id);
+                                      setInlineCategoryName('');
+                                    } else {
+                                      handleUpdateItem(item.id, { category: e.target.value });
+                                    }
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                >
+                                  {menu.categories.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                  {item.category &&
+                                    !menu.categories.some(
+                                      (c) => c.id === item.category || c.name === item.category
+                                    ) && (
+                                      <option value={item.category}>
+                                        {item.category}
+                                      </option>
+                                    )}
+                                  <option
+                                    value="__CREATE_NEW_CAT__"
+                                    className="text-emerald-400 font-bold bg-slate-900"
+                                  >
+                                    ➕ + Criar Nova Categoria...
                                   </option>
-                                ))}
-                              </select>
+                                </select>
+                              )}
                             </div>
 
                             <div>
@@ -2563,6 +2719,20 @@ export default function MenuEditorModal({
         onCancel={handleCloseCrop}
         onConfirm={handleConfirmCrop}
       />
+
+      {isOrdersModalOpen && menu && (
+        <StoreOrdersModal
+          isOpen={isOrdersModalOpen}
+          onClose={() => setIsOrdersModalOpen(false)}
+          storeSlug={menu.slug}
+          storeTitle={menu.title}
+          storeMode={isCatalog ? 'catalog' : 'menu'}
+          themeMode={menu.themeMode || 'dark'}
+          onOrderUpdated={() => {
+            loadMenuData();
+          }}
+        />
+      )}
     </div>
   );
 }
