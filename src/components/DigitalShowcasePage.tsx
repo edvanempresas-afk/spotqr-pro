@@ -24,9 +24,15 @@ import {
   Truck,
   ZoomIn,
   ZoomOut,
+  CreditCard,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
+import {
+  getAcceptedPaymentOptions,
+  getAcceptedPaymentsList,
+} from '@/lib/payments';
+import { resolveShowcaseTheme } from '@/lib/theme';
 import { generatePixPayload } from '@/lib/pix-brcode';
 import QRCode from 'qrcode';
 import Link from 'next/link';
@@ -64,9 +70,7 @@ export default function DigitalShowcasePage({
   const [tableNumber, setTableNumber] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<
-    'PIX' | 'Cartão' | 'Dinheiro'
-  >('PIX');
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [notes, setNotes] = useState('');
 
   // Quick actions
@@ -217,9 +221,64 @@ export default function DigitalShowcasePage({
     }
   }, [enabledModes, orderMode]);
 
+  const acceptedPaymentIds = getAcceptedPaymentsList(menu);
+  const acceptedPaymentOptions = useMemo(
+    () => getAcceptedPaymentOptions(menu),
+    [menu]
+  );
+  const acceptsPix = acceptedPaymentIds.includes('pix');
+  const canShowPixButton = acceptsPix && Boolean(menu?.pixKey?.trim());
+
+  useEffect(() => {
+    if (acceptedPaymentOptions.length === 0) {
+      setPaymentMethod('A combinar pelo WhatsApp');
+      return;
+    }
+    const validLabels = acceptedPaymentOptions.map((o) => o.whatsappLabel);
+    if (!validLabels.includes(paymentMethod)) {
+      setPaymentMethod(acceptedPaymentOptions[0].whatsappLabel);
+    }
+  }, [acceptedPaymentOptions, paymentMethod]);
+
   const isPro = Boolean(
     menu?.isPaid || slug === 'demo-restaurante' || slug === 'demo-catalogo'
   );
+
+  const theme = useMemo(
+    () =>
+      resolveShowcaseTheme(
+        menu?.themeMode,
+        menu?.themeColor,
+        isCatalog ? '#10b981' : '#16a34a'
+      ),
+    [menu?.themeMode, menu?.themeColor, isCatalog]
+  );
+  const isLight = theme.isLight;
+  const pageBgClass = isLight
+    ? 'bg-slate-50 text-slate-900'
+    : 'bg-[#090d14] text-slate-100';
+  const surfaceCardClass = isLight
+    ? 'bg-white border-slate-200/90'
+    : 'bg-[#121929] border-slate-800';
+  const modalBoxClass = isLight
+    ? 'bg-white border-slate-200 text-slate-900'
+    : 'bg-[#121929] border-slate-700 text-white';
+  const modalSubBarClass = isLight
+    ? 'bg-slate-50 border-slate-200'
+    : 'bg-[#0d1320] border-slate-800';
+  const inputFieldClass = isLight
+    ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-slate-500'
+    : 'bg-slate-900 border-slate-700 text-white placeholder:text-slate-500 focus:border-slate-400';
+  const mutedTextClass = isLight ? 'text-slate-600' : 'text-slate-400';
+  const labelTextClass = isLight ? 'text-slate-700' : 'text-slate-300';
+  const headingTextClass = isLight ? 'text-slate-900' : 'text-white';
+  const pillMutedClass = isLight
+    ? 'bg-slate-100 border-slate-200 text-slate-700'
+    : 'bg-slate-800 border-slate-700 text-slate-300';
+  const subtleOnSolidClass =
+    theme.accentTextOnSolid === '#0f172a'
+      ? 'bg-black/10 hover:bg-black/20'
+      : 'bg-white/15 hover:bg-white/25';
 
   const addToCart = (item: MenuItem) => {
     const stock = getItemStockInfo(item);
@@ -340,28 +399,33 @@ export default function DigitalShowcasePage({
       ? '🛵 *PEDIDO PARA ENTREGA (DELIVERY)*'
       : '🛍️ *PEDIDO PARA RETIRADA NO BALCÃO*';
 
+    const resolvedPaymentText =
+      acceptedPaymentOptions.length > 0
+        ? paymentMethod || acceptedPaymentOptions[0].whatsappLabel
+        : 'A combinar pelo WhatsApp';
+
     let message =
       `${modeTitle}\n` +
       `*${isCatalog ? 'Loja / Marca' : 'Estabelecimento'}:* ${menu.title}\n` +
       `────────────────────\n`;
 
     if (!activeMode) {
-      message += `*Forma de Pagamento:* ${paymentMethod}\n`;
+      message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
     } else if (activeMode === 'table') {
       message += `*${isCatalog ? 'Stand / Ref' : 'Mesa'}:* ${
         tableNumber || 'Presencial'
       }\n`;
-      if (isCatalog) {
-        message += `*Forma de Pagamento:* ${paymentMethod}\n`;
+      if (isCatalog || acceptedPaymentOptions.length > 0) {
+        message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
       }
     } else if (activeMode === 'delivery') {
       message += `*Endereço de Entrega:* ${deliveryAddress || 'A combinar'}\n`;
-      message += `*Forma de Pagamento:* ${paymentMethod}\n`;
+      message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
     } else {
       message += `*Modalidade:* ${
         isCatalog ? 'Retirada na Loja' : 'Retirada no Balcão'
       }\n`;
-      message += `*Forma de Pagamento:* ${paymentMethod}\n`;
+      message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
     }
 
     if (customerName) {
@@ -392,9 +456,19 @@ export default function DigitalShowcasePage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0f17] flex items-center justify-center text-slate-400">
+      <div
+        className={`min-h-screen flex items-center justify-center ${
+          isLight ? 'bg-slate-50 text-slate-500' : 'bg-[#0b0f17] text-slate-400'
+        }`}
+      >
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+          <div
+            className="w-10 h-10 border-4 rounded-full animate-spin"
+            style={{
+              borderColor: theme.accentHex,
+              borderTopColor: 'transparent',
+            }}
+          />
           <p className="text-xs">
             {isCatalog
               ? 'Carregando catálogo digital...'
@@ -407,17 +481,27 @@ export default function DigitalShowcasePage({
 
   if (!menu) {
     return (
-      <div className="min-h-screen bg-[#0b0f17] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-[#101726] border border-slate-800 rounded-3xl p-8 text-center">
-          <h2 className="text-xl font-bold text-white mb-2">
+      <div
+        className={`min-h-screen flex items-center justify-center p-4 ${
+          isLight ? 'bg-slate-50' : 'bg-[#0b0f17]'
+        }`}
+      >
+        <div
+          className={`max-w-md w-full border rounded-3xl p-8 text-center ${surfaceCardClass}`}
+        >
+          <h2 className={`text-xl font-bold mb-2 ${headingTextClass}`}>
             {isCatalog ? 'Catálogo não encontrado' : 'Cardápio não encontrado'}
           </h2>
-          <p className="text-xs text-slate-400 mb-6">
+          <p className={`text-xs mb-6 ${mutedTextClass}`}>
             Esta vitrine digital ainda não foi configurada.
           </p>
           <Link
             href="/"
-            className="inline-block px-5 py-2.5 bg-emerald-500 text-white font-semibold text-xs rounded-xl"
+            style={{
+              backgroundColor: theme.accentHex,
+              color: theme.accentTextOnSolid,
+            }}
+            className="inline-block px-5 py-2.5 font-semibold text-xs rounded-xl shadow-sm hover:brightness-105 transition"
           >
             Voltar ao Início
           </Link>
@@ -447,7 +531,13 @@ export default function DigitalShowcasePage({
 
     if (!itemStock.canOrder) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400/90 bg-rose-500/10 border border-rose-500/25 px-3 py-1.5 rounded-xl shrink-0">
+        <span
+          className={`inline-flex items-center gap-1 text-[11px] font-bold border px-3 py-1.5 rounded-xl shrink-0 ${
+            isLight
+              ? 'text-rose-700 bg-rose-50 border-rose-200'
+              : 'text-rose-400/90 bg-rose-500/10 border-rose-500/25'
+          }`}
+        >
           Indisponível
         </span>
       );
@@ -456,13 +546,20 @@ export default function DigitalShowcasePage({
     if (itemInCart > 0) {
       return (
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-xl px-1.5 py-1 shadow-md shadow-emerald-500/20 border border-emerald-300/40">
+          <div
+            style={{
+              backgroundColor: theme.accentHex,
+              color: theme.accentTextOnSolid,
+              borderColor: theme.accentBorder,
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl px-1.5 py-1 shadow-md border"
+          >
             <ShoppingCart className="w-3.5 h-3.5 stroke-[2.3] ml-1 shrink-0 opacity-85" />
             <button
               type="button"
               onClick={() => removeFromCart(targetItem.id)}
               aria-label={`Remover 1 ${targetItem.name} do carrinho`}
-              className="p-1 bg-slate-950/10 hover:bg-slate-950/20 rounded-lg transition"
+              className={`p-1 rounded-lg transition ${subtleOnSolidClass}`}
             >
               <Minus className="w-3.5 h-3.5 stroke-[2.6]" />
             </button>
@@ -482,16 +579,18 @@ export default function DigitalShowcasePage({
                   : 'Adicionar mais uma unidade'
               }
               className={`p-1 rounded-lg transition ${
-                itemReachedMax
-                  ? 'opacity-35 cursor-not-allowed'
-                  : 'bg-slate-950/10 hover:bg-slate-950/20'
+                itemReachedMax ? 'opacity-35 cursor-not-allowed' : subtleOnSolidClass
               }`}
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.6]" />
             </button>
           </div>
           {itemReachedMax && (
-            <span className="text-[9px] font-bold text-amber-300">
+            <span
+              className={`text-[9px] font-bold ${
+                isLight ? 'text-amber-700' : 'text-amber-300'
+              }`}
+            >
               {itemStock.isUnique
                 ? 'Peça única (máx. 1)'
                 : `Máx. ${itemStock.maxQuantity} disp.`}
@@ -506,11 +605,20 @@ export default function DigitalShowcasePage({
         type="button"
         onClick={() => addToCart(targetItem)}
         aria-label={`Adicionar ${targetItem.name} ao carrinho`}
-        className="group/add shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.97] text-slate-950 shadow-md shadow-emerald-500/20 border border-emerald-300/40 transition-all whitespace-nowrap"
+        style={{
+          backgroundColor: theme.accentHex,
+          color: theme.accentTextOnSolid,
+          borderColor: theme.accentBorder,
+        }}
+        className="group/add shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold hover:brightness-105 active:scale-[0.97] shadow-md border transition-all whitespace-nowrap"
       >
         <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
         <span>Adicionar</span>
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-md bg-slate-950/15">
+        <span
+          className={`inline-flex items-center justify-center w-4 h-4 rounded-md ${
+            theme.accentTextOnSolid === '#0f172a' ? 'bg-black/15' : 'bg-white/20'
+          }`}
+        >
           <Plus className="w-3 h-3 stroke-[2.8]" />
         </span>
       </button>
@@ -525,35 +633,134 @@ export default function DigitalShowcasePage({
         onClick={() => openPhotoZoom(targetItem)}
         aria-label={`Ampliar foto de ${targetItem.name}`}
         title="Clique para ampliar e ver a foto em detalhes"
-        className={`group/img relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-400/70 shadow-md shrink-0 cursor-zoom-in transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${extraClass}`}
+        className={`group/img relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border shadow-md shrink-0 cursor-zoom-in transition focus:outline-none ${
+          isLight
+            ? 'border-slate-200 hover:border-slate-400'
+            : 'border-slate-700/60 hover:border-slate-500'
+        } ${extraClass}`}
       >
         <img
           src={targetItem.imageUrl}
           alt={targetItem.name}
           className="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
         />
-        <span className="absolute bottom-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md bg-black/70 backdrop-blur-sm border border-white/20 text-white group-hover/img:bg-emerald-500 group-hover/img:text-slate-950 transition shadow">
+        <span className="absolute bottom-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md bg-black/75 backdrop-blur-sm border border-white/20 text-white group-hover/img:scale-110 transition shadow">
           <ZoomIn className="w-3 h-3" />
         </span>
       </button>
     );
   };
 
+  const renderPaymentSelector = () => {
+    if (acceptedPaymentOptions.length === 0) {
+      return (
+        <div
+          className={`border rounded-xl px-3 py-2.5 text-xs flex items-center justify-between gap-2 ${
+            isLight
+              ? 'bg-slate-100 border-slate-200'
+              : 'bg-slate-900/70 border-slate-800'
+          }`}
+        >
+          <span className={`font-semibold ${mutedTextClass}`}>
+            Forma de Pagamento:
+          </span>
+          <span
+            className="font-bold"
+            style={{ color: theme.readableAccentText }}
+          >
+            💬 A combinar pelo WhatsApp
+          </span>
+        </div>
+      );
+    }
+
+    if (acceptedPaymentOptions.length === 1) {
+      const onlyOpt = acceptedPaymentOptions[0];
+      return (
+        <div
+          style={{
+            backgroundColor: theme.accentSoftBg,
+            borderColor: theme.accentBorder,
+          }}
+          className="border rounded-xl px-3 py-2.5 text-xs flex items-center justify-between gap-2"
+        >
+          <span className={`font-semibold ${labelTextClass}`}>
+            Pagamento aceito pela loja:
+          </span>
+          <span
+            className="font-extrabold"
+            style={{ color: theme.readableAccentText }}
+          >
+            {onlyOpt.icon} {onlyOpt.label}
+          </span>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <label className={`text-xs font-semibold block mb-1.5 ${labelTextClass}`}>
+          Forma de Pagamento:
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {acceptedPaymentOptions.map((opt) => {
+            const selected = paymentMethod === opt.whatsappLabel;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setPaymentMethod(opt.whatsappLabel)}
+                style={
+                  selected
+                    ? {
+                        backgroundColor: theme.accentHex,
+                        color: theme.accentTextOnSolid,
+                        borderColor: theme.accentHex,
+                      }
+                    : undefined
+                }
+                className={`px-3 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
+                  selected
+                    ? 'shadow-sm'
+                    : isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400 hover:bg-slate-200/70'
+                    : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                }`}
+              >
+                <span>{opt.icon}</span>
+                <span>{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-[#090d14] text-slate-100 pb-28">
+    <div className={`min-h-screen pb-28 transition-colors ${pageBgClass}`}>
       {/* Cover Banner */}
       <div className="relative w-full h-44 sm:h-56 bg-slate-900 overflow-hidden">
         <img
           src={menu.coverImage || fallbackCover}
           alt={menu.title}
-          className="w-full h-full object-cover opacity-60"
+          className={`w-full h-full object-cover ${
+            isLight ? 'opacity-85' : 'opacity-60'
+          }`}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/40 to-transparent" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: isLight
+              ? 'linear-gradient(to top, #f8fafc 0%, rgba(248, 250, 252, 0.35) 55%, transparent 100%)'
+              : 'linear-gradient(to top, #090d14 0%, rgba(9, 13, 20, 0.4) 55%, transparent 100%)',
+          }}
+        />
 
         {/* Back button */}
         <Link
           href="/"
-          className="absolute top-4 left-4 px-3 py-2 bg-black/50 backdrop-blur-md rounded-xl text-slate-200 hover:text-white border border-white/10 flex items-center gap-1.5 text-xs font-semibold"
+          className="absolute top-4 left-4 px-3 py-2 bg-black/55 backdrop-blur-md rounded-xl text-slate-100 hover:text-white border border-white/15 flex items-center gap-1.5 text-xs font-semibold"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Criador de QR</span>
@@ -561,7 +768,13 @@ export default function DigitalShowcasePage({
 
         {/* Table badge if detected from URL */}
         {tableNumber && (
-          <div className="absolute top-4 right-4 px-3.5 py-1.5 bg-emerald-500 text-white rounded-full text-xs font-extrabold shadow-glow flex items-center gap-1.5">
+          <div
+            style={{
+              backgroundColor: theme.accentHex,
+              color: theme.accentTextOnSolid,
+            }}
+            className="absolute top-4 right-4 px-3.5 py-1.5 rounded-full text-xs font-extrabold shadow-lg flex items-center gap-1.5"
+          >
             <span>📍 {tableNumber}</span>
           </div>
         )}
@@ -584,14 +797,25 @@ export default function DigitalShowcasePage({
               : 'lg:col-span-8 lg:col-start-3 w-full max-w-3xl mx-auto'
           }
         >
-          <div className="bg-[#121929]/95 border border-slate-800/90 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-md">
+          <div
+            className={`border rounded-3xl p-5 sm:p-6 backdrop-blur-md ${
+              isLight
+                ? 'bg-white/95 border-slate-200/90 shadow-xl'
+                : 'bg-[#121929]/95 border-slate-800/90 shadow-2xl'
+            }`}
+          >
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
               <div
-                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-emerald-500/40 flex items-center justify-center shrink-0 shadow-glow overflow-hidden ${
-                  menu.logoImage
-                    ? 'bg-slate-950'
-                    : 'bg-emerald-500/20 text-emerald-400'
-                }`}
+                style={{
+                  borderColor: theme.accentBorder,
+                  backgroundColor: menu.logoImage
+                    ? isLight
+                      ? '#f8fafc'
+                      : '#020617'
+                    : theme.accentSoftBg,
+                  color: theme.readableAccentText,
+                }}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 flex items-center justify-center shrink-0 shadow-md overflow-hidden"
               >
                 {menu.logoImage ? (
                   <img
@@ -608,67 +832,137 @@ export default function DigitalShowcasePage({
 
               <div className="flex-1 space-y-1.5">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
+                  <h1
+                    className={`text-xl sm:text-2xl font-extrabold tracking-tight ${headingTextClass}`}
+                  >
                     {menu.title}
                   </h1>
                   {menu.isOpen !== false ? (
-                    <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                    <span
+                      className={`border text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                        isLight
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      }`}
+                    >
                       {isCatalog ? '● Loja Aberta' : '● Aberto Agora'}
                     </span>
                   ) : (
-                    <span className="bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                    <span
+                      className={`border text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                        isLight
+                          ? 'bg-rose-50 border-rose-200 text-rose-700'
+                          : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                      }`}
+                    >
                       ● Fechado
                     </span>
                   )}
                   {isPro && (
-                    <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">
+                    <span
+                      className={`border text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase ${
+                        isLight
+                          ? 'bg-amber-50 border-amber-200 text-amber-700'
+                          : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                      }`}
+                    >
                       Verificado PRO
                     </span>
                   )}
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
+                <p className={`text-xs leading-relaxed max-w-xl ${mutedTextClass}`}>
                   {menu.description}
                 </p>
 
                 {/* Info Badges */}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1.5 text-xs text-slate-400">
+                <div
+                  className={`flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1.5 text-xs ${mutedTextClass}`}
+                >
                   {menu.openingHours && (
                     <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <Clock
+                        className={`w-3.5 h-3.5 ${
+                          isLight ? 'text-amber-600' : 'text-amber-400'
+                        }`}
+                      />
                       <span>{menu.openingHours}</span>
                     </span>
                   )}
                   {menu.address && (
                     <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                      <MapPin
+                        className="w-3.5 h-3.5"
+                        style={{ color: theme.readableAccentText }}
+                      />
                       <span>{menu.address}</span>
                     </span>
                   )}
                   {allowDelivery && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px] font-semibold">
+                    <span
+                      style={{
+                        backgroundColor: theme.accentSoftBg,
+                        borderColor: theme.accentBorder,
+                        color: theme.readableAccentText,
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold"
+                    >
                       <Truck className="w-3 h-3" />
                       <span>{isCatalog ? 'Fazemos Envio / Entrega' : 'Delivery'}</span>
                     </span>
                   )}
                   {allowPickup && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-semibold">
-                      <Store className="w-3 h-3 text-amber-400" />
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${pillMutedClass}`}
+                    >
+                      <Store
+                        className={`w-3 h-3 ${
+                          isLight ? 'text-amber-600' : 'text-amber-400'
+                        }`}
+                      />
                       <span>Retirada no Local</span>
                     </span>
                   )}
                   {allowOnSite && isCatalog && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-semibold">
-                      <ShoppingBag className="w-3 h-3 text-emerald-400" />
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${pillMutedClass}`}
+                    >
+                      <ShoppingBag
+                        className="w-3 h-3"
+                        style={{ color: theme.readableAccentText }}
+                      />
                       <span>Presencial</span>
+                    </span>
+                  )}
+                  {acceptedPaymentOptions.length > 0 && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md border text-[11px] font-semibold ${pillMutedClass}`}
+                    >
+                      <CreditCard
+                        className="w-3 h-3 shrink-0"
+                        style={{ color: theme.readableAccentText }}
+                      />
+                      <span>
+                        Aceita:{' '}
+                        {acceptedPaymentOptions
+                          .map((opt) => opt.shortLabel)
+                          .join(' • ')}
+                      </span>
                     </span>
                   )}
                   {menu.wifiInfo && (
                     <button
                       onClick={handleCopyWifi}
-                      className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 border border-slate-700 transition"
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition ${
+                        isLight
+                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                      }`}
                     >
-                      <Wifi className="w-3.5 h-3.5 text-emerald-400" />
+                      <Wifi
+                        className="w-3.5 h-3.5"
+                        style={{ color: theme.readableAccentText }}
+                      />
                       <span>
                         {copiedWifi ? '✅ Wi-Fi Copiado!' : `Wi-Fi: ${menu.wifiInfo}`}
                       </span>
@@ -678,40 +972,66 @@ export default function DigitalShowcasePage({
               </div>
             </div>
 
-            {/* Quick Assistance Bar (Waiter/Seller + Pay with PIX) */}
-            <div className="mt-5 pt-4 border-t border-slate-800/80 grid grid-cols-2 gap-3">
+            {/* Quick Assistance Bar (Waiter/Seller + Pay with PIX when enabled) */}
+            <div
+              className={`mt-5 pt-4 border-t grid gap-3 ${
+                isLight ? 'border-slate-200' : 'border-slate-800/80'
+              } ${canShowPixButton ? 'grid-cols-2' : 'grid-cols-1'}`}
+            >
               <button
                 type="button"
                 onClick={handlePrimaryAssist}
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition"
+                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
+                    : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-700'
+                }`}
               >
                 {isCatalog ? (
                   <>
-                    <MessageCircle className="w-4 h-4 text-emerald-400" />
+                    <MessageCircle
+                      className="w-4 h-4"
+                      style={{ color: theme.readableAccentText }}
+                    />
                     <span>Falar com Vendedor</span>
                   </>
                 ) : (
                   <>
-                    <Bell className="w-4 h-4 text-amber-400" />
+                    <Bell
+                      className={`w-4 h-4 ${
+                        isLight ? 'text-amber-600' : 'text-amber-400'
+                      }`}
+                    />
                     <span>Chamar Garçom</span>
                   </>
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsPixModalOpen(true)}
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 text-xs font-bold border border-emerald-500/30 transition"
-              >
-                <QrCode className="w-4 h-4 text-emerald-400" />
-                <span>{isCatalog ? 'Pagar com PIX' : 'Pagar Conta com PIX'}</span>
-              </button>
+              {canShowPixButton && (
+                <button
+                  type="button"
+                  onClick={() => setIsPixModalOpen(true)}
+                  style={{
+                    backgroundColor: theme.accentSoftBg,
+                    borderColor: theme.accentBorder,
+                    color: theme.readableAccentText,
+                  }}
+                  className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition hover:brightness-105"
+                >
+                  <QrCode className="w-4 h-4" />
+                  <span>{isCatalog ? 'Pagar com PIX' : 'Pagar Conta com PIX'}</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Search Input */}
           <div className="mt-4 relative">
-            <Search className="w-4 h-4 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2" />
+            <Search
+              className={`w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 ${
+                isLight ? 'text-slate-400' : 'text-slate-500'
+              }`}
+            />
             <input
               type="text"
               value={searchQuery}
@@ -721,12 +1041,20 @@ export default function DigitalShowcasePage({
                   ? 'Buscar produto, modelo 3D, roupa ou peça artesanal...'
                   : 'Buscar prato, ingrediente ou bebida...'
               }
-              className="w-full bg-[#121929] border border-slate-800 focus:border-emerald-500 rounded-2xl pl-11 pr-4 py-3 text-xs text-white outline-none transition"
+              className={`w-full border rounded-2xl pl-11 pr-4 py-3 text-xs outline-none transition ${
+                isLight
+                  ? 'bg-white border-slate-200 text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-slate-400'
+                  : 'bg-[#121929] border-slate-800 text-white placeholder:text-slate-500 focus:border-slate-600'
+              }`}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 ${
+                  isLight
+                    ? 'text-slate-400 hover:text-slate-700'
+                    : 'text-slate-400 hover:text-white'
+                }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -734,12 +1062,28 @@ export default function DigitalShowcasePage({
           </div>
 
           {/* Sticky Category Tabs */}
-          <div className="sticky top-0 z-30 bg-[#090d14]/95 backdrop-blur-md py-3.5 border-b border-slate-800/80 my-3 flex gap-2 overflow-x-auto no-scrollbar">
+          <div
+            className={`sticky top-0 z-30 backdrop-blur-md py-3.5 border-b my-3 flex gap-2 overflow-x-auto no-scrollbar ${
+              isLight
+                ? 'bg-slate-50/95 border-slate-200/90'
+                : 'bg-[#090d14]/95 border-slate-800/80'
+            }`}
+          >
             <button
               onClick={() => setActiveCategory('all')}
+              style={
+                activeCategory === 'all'
+                  ? {
+                      backgroundColor: theme.accentHex,
+                      color: theme.accentTextOnSolid,
+                    }
+                  : undefined
+              }
               className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                 activeCategory === 'all'
-                  ? 'bg-emerald-500 text-white shadow-glow'
+                  ? 'shadow-sm'
+                  : isLight
+                  ? 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
@@ -749,9 +1093,19 @@ export default function DigitalShowcasePage({
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
+                style={
+                  activeCategory === cat.id
+                    ? {
+                        backgroundColor: theme.accentHex,
+                        color: theme.accentTextOnSolid,
+                      }
+                    : undefined
+                }
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                   activeCategory === cat.id
-                    ? 'bg-emerald-500 text-white shadow-glow'
+                    ? 'shadow-sm'
+                    : isLight
+                    ? 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                     : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
@@ -763,8 +1117,14 @@ export default function DigitalShowcasePage({
           {/* Product Grid */}
           <div className="space-y-3.5">
             {filteredItems.length === 0 ? (
-              <div className="text-center py-12 bg-[#121929]/40 rounded-2xl border border-slate-800/60">
-                <p className="text-sm text-slate-400">
+              <div
+                className={`text-center py-12 rounded-2xl border ${
+                  isLight
+                    ? 'bg-white border-slate-200 shadow-sm'
+                    : 'bg-[#121929]/40 border-slate-800/60'
+                }`}
+              >
+                <p className={`text-sm ${mutedTextClass}`}>
                   Nenhum item encontrado para sua busca.
                 </p>
               </div>
@@ -776,9 +1136,15 @@ export default function DigitalShowcasePage({
                 return (
                   <React.Fragment key={item.id}>
                     <div
-                      className={`bg-[#121929]/75 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex gap-3.5 sm:gap-4 items-stretch justify-between transition shadow-sm ${
+                      className={`border rounded-2xl p-4 sm:p-5 flex gap-3.5 sm:gap-4 items-stretch justify-between transition shadow-sm ${
+                        isLight
+                          ? 'bg-white border-slate-200/90'
+                          : 'bg-[#121929]/75 border-slate-800/80'
+                      } ${
                         stock.canOrder
-                          ? 'hover:border-emerald-500/35'
+                          ? isLight
+                            ? 'hover:border-slate-300 hover:shadow-md'
+                            : 'hover:border-slate-700'
                           : 'opacity-60 grayscale-[40%]'
                       }`}
                     >
@@ -788,37 +1154,68 @@ export default function DigitalShowcasePage({
                       <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-sm sm:text-base font-bold text-white">
+                            <h3
+                              className={`text-sm sm:text-base font-bold ${headingTextClass}`}
+                            >
                               {item.name}
                             </h3>
                             {item.badge && stock.canOrder && (
-                              <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              <span
+                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isLight
+                                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                    : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                                }`}
+                              >
                                 {item.badge}
                               </span>
                             )}
                             {stock.canOrder && stock.isUnique && (
-                              <span className="bg-purple-500/15 border border-purple-500/35 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              <span
+                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isLight
+                                    ? 'bg-purple-50 border-purple-200 text-purple-700'
+                                    : 'bg-purple-500/15 border-purple-500/35 text-purple-300'
+                                }`}
+                              >
                                 💎 Peça Única
                               </span>
                             )}
                             {stock.canOrder && stock.isLimited && stock.badgeText && (
-                              <span className="bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              <span
+                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  isLight
+                                    ? 'bg-sky-50 border-sky-200 text-sky-700'
+                                    : 'bg-sky-500/15 border-sky-500/35 text-sky-300'
+                                }`}
+                              >
                                 📦 {stock.badgeText}
                               </span>
                             )}
                             {!stock.canOrder && (
-                              <span className="bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                              <span
+                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                                  isLight
+                                    ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                    : 'bg-rose-500/20 border-rose-500/30 text-rose-400'
+                                }`}
+                              >
                                 Esgotado
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                          <p
+                            className={`text-xs line-clamp-2 leading-relaxed ${mutedTextClass}`}
+                          >
                             {item.description}
                           </p>
                         </div>
 
                         <div className="pt-1 flex flex-wrap items-center justify-between gap-2.5">
-                          <span className="text-sm sm:text-base font-extrabold text-emerald-400">
+                          <span
+                            className="text-sm sm:text-base font-extrabold"
+                            style={{ color: theme.readableAccentText }}
+                          >
                             R$ {item.price.toFixed(2)}
                           </span>
                           {(imageOnLeft || !item.imageUrl) && (
@@ -854,7 +1251,11 @@ export default function DigitalShowcasePage({
 
           {/* Free watermark at bottom if not PRO */}
           {!isPro && (
-            <div className="mt-8 text-center text-xs text-slate-500 py-4 border-t border-slate-800">
+            <div
+              className={`mt-8 text-center text-xs text-slate-500 py-4 border-t ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}
+            >
               <p>
                 {isCatalog
                   ? 'Catálogo Digital criado gratuitamente com SpotQR.'
@@ -862,7 +1263,8 @@ export default function DigitalShowcasePage({
               </p>
               <Link
                 href="/"
-                className="text-emerald-400 font-semibold underline underline-offset-2"
+                style={{ color: theme.readableAccentText }}
+                className="font-semibold underline underline-offset-2"
               >
                 {isCatalog
                   ? 'Crie o catálogo da sua loja sem comissões'
@@ -885,14 +1287,24 @@ export default function DigitalShowcasePage({
         <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-slide-up">
           <button
             onClick={() => setIsCartOpen(true)}
-            className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white p-4 rounded-2xl shadow-glow-lg flex items-center justify-between transition-all"
+            style={{
+              backgroundColor: theme.accentHex,
+              color: theme.accentTextOnSolid,
+            }}
+            className="w-full p-4 rounded-2xl shadow-xl flex items-center justify-between transition-all hover:brightness-105 active:scale-[0.99]"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-black/20 rounded-xl flex items-center justify-center font-bold text-sm">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${
+                  theme.accentTextOnSolid === '#0f172a'
+                    ? 'bg-black/15'
+                    : 'bg-white/20'
+                }`}
+              >
                 {totalItems}
               </div>
               <div className="text-left">
-                <span className="text-xs text-emerald-100 block">
+                <span className="text-xs opacity-85 block">
                   {isCatalog ? 'Ver Carrinho / Pedido' : 'Ver Comanda / Sacola'}
                 </span>
                 <span className="text-sm font-extrabold">
@@ -912,30 +1324,46 @@ export default function DigitalShowcasePage({
       {/* PIX Bill Payment Modal */}
       {isPixModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-sm bg-[#121929] border border-slate-700 rounded-3xl p-6 text-center shadow-2xl space-y-4">
+          <div
+            className={`relative w-full max-w-sm border rounded-3xl p-6 text-center shadow-2xl space-y-4 ${modalBoxClass}`}
+          >
             <button
               onClick={() => setIsPixModalOpen(false)}
-              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+              className={`absolute top-4 right-4 p-1.5 rounded-lg transition ${
+                isLight
+                  ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+            <div
+              style={{
+                backgroundColor: theme.accentSoftBg,
+                color: theme.readableAccentText,
+              }}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto"
+            >
               <QrCode className="w-6 h-6" />
             </div>
 
             <div>
-              <h3 className="text-lg font-extrabold text-white">
+              <h3 className={`text-lg font-extrabold ${headingTextClass}`}>
                 {isCatalog ? 'Pagamento via PIX' : 'Pagamento PIX na Mesa'}
               </h3>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className={`text-xs mt-1 ${mutedTextClass}`}>
                 Escaneie ou copie a chave PIX oficial de{' '}
-                <strong className="text-white">{menu.title}</strong>
+                <strong className={headingTextClass}>{menu.title}</strong>
               </p>
             </div>
 
             {pixQrUrl && (
-              <div className="bg-white p-3 rounded-2xl inline-block mx-auto shadow-lg">
+              <div
+                className={`bg-white p-3 rounded-2xl inline-block mx-auto ${
+                  isLight ? 'border border-slate-200 shadow-md' : 'shadow-lg'
+                }`}
+              >
                 <img
                   src={pixQrUrl}
                   alt="QR Code PIX"
@@ -944,11 +1372,20 @@ export default function DigitalShowcasePage({
               </div>
             )}
 
-            <div className="text-xs text-slate-300 bg-slate-900 border border-slate-800 rounded-xl p-3">
+            <div
+              className={`text-xs border rounded-xl p-3 ${
+                isLight
+                  ? 'text-slate-700 bg-slate-100 border-slate-200'
+                  : 'text-slate-300 bg-slate-900 border-slate-800'
+              }`}
+            >
               <span className="text-slate-500 block text-[10px] uppercase mb-0.5">
                 Chave PIX Oficial:
               </span>
-              <strong className="font-mono text-emerald-400">
+              <strong
+                className="font-mono"
+                style={{ color: theme.readableAccentText }}
+              >
                 {menu.pixKey || 'financeiro@spotqr.com.br'}
               </strong>
             </div>
@@ -961,7 +1398,11 @@ export default function DigitalShowcasePage({
                 setCopiedPix(true);
                 setTimeout(() => setCopiedPix(false), 2500);
               }}
-              className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: theme.accentHex,
+                color: theme.accentTextOnSolid,
+              }}
+              className="w-full py-3 rounded-xl text-xs font-bold transition hover:brightness-105 flex items-center justify-center gap-2"
             >
               {copiedPix ? (
                 <>
@@ -982,17 +1423,30 @@ export default function DigitalShowcasePage({
       {/* Cart & WhatsApp Checkout Drawer/Modal */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4">
-          <div className="relative w-full max-w-lg bg-[#121929] border border-slate-700 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] flex flex-col">
-            <div className="shrink-0 flex items-center justify-between pb-4 border-b border-slate-800">
+          <div
+            className={`relative w-full max-w-lg border rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] flex flex-col ${modalBoxClass}`}
+          >
+            <div
+              className={`shrink-0 flex items-center justify-between pb-4 border-b ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}
+            >
               <div className="flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-bold text-white">
+                <ShoppingBag
+                  className="w-5 h-5"
+                  style={{ color: theme.readableAccentText }}
+                />
+                <h3 className={`text-base font-bold ${headingTextClass}`}>
                   Finalizar Pedido
                 </h3>
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                className={`p-1.5 rounded-lg transition ${
+                  isLight
+                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1001,7 +1455,11 @@ export default function DigitalShowcasePage({
             {/* Order Mode Selector (only renders modes explicitly enabled by owner) */}
             {enabledModes.length > 0 && (
               <div
-                className={`shrink-0 grid gap-2 my-3 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 ${
+                className={`shrink-0 grid gap-2 my-3 p-1.5 rounded-2xl border ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-200'
+                    : 'bg-slate-900 border-slate-800'
+                } ${
                   enabledModes.length === 1
                     ? 'grid-cols-1'
                     : enabledModes.length === 2
@@ -1032,9 +1490,19 @@ export default function DigitalShowcasePage({
                       key={modeKey}
                       type="button"
                       onClick={() => setOrderMode(modeKey)}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: theme.accentHex,
+                              color: theme.accentTextOnSolid,
+                            }
+                          : undefined
+                      }
                       className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition ${
                         isActive
-                          ? 'bg-emerald-500 text-white shadow-sm'
+                          ? 'shadow-sm'
+                          : isLight
+                          ? 'text-slate-600 hover:text-slate-900'
                           : 'text-slate-400 hover:text-white'
                       }`}
                     >
@@ -1054,18 +1522,29 @@ export default function DigitalShowcasePage({
                 return (
                   <div
                     key={c.item.id}
-                    className="flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800"
+                    className={`flex items-center justify-between p-3 rounded-xl border ${
+                      isLight
+                        ? 'bg-slate-50 border-slate-200'
+                        : 'bg-slate-900/60 border-slate-800'
+                    }`}
                   >
                     <div>
-                      <h4 className="text-xs font-bold text-white">
+                      <h4 className={`text-xs font-bold ${headingTextClass}`}>
                         {c.item.name}
                       </h4>
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-emerald-400 font-semibold">
+                        <span
+                          className="text-[11px] font-semibold"
+                          style={{ color: theme.readableAccentText }}
+                        >
                           R$ {(c.item.price * c.quantity).toFixed(2)}
                         </span>
                         {(stock.isUnique || stock.isLimited) && (
-                          <span className="text-[10px] text-amber-300 font-semibold">
+                          <span
+                            className={`text-[10px] font-semibold ${
+                              isLight ? 'text-amber-700' : 'text-amber-300'
+                            }`}
+                          >
                             {stock.isUnique
                               ? '• Peça única (máx. 1)'
                               : `• Limite: ${stock.maxQuantity} unid.`}
@@ -1074,14 +1553,26 @@ export default function DigitalShowcasePage({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-2 py-1">
+                    <div
+                      className={`flex items-center gap-2 rounded-lg px-2 py-1 ${
+                        isLight
+                          ? 'bg-white border border-slate-200'
+                          : 'bg-slate-800'
+                      }`}
+                    >
                       <button
                         onClick={() => removeFromCart(c.item.id)}
-                        className="text-slate-400 hover:text-white p-0.5"
+                        className={`p-0.5 transition ${
+                          isLight
+                            ? 'text-slate-500 hover:text-slate-900'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
                       >
                         <Minus className="w-3 h-3" />
                       </button>
-                      <span className="text-xs font-bold px-1 text-white">
+                      <span
+                        className={`text-xs font-bold px-1 ${headingTextClass}`}
+                      >
                         {c.quantity}
                       </span>
                       <button
@@ -1094,7 +1585,11 @@ export default function DigitalShowcasePage({
                         }
                         className={`p-0.5 transition ${
                           reachedMax
-                            ? 'text-slate-600 cursor-not-allowed'
+                            ? isLight
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-600 cursor-not-allowed'
+                            : isLight
+                            ? 'text-slate-500 hover:text-slate-900'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -1108,42 +1603,28 @@ export default function DigitalShowcasePage({
               {/* Dynamic Fields by Mode */}
               <div className="pt-2 space-y-3">
                 {enabledModes.length === 0 && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Seu Nome:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Carlos"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Forma de Pagamento:
-                      </label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) =>
-                          setPaymentMethod(e.target.value as any)
-                        }
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                      >
-                        <option value="PIX">PIX</option>
-                        <option value="Cartão">Cartão</option>
-                        <option value="Dinheiro">Dinheiro</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label
+                      className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                    >
+                      Seu Nome:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Carlos"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                    />
                   </div>
                 )}
 
                 {enabledModes.includes('table') && orderMode === 'table' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      <label
+                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                      >
                         {isCatalog ? 'Balcão / Stand (opcional):' : 'Número da Mesa:'}
                       </label>
                       <input
@@ -1151,11 +1632,13 @@ export default function DigitalShowcasePage({
                         placeholder={isCatalog ? 'Ex: Balcão Principal' : 'Ex: Mesa 04'}
                         value={tableNumber}
                         onChange={(e) => setTableNumber(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      <label
+                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                      >
                         Seu Nome:
                       </label>
                       <input
@@ -1163,7 +1646,7 @@ export default function DigitalShowcasePage({
                         placeholder="Ex: Carlos"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
                       />
                     </div>
                   </div>
@@ -1172,7 +1655,9 @@ export default function DigitalShowcasePage({
                 {enabledModes.includes('delivery') && orderMode === 'delivery' && (
                   <div className="space-y-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
+                      <label
+                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                      >
                         Endereço Completo para Entrega / Envio:
                       </label>
                       <input
@@ -1180,77 +1665,50 @@ export default function DigitalShowcasePage({
                         placeholder="Rua, Número, Bairro, Cidade / CEP"
                         value={deliveryAddress}
                         onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-semibold text-slate-300 block mb-1">
-                          Seu Nome:
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ex: Carlos"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-semibold text-slate-300 block mb-1">
-                          Forma de Pagamento:
-                        </label>
-                        <select
-                          value={paymentMethod}
-                          onChange={(e) =>
-                            setPaymentMethod(e.target.value as any)
-                          }
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                        >
-                          <option value="PIX">PIX</option>
-                          <option value="Cartão">Cartão na Entrega</option>
-                          <option value="Dinheiro">Dinheiro</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {enabledModes.includes('pickup') && orderMode === 'pickup' && (
-                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Seu Nome para Retirada:
+                      <label
+                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                      >
+                        Seu Nome:
                       </label>
                       <input
                         type="text"
                         placeholder="Ex: Carlos"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
                       />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-300 block mb-1">
-                        Pagamento:
-                      </label>
-                      <select
-                        value={paymentMethod}
-                        onChange={(e) =>
-                          setPaymentMethod(e.target.value as any)
-                        }
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
-                      >
-                        <option value="PIX">PIX</option>
-                        <option value="Cartão">Cartão no Balcão</option>
-                        <option value="Dinheiro">Dinheiro</option>
-                      </select>
                     </div>
                   </div>
                 )}
 
+                {enabledModes.includes('pickup') && orderMode === 'pickup' && (
+                  <div>
+                    <label
+                      className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                    >
+                      Seu Nome para Retirada:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: Carlos"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                    />
+                  </div>
+                )}
+
+                {/* Accepted Payment Methods (strictly configured by advertiser) */}
+                {renderPaymentSelector()}
+
                 <div>
-                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                  <label
+                    className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                  >
                     {isCatalog
                       ? 'Tamanho, Cor ou Personalização (opcional):'
                       : 'Observações do Pedido (opcional):'}
@@ -1264,32 +1722,45 @@ export default function DigitalShowcasePage({
                     }
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
                   />
                 </div>
               </div>
             </div>
 
             {/* Total and Submit */}
-            <div className="shrink-0 pt-4 border-t border-slate-800 space-y-3">
+            <div
+              className={`shrink-0 pt-4 border-t space-y-3 ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}
+            >
               {deliveryFee > 0 && (
-                <div className="flex items-center justify-between text-xs text-slate-400">
+                <div
+                  className={`flex items-center justify-between text-xs ${mutedTextClass}`}
+                >
                   <span>{isCatalog ? 'Frete / Entrega:' : 'Taxa de Entrega:'}</span>
                   <span>+ R$ {deliveryFee.toFixed(2)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-300 font-semibold">
+                <span className={`font-semibold ${labelTextClass}`}>
                   Total do Pedido:
                 </span>
-                <span className="text-lg font-extrabold text-emerald-400">
+                <span
+                  className="text-lg font-extrabold"
+                  style={{ color: theme.readableAccentText }}
+                >
                   R$ {totalPrice.toFixed(2)}
                 </span>
               </div>
 
               <button
                 onClick={handleSendWhatsAppOrder}
-                className="w-full py-3.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition shadow-glow flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: theme.accentHex,
+                  color: theme.accentTextOnSolid,
+                }}
+                className="w-full py-3.5 px-4 rounded-xl text-xs font-bold transition shadow-md hover:brightness-105 flex items-center justify-center gap-2"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Enviar Pedido pelo WhatsApp</span>
@@ -1310,15 +1781,19 @@ export default function DigitalShowcasePage({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#121929] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl"
+            className={`relative w-full max-w-2xl max-h-[92vh] flex flex-col border rounded-3xl overflow-hidden shadow-2xl ${modalBoxClass}`}
           >
             {/* Header */}
-            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-slate-800 bg-[#0d1320]">
+            <div
+              className={`shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b ${modalSubBarClass}`}
+            >
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
+                <h3
+                  className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
+                >
                   {zoomedItem.name}
                 </h3>
-                <p className="text-[11px] text-slate-400">
+                <p className={`text-[11px] ${mutedTextClass}`}>
                   Clique na foto ou use os botões para aproximar
                 </p>
               </div>
@@ -1334,11 +1809,20 @@ export default function DigitalShowcasePage({
                   disabled={photoZoomScale <= 1}
                   aria-label="Diminuir zoom"
                   title="Diminuir zoom"
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                  className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
+                    isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
+                  }`}
                 >
                   <ZoomOut className="w-4 h-4" />
                 </button>
-                <span className="px-2 py-1 text-[11px] font-mono font-bold text-emerald-300 bg-slate-900 border border-slate-800 rounded-lg min-w-[3.2rem] text-center">
+                <span
+                  style={{
+                    color: theme.readableAccentText,
+                    backgroundColor: isLight ? '#ffffff' : '#0f172a',
+                    borderColor: theme.accentBorder,
+                  }}
+                  className="px-2 py-1 text-[11px] font-mono font-bold border rounded-lg min-w-[3.2rem] text-center"
+                >
                   {Math.round(photoZoomScale * 100)}%
                 </span>
                 <button
@@ -1351,7 +1835,9 @@ export default function DigitalShowcasePage({
                   disabled={photoZoomScale >= 2.5}
                   aria-label="Aumentar zoom"
                   title="Aumentar zoom"
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                  className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
+                    isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
+                  }`}
                 >
                   <ZoomIn className="w-4 h-4" />
                 </button>
@@ -1360,7 +1846,11 @@ export default function DigitalShowcasePage({
                   onClick={closePhotoZoom}
                   aria-label="Fechar foto ampliada"
                   title="Fechar"
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition ml-1"
+                  className={`p-2 rounded-xl border transition ml-1 ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-200'
+                      : 'bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border-slate-700'
+                  }`}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1368,7 +1858,11 @@ export default function DigitalShowcasePage({
             </div>
 
             {/* Interactive Zoom Image Stage */}
-            <div className="flex-1 min-h-0 overflow-auto bg-[#070a10] p-3 sm:p-5 flex">
+            <div
+              className={`flex-1 min-h-0 overflow-auto p-3 sm:p-5 flex ${
+                isLight ? 'bg-slate-100' : 'bg-[#070a10]'
+              }`}
+            >
               <img
                 src={zoomedItem.imageUrl}
                 alt={zoomedItem.name}
@@ -1399,18 +1893,25 @@ export default function DigitalShowcasePage({
             </div>
 
             {/* Product Details & Direct Add Footer */}
-            <div className="shrink-0 p-4 sm:px-5 sm:py-4 border-t border-slate-800 bg-[#0d1320] space-y-3">
+            <div
+              className={`shrink-0 p-4 sm:px-5 sm:py-4 border-t space-y-3 ${modalSubBarClass}`}
+            >
               {zoomedItem.description && (
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className={`text-xs leading-relaxed ${labelTextClass}`}>
                   {zoomedItem.description}
                 </p>
               )}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">
+                  <span
+                    className={`text-[10px] uppercase tracking-wider font-semibold block ${mutedTextClass}`}
+                  >
                     Preço
                   </span>
-                  <span className="text-lg font-extrabold text-emerald-400">
+                  <span
+                    className="text-lg font-extrabold"
+                    style={{ color: theme.readableAccentText }}
+                  >
                     R$ {zoomedItem.price.toFixed(2)}
                   </span>
                 </div>

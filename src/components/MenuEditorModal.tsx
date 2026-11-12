@@ -26,16 +26,32 @@ import {
   ArrowDown,
   Crop,
   Download,
+  Sun,
+  Moon,
+  Palette,
+  ShoppingCart,
 } from 'lucide-react';
 import {
   RestaurantMenu,
   MenuItem,
   MenuCategory,
   ProductStockMode,
+  ShowcasePaymentMethod,
   QRConfig,
 } from '@/lib/types';
 import { ImageUploadPreset } from '@/lib/image-upload';
 import { getItemStockInfo } from '@/lib/stock';
+import {
+  SHOWCASE_PAYMENT_OPTIONS,
+  getAcceptedPaymentsList,
+} from '@/lib/payments';
+import {
+  SHOWCASE_COLOR_PRESETS,
+  normalizeHexColor,
+  resolveShowcaseTheme,
+  getContrastTextColor,
+  getReadableAccentTextColor,
+} from '@/lib/theme';
 import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import ImageCropModal from './ImageCropModal';
 
@@ -135,6 +151,16 @@ export default function MenuEditorModal({
   const allowDelivery = menu?.allowDelivery ?? defaultFulfill;
   const allowPickup = menu?.allowPickup ?? defaultFulfill;
   const allowOnSite = menu?.allowOnSite ?? defaultFulfill;
+  const acceptedPayments = getAcceptedPaymentsList(menu);
+
+  const toggleAcceptedPayment = (method: ShowcasePaymentMethod) => {
+    if (!menu) return;
+    const current = getAcceptedPaymentsList(menu);
+    const next = current.includes(method)
+      ? current.filter((m) => m !== method)
+      : [...current, method];
+    setMenu({ ...menu, acceptedPayments: next });
+  };
 
   useEffect(() => {
     if (!isOpen || !slug) return;
@@ -180,6 +206,12 @@ export default function MenuEditorModal({
     allowDelivery: source.allowDelivery ?? !( (source.mode || mode) === 'catalog' ),
     allowPickup: source.allowPickup ?? !( (source.mode || mode) === 'catalog' ),
     allowOnSite: source.allowOnSite ?? !( (source.mode || mode) === 'catalog' ),
+    acceptedPayments: getAcceptedPaymentsList(source),
+    themeMode: source.themeMode === 'light' ? 'light' : 'dark',
+    themeColor: normalizeHexColor(
+      source.themeColor,
+      (source.mode || mode) === 'catalog' ? '#10b981' : '#16a34a'
+    ),
     productImagePosition: source.productImagePosition || 'right',
     updatedAt: new Date().toISOString(),
   });
@@ -536,7 +568,7 @@ export default function MenuEditorModal({
             },
             {
               id: 'branding',
-              label: '🎨 Logo & Imagem de Fundo',
+              label: '🎨 Visual, Logo & Cores',
             },
             { id: 'categories', label: `📂 Categorias (${menu?.categories.length || 0})` },
             {
@@ -598,89 +630,119 @@ export default function MenuEditorModal({
               {/* TAB 1: PRODUCTS / ITEMS */}
               {activeTab === 'items' && (
                 <div className="space-y-4">
-                  {/* Quick Visual & Fulfillment Bar: Photo Side + Shipping/Pickup */}
-                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[11px] font-bold text-slate-300">
-                        📸 Posição da Foto:
-                      </span>
-                      <div className="inline-flex bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
+                  {/* Quick Visual, Fulfillment & Payment Bar */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-300">
+                          📸 Posição da Foto:
+                        </span>
+                        <div className="inline-flex bg-slate-950 border border-slate-800 rounded-xl p-1 gap-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMenu({ ...menu, productImagePosition: 'left' })
+                            }
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
+                              imagePos === 'left'
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            ◧ Lado Esquerdo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMenu({ ...menu, productImagePosition: 'right' })
+                            }
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
+                              imagePos === 'right'
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            ◨ Lado Direito
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-slate-300">
+                          🚚 Entrega / Retirada no Menu:
+                        </span>
                         <button
                           type="button"
                           onClick={() =>
-                            setMenu({ ...menu, productImagePosition: 'left' })
+                            setMenu({ ...menu, allowDelivery: !allowDelivery })
                           }
-                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
-                            imagePos === 'left'
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-white'
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                            allowDelivery
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
                           }`}
                         >
-                          ◧ Lado Esquerdo
+                          {allowDelivery ? '✅' : '○'}{' '}
+                          {isCatalog ? 'Fazemos Envio' : 'Delivery'}
                         </button>
+
                         <button
                           type="button"
                           onClick={() =>
-                            setMenu({ ...menu, productImagePosition: 'right' })
+                            setMenu({ ...menu, allowPickup: !allowPickup })
                           }
-                          className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
-                            imagePos === 'right'
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'text-slate-400 hover:text-white'
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                            allowPickup
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
                           }`}
                         >
-                          ◨ Lado Direito
+                          {allowPickup ? '✅' : '○'} Retirada no Local
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({ ...menu, allowOnSite: !allowOnSite })
+                          }
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                            allowOnSite
+                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          {allowOnSite ? '✅' : '○'}{' '}
+                          {isCatalog ? 'Presencial / Balcão' : 'Na Mesa'}
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="pt-2.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] font-bold text-slate-300">
-                        🚚 Entrega / Retirada no Menu:
+                        💳 Pagamentos Aceitos:
                       </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMenu({ ...menu, allowDelivery: !allowDelivery })
-                        }
-                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                          allowDelivery
-                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        {allowDelivery ? '✅' : '○'}{' '}
-                        {isCatalog ? 'Fazemos Envio' : 'Delivery'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMenu({ ...menu, allowPickup: !allowPickup })
-                        }
-                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                          allowPickup
-                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        {allowPickup ? '✅' : '○'} Retirada no Local
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMenu({ ...menu, allowOnSite: !allowOnSite })
-                        }
-                        className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                          allowOnSite
-                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                            : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        {allowOnSite ? '✅' : '○'}{' '}
-                        {isCatalog ? 'Presencial / Balcão' : 'Na Mesa'}
-                      </button>
+                      {SHOWCASE_PAYMENT_OPTIONS.map((opt) => {
+                        const enabled = acceptedPayments.includes(opt.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => toggleAcceptedPayment(opt.id)}
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                              enabled
+                                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                                : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            {enabled ? '✅' : '○'} {opt.icon} {opt.shortLabel}
+                          </button>
+                        );
+                      })}
+                      {acceptedPayments.length === 0 && (
+                        <span className="text-[10px] text-amber-300 font-semibold">
+                          (Nenhum marcado: pedido irá como &ldquo;A combinar no WhatsApp&rdquo;)
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1140,49 +1202,257 @@ export default function MenuEditorModal({
                 </div>
               )}
 
-              {/* TAB: BRANDING (LOGO & BACKGROUND COVER) */}
+              {/* TAB: BRANDING (THEME, COLORS, LOGO & BACKGROUND COVER) */}
               {activeTab === 'branding' && (() => {
                 const defaultCover = isCatalog
                   ? '/catalogo/cover-loja.jpg'
                   : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80';
+                const theme = resolveShowcaseTheme(
+                  menu.themeMode,
+                  menu.themeColor,
+                  isCatalog ? '#10b981' : '#16a34a'
+                );
                 return (
                   <div className="space-y-6 max-w-3xl">
-                    {/* Live Header Mini Preview */}
-                    <div className="rounded-2xl overflow-hidden border border-slate-800 bg-[#090d14]">
-                      <div className="relative h-28 sm:h-36 bg-slate-900">
+                    {/* Live Theme, Color & Header Mini Preview */}
+                    <div
+                      className={`rounded-2xl overflow-hidden border transition-colors ${
+                        theme.isLight
+                          ? 'border-slate-300 bg-slate-50'
+                          : 'border-slate-800 bg-[#090d14]'
+                      }`}
+                    >
+                      <div className="relative h-28 sm:h-32 bg-slate-900">
                         <img
                           src={menu.coverImage || defaultCover}
                           alt="Capa da vitrine"
-                          className="w-full h-full object-cover opacity-65"
+                          className={`w-full h-full object-cover ${
+                            theme.isLight ? 'opacity-80' : 'opacity-65'
+                          }`}
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#090d14] via-[#090d14]/40 to-transparent" />
-                        <span className="absolute top-2.5 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-300 border border-white/10">
-                          Prévia do Cabeçalho
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: theme.isLight
+                              ? 'linear-gradient(to top, #f8fafc 4%, rgba(248,250,252,0.35) 55%, transparent 100%)'
+                              : 'linear-gradient(to top, #090d14 4%, rgba(9,13,20,0.4) 55%, transparent 100%)',
+                          }}
+                        />
+                        <span className="absolute top-2.5 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-200 border border-white/15">
+                          Prévia ao Vivo ({theme.isLight ? '☀️ Claro' : '🌙 Escuro'})
                         </span>
                       </div>
-                      <div className="px-4 pb-4 -mt-8 relative z-10">
-                        <div className="bg-[#121929]/95 border border-slate-800 rounded-2xl p-4 flex items-center gap-3.5 shadow-xl">
-                          <div className="w-14 h-14 rounded-xl border-2 border-emerald-500/40 bg-slate-950 flex items-center justify-center overflow-hidden shrink-0">
-                            {menu.logoImage ? (
-                              <img
-                                src={menu.logoImage}
-                                alt="Logo"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : isCatalog ? (
-                              <ShoppingBag className="w-7 h-7 text-emerald-400" />
-                            ) : (
-                              <Utensils className="w-7 h-7 text-emerald-400" />
-                            )}
+
+                      <div className="px-4 pb-4 -mt-8 relative z-10 space-y-2.5">
+                        <div
+                          className={`rounded-2xl p-3.5 flex items-center justify-between gap-3 border shadow-lg transition-colors ${
+                            theme.isLight
+                              ? 'bg-white border-slate-200'
+                              : 'bg-[#121929]/95 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div
+                              className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center overflow-hidden shrink-0 ${
+                                theme.isLight ? 'bg-slate-100' : 'bg-slate-950'
+                              }`}
+                              style={{ borderColor: theme.accentHex }}
+                            >
+                              {menu.logoImage ? (
+                                <img
+                                  src={menu.logoImage}
+                                  alt="Logo"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : isCatalog ? (
+                                <ShoppingBag
+                                  className="w-6 h-6"
+                                  style={{ color: theme.readableAccentText }}
+                                />
+                              ) : (
+                                <Utensils
+                                  className="w-6 h-6"
+                                  style={{ color: theme.readableAccentText }}
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <h4
+                                className={`text-sm font-extrabold truncate ${
+                                  theme.isLight ? 'text-slate-900' : 'text-white'
+                                }`}
+                              >
+                                {menu.title}
+                              </h4>
+                              <p
+                                className={`text-[11px] line-clamp-1 ${
+                                  theme.isLight ? 'text-slate-500' : 'text-slate-400'
+                                }`}
+                              >
+                                {menu.description}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <h4 className="text-sm font-extrabold text-white truncate">
-                              {menu.title}
+
+                          <div className="hidden sm:flex items-center gap-2 shrink-0">
+                            <span
+                              className="text-xs font-extrabold"
+                              style={{ color: theme.readableAccentText }}
+                            >
+                              R$ 49,90
+                            </span>
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold shadow-sm"
+                              style={{
+                                backgroundColor: theme.accentHex,
+                                color: theme.accentTextOnSolid,
+                              }}
+                            >
+                              <ShoppingCart className="w-3 h-3" />
+                              <span>Adicionar +</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Theme Mode (Light / Dark) & Brand Accent Color Picker */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Light / Dark Mode Selector */}
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                            {theme.isLight ? (
+                              <Sun className="w-4 h-4 text-amber-400" />
+                            ) : (
+                              <Moon className="w-4 h-4 text-sky-400" />
+                            )}
+                            <span>Tema da Página do Cliente</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Escolha se os clientes verão seu{' '}
+                            {isCatalog ? 'catálogo' : 'cardápio'} no estilo escuro ou claro.
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setMenu({ ...menu, themeMode: 'dark' })}
+                            className={`p-3 rounded-xl border text-left transition ${
+                              !theme.isLight
+                                ? 'bg-[#090d14] border-emerald-500 ring-1 ring-emerald-500/40'
+                                : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <Moon className="w-4 h-4 text-sky-400" />
+                              {!theme.isLight && (
+                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              )}
+                            </div>
+                            <span className="text-xs font-extrabold text-white block">
+                              Tema Escuro
+                            </span>
+                            <span className="text-[10px] text-slate-400 leading-tight block mt-0.5">
+                              Elegante &amp; moderno
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setMenu({ ...menu, themeMode: 'light' })}
+                            className={`p-3 rounded-xl border text-left transition ${
+                              theme.isLight
+                                ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/40 shadow-md'
+                                : 'bg-slate-100/95 border-slate-300/60 hover:bg-white'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <Sun className="w-4 h-4 text-amber-500" />
+                              {theme.isLight && (
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              )}
+                            </div>
+                            <span className="text-xs font-extrabold text-slate-900 block">
+                              Tema Claro
+                            </span>
+                            <span className="text-[10px] text-slate-600 leading-tight block mt-0.5">
+                              Clean &amp; luminoso
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Brand Color Selector */}
+                      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                              <Palette className="w-4 h-4 text-emerald-400" />
+                              <span>Cor Predominante da Marca</span>
                             </h4>
-                            <p className="text-[11px] text-slate-400 line-clamp-1">
-                              {menu.description}
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Define botões, preços, categorias ativas e detalhes.
                             </p>
                           </div>
+                          <span
+                            className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border shrink-0"
+                            style={{
+                              backgroundColor: theme.accentSoftBg,
+                              borderColor: theme.accentBorder,
+                              color: getReadableAccentTextColor(theme.accentHex, false),
+                            }}
+                          >
+                            {theme.accentHex.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {SHOWCASE_COLOR_PRESETS.map((preset) => {
+                            const isSelected =
+                              theme.accentHex.toLowerCase() ===
+                              preset.hex.toLowerCase();
+                            return (
+                              <button
+                                key={preset.hex}
+                                type="button"
+                                onClick={() =>
+                                  setMenu({ ...menu, themeColor: preset.hex })
+                                }
+                                title={preset.name}
+                                aria-label={`Cor ${preset.name}`}
+                                className={`w-7 h-7 rounded-full border-2 transition flex items-center justify-center ${
+                                  isSelected
+                                    ? 'border-white scale-110 ring-2 ring-white/30'
+                                    : 'border-slate-700 hover:scale-105'
+                                }`}
+                                style={{ backgroundColor: preset.hex }}
+                              >
+                                {isSelected && (
+                                  <Check
+                                    className="w-3.5 h-3.5"
+                                    style={{ color: getContrastTextColor(preset.hex) }}
+                                  />
+                                )}
+                              </button>
+                            );
+                          })}
+
+                          <label
+                            title="Escolher qualquer cor personalizada"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950 border border-slate-700 hover:border-slate-500 text-[11px] font-semibold text-slate-200 cursor-pointer transition"
+                          >
+                            <input
+                              type="color"
+                              value={theme.accentHex}
+                              onChange={(e) =>
+                                setMenu({ ...menu, themeColor: e.target.value })
+                              }
+                              className="w-4 h-4 rounded-full bg-transparent border-0 p-0 cursor-pointer"
+                            />
+                            <span>Personalizar</span>
+                          </label>
                         </div>
                       </div>
                     </div>
@@ -1683,6 +1953,40 @@ export default function MenuEditorModal({
                           </span>
                         </label>
                       </div>
+                    </div>
+
+                    <div className="md:col-span-2 pt-3 border-t border-slate-800/80">
+                      <span className="text-xs font-bold text-white block mb-1">
+                        💳 Formas de Pagamento que Você Aceita
+                      </span>
+                      <p className="text-[11px] text-slate-400 mb-2.5">
+                        Só aparecerão para seu cliente escolher na hora do pedido as opções marcadas abaixo:
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                        {SHOWCASE_PAYMENT_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.id}
+                            className="flex items-center gap-2 text-xs text-slate-200 cursor-pointer bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2 hover:border-slate-700 transition"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={acceptedPayments.includes(opt.id)}
+                              onChange={() => toggleAcceptedPayment(opt.id)}
+                              className="accent-emerald-500 w-4 h-4 shrink-0"
+                            />
+                            <span>
+                              {opt.icon} {opt.label}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      {acceptedPayments.includes('pix') &&
+                        !menu.pixKey?.trim() && (
+                          <p className="text-[11px] text-amber-300 mt-2">
+                            💡 Você marcou <strong>PIX</strong> — preencha sua{' '}
+                            <strong>Chave PIX</strong> acima para liberar o QR Code PIX no topo da página.
+                          </p>
+                        )}
                     </div>
                   </div>
 

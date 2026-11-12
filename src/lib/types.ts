@@ -66,6 +66,15 @@ export interface QRConfig {
 
 export type ProductStockMode = 'unlimited' | 'limited' | 'unique';
 
+export type ShowcaseThemeMode = 'dark' | 'light';
+
+export type ShowcasePaymentMethod =
+  | 'pix'
+  | 'credit_card'
+  | 'debit_card'
+  | 'cash'
+  | 'payment_link';
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -95,6 +104,7 @@ export interface RestaurantMenu {
   currency: string;
   tableNumberPrompt: boolean;
   themeColor: string;
+  themeMode?: ShowcaseThemeMode;
   coverImage?: string;
   logoImage?: string;
   categories: MenuCategory[];
@@ -108,6 +118,7 @@ export interface RestaurantMenu {
   allowDelivery?: boolean;
   allowPickup?: boolean;
   allowOnSite?: boolean;
+  acceptedPayments?: ShowcasePaymentMethod[];
   productImagePosition?: 'left' | 'right';
   ownerId?: string;
   ownerEmail?: string;

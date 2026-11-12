@@ -11,6 +11,7 @@ import {
   DeveloperNotificationType,
   PaymentRecord,
 } from './types';
+import { DEMO_PAYMENTS } from './payments';
 
 interface DatabaseSchema {
   dynamicQRs: Record<string, DynamicQRRecord>;
@@ -55,6 +56,7 @@ export function createStarterMenu(
     currency: 'R$',
     tableNumberPrompt: true,
     themeColor: '#16a34a',
+    themeMode: 'dark',
     address: 'Rua Gastronômica, 142 - Jardins, São Paulo',
     wifiInfo: 'Cliente_VIP | Senha: bemvindo2026',
     pixKey,
@@ -64,6 +66,7 @@ export function createStarterMenu(
     allowDelivery: true,
     allowPickup: true,
     allowOnSite: true,
+    acceptedPayments: slug === 'demo-restaurante' ? DEMO_PAYMENTS : [],
     productImagePosition: 'right',
     updatedAt: new Date().toISOString(),
     categories: [
@@ -199,6 +202,7 @@ export function createStarterCatalog(
     currency: 'R$',
     tableNumberPrompt: false,
     themeColor: '#10b981',
+    themeMode: 'dark',
     coverImage: '/catalogo/cover-loja.jpg',
     address: 'São Paulo - SP',
     wifiInfo: '',
@@ -209,6 +213,7 @@ export function createStarterCatalog(
     allowDelivery: false,
     allowPickup: false,
     allowOnSite: false,
+    acceptedPayments: slug === 'demo-catalogo' ? DEMO_PAYMENTS : [],
     productImagePosition: 'right',
     updatedAt: new Date().toISOString(),
     categories: [
