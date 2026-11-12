@@ -15,6 +15,7 @@ import {
   createClientUser,
   syncDbFromCloud,
   persistSliceToCloud,
+  isCloudPersistenceConfigured,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export async function GET(req: NextRequest) {
   await syncDbFromCloud();
   const clientUser = getAuthenticatedClientUser(req);
   const isAdmin = isAdminRequestAuthenticated(req);
+  const cloudPersistenceEnabled = isCloudPersistenceConfigured();
 
   if (clientUser) {
     const { passwordHash, ...safeUser } = clientUser;
@@ -30,6 +32,7 @@ export async function GET(req: NextRequest) {
       authenticated: true,
       role: 'client',
       isAdmin,
+      cloudPersistenceEnabled,
       user: safeUser,
     });
   }
@@ -39,6 +42,7 @@ export async function GET(req: NextRequest) {
       authenticated: true,
       role: 'admin',
       isAdmin: true,
+      cloudPersistenceEnabled,
       user: {
         id: 'admin',
         name: 'Desenvolvedor (Admin)',
@@ -50,7 +54,12 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json(
-    { authenticated: false, user: null, isAdmin: false },
+    {
+      authenticated: false,
+      user: null,
+      isAdmin: false,
+      cloudPersistenceEnabled,
+    },
     { status: 200 }
   );
 }

@@ -715,10 +715,17 @@ export default function DashboardPage() {
                             onClick={() =>
                               handleOpenTableTentOrDownload(qr, 'download')
                             }
-                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl border border-slate-700 transition"
-                            title="Baixar PNG em Alta Definição"
+                            className="flex items-center gap-1.5 px-3.5 py-2 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-xl text-xs font-bold border border-sky-500/40 transition shadow-sm"
+                            title="Baixar imagem do QR Code em PNG em Alta Definição"
                           >
-                            <Download className="w-4 h-4 text-emerald-400" />
+                            <Download className="w-4 h-4 text-sky-400" />
+                            <span>
+                              {qr.type === 'catalog'
+                                ? 'Baixar QR do Catálogo'
+                                : qr.type === 'menu' || qr.linkedMenuId
+                                ? 'Baixar QR do Cardápio'
+                                : 'Baixar QR PNG'}
+                            </span>
                           </button>
 
                           {/* Edit Destination Button */}
@@ -846,6 +853,12 @@ export default function DashboardPage() {
             currentUser?.businessName
           }
           onSaved={() => fetchQRs()}
+          onDownloadQR={() => {
+            const targetQr = qrs.find((q) => q.slug === menuEditorSlug);
+            if (targetQr) {
+              handleOpenTableTentOrDownload(targetQr, 'download');
+            }
+          }}
         />
       )}
 

@@ -146,20 +146,22 @@ export default function QRPreview({
           )}
 
           {/* Quick hover action */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-3">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center gap-3">
             <button
               onClick={() => handleDownloadClick('png')}
-              className="p-3 bg-emerald-500 text-white rounded-xl shadow-lg hover:bg-emerald-400 transition"
-              title="Baixar PNG"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-emerald-400 transition"
+              title="Baixar imagem PNG do QR Code"
             >
-              <Download className="w-5 h-5" />
+              <Download className="w-4 h-4" />
+              <span>Baixar PNG</span>
             </button>
             <button
               onClick={() => setIsTableTentOpen(true)}
-              className="p-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-slate-700 transition"
-              title="Ver Plaquinha de Mesa"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold shadow-lg hover:bg-slate-700 transition"
+              title="Imprimir Plaquinha de Mesa"
             >
-              <Printer className="w-5 h-5" />
+              <Printer className="w-4 h-4" />
+              <span>Placa</span>
             </button>
           </div>
         </div>
@@ -233,6 +235,10 @@ export default function QRPreview({
             <span>
               {config.isDynamic
                 ? 'Baixar PNG 1200px Instantâneo (PRO)'
+                : config.type === 'catalog'
+                ? 'Baixar QR do Catálogo (PNG Grátis)'
+                : config.type === 'menu'
+                ? 'Baixar QR do Cardápio (PNG Grátis)'
                 : 'Baixar PNG Alta Definição (Grátis)'}
             </span>
           </button>

@@ -506,17 +506,35 @@ const CLOUD_KEYS: CloudSliceKey[] = [
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
-  const url = (
+  const directUrl = (
     process.env.KV_REST_API_URL ||
     process.env.UPSTASH_REDIS_REST_URL ||
+    process.env.REDIS_REST_API_URL ||
     ''
   ).trim();
-  const token = (
+  const directToken = (
     process.env.KV_REST_API_TOKEN ||
     process.env.UPSTASH_REDIS_REST_TOKEN ||
+    process.env.REDIS_REST_API_TOKEN ||
     ''
   ).trim();
-  return url && token ? { url: url.replace(/\/+$/, ''), token } : null;
+  if (directUrl && directToken) {
+    return { url: directUrl.replace(/\/+$/, ''), token: directToken };
+  }
+
+  // Auto-detect custom-prefixed Vercel Storage / Upstash REST variables (e.g., SPOTQR_KV_REST_API_URL)
+  for (const key of Object.keys(process.env)) {
+    const match = key.match(/^([A-Z0-9_]+?)_(REST_API_URL)$/);
+    if (!match) continue;
+    const urlVal = (process.env[key] || '').trim();
+    const tokenKey = `${match[1]}_REST_API_TOKEN`;
+    const tokenVal = (process.env[tokenKey] || '').trim();
+    if (urlVal && tokenVal) {
+      return { url: urlVal.replace(/\/+$/, ''), token: tokenVal };
+    }
+  }
+
+  return null;
 }
 
 export function isCloudPersistenceConfigured(): boolean {
@@ -536,10 +554,14 @@ async function kvRequest(command: unknown[]): Promise<any> {
       body: JSON.stringify(command),
       cache: 'no-store',
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error('[SpotQR Cloud KV] HTTP error:', res.status);
+      return null;
+    }
     const data = await res.json();
     return data?.result ?? null;
-  } catch {
+  } catch (err) {
+    console.error('[SpotQR Cloud KV] Network error:', err);
     return null;
   }
 }
@@ -636,6 +658,52 @@ export async function syncMenuFromCloud(slug: string): Promise<void> {
 export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
   if (!getCloudKVConfig()) return;
   const db = ensureDb();
+
+  if (slice === 'users') {
+    const rawCloud = await kvRequest(['GET', 'spotqr:users']);
+    let cloudUsers: Record<string, ClientUser> = {};
+    if (typeof rawCloud === 'string' && rawCloud) {
+      try {
+        cloudUsers = JSON.parse(rawCloud);
+      } catch {
+        cloudUsers = {};
+      }
+    }
+    const merged: Record<string, ClientUser> = {
+      ...cloudUsers,
+      ...(db.users || {}),
+    };
+    for (const uid of Object.keys(cloudUsers)) {
+      if (cloudUsers[uid]?.passwordHash && !merged[uid]?.passwordHash) {
+        merged[uid] = cloudUsers[uid];
+      }
+    }
+    db.users = merged;
+    saveDb(db);
+    await kvRequest(['SET', 'spotqr:users', JSON.stringify(merged)]);
+    return;
+  }
+
+  if (slice === 'qrs') {
+    const rawCloud = await kvRequest(['GET', 'spotqr:qrs']);
+    let cloudQRs: Record<string, DynamicQRRecord> = {};
+    if (typeof rawCloud === 'string' && rawCloud) {
+      try {
+        cloudQRs = JSON.parse(rawCloud);
+      } catch {
+        cloudQRs = {};
+      }
+    }
+    const merged = {
+      ...cloudQRs,
+      ...(db.dynamicQRs || {}),
+    };
+    db.dynamicQRs = merged;
+    saveDb(db);
+    await kvRequest(['SET', 'spotqr:qrs', JSON.stringify(merged)]);
+    return;
+  }
+
   const map: Record<CloudSliceKey, unknown> = {
     users: db.users || {},
     qrs: db.dynamicQRs || {},
@@ -1089,8 +1157,10 @@ export function saveDeveloperSettings(
 export function getClientUserByEmail(email: string): ClientUser | null {
   const db = ensureDb();
   const clean = (email || '').trim().toLowerCase();
-  const users = Object.values(db.users || {});
-  return users.find((u) => u.email.toLowerCase() === clean) || null;
+  const matches = Object.values(db.users || {}).filter(
+    (u) => u.email.toLowerCase() === clean
+  );
+  return matches.find((u) => Boolean(u.passwordHash)) || matches[0] || null;
 }
 
 export function getClientUserById(id: string): ClientUser | null {
@@ -1114,14 +1184,21 @@ export function createClientUser(input: {
   if (!db.users) db.users = {};
 
   const cleanEmail = input.email.trim().toLowerCase();
-  const existing = Object.values(db.users).find(
+  const existingMatches = Object.values(db.users).filter(
     (u) => u.email.toLowerCase() === cleanEmail
   );
-  if (existing) {
+  const existingWithPassword = existingMatches.find((u) =>
+    Boolean(u.passwordHash)
+  );
+  if (existingWithPassword) {
     throw new Error('Já existe uma conta cadastrada com este e-mail/login.');
   }
 
-  const id = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  // If a passwordless session stub exists from before cloud DB sync, upgrade it in place
+  const stub = existingMatches[0];
+  const id =
+    stub?.id ||
+    `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const user: ClientUser = {
     id,
     name: input.name.trim(),
@@ -1129,7 +1206,7 @@ export function createClientUser(input: {
     email: cleanEmail,
     whatsapp: (input.whatsapp || '').trim(),
     passwordHash: hashClientPassword(input.passwordPlain),
-    createdAt: new Date().toISOString(),
+    createdAt: stub?.createdAt || new Date().toISOString(),
   };
 
   db.users[id] = user;

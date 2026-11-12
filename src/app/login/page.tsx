@@ -66,7 +66,7 @@ export default function ClientLoginPage() {
           name,
           businessName: businessName || name,
           whatsapp,
-          email,
+          email: email.trim(),
           password,
         }),
       });
@@ -219,9 +219,24 @@ export default function ClientLoginPage() {
             </div>
 
             {errorMsg && (
-              <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                <span>{errorMsg}</span>
+              <div className="mb-4 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-semibold space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+                {tab === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTab('register');
+                      setErrorMsg('');
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Criar conta com este e-mail agora</span>
+                  </button>
+                )}
               </div>
             )}
 

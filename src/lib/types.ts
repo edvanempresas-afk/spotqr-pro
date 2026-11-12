@@ -64,6 +64,8 @@ export interface QRConfig {
   title?: string;
 }
 
+export type ProductStockMode = 'unlimited' | 'limited' | 'unique';
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -73,6 +75,8 @@ export interface MenuItem {
   imageUrl?: string;
   badge?: string; // 'Mais Vendido' | 'Novo' | 'Promoção' | 'Vegetariano' | 'Chef Especial'
   isAvailable: boolean;
+  stockMode?: ProductStockMode;
+  stockQuantity?: number;
 }
 
 export interface MenuCategory {

@@ -23,6 +23,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem } from '@/lib/types';
+import { getItemStockInfo } from '@/lib/stock';
 import { generatePixPayload } from '@/lib/pix-brcode';
 import QRCode from 'qrcode';
 import Link from 'next/link';
@@ -193,14 +194,19 @@ export default function DigitalShowcasePage({
   );
 
   const addToCart = (item: MenuItem) => {
-    if (!item.isAvailable) return;
+    const stock = getItemStockInfo(item);
+    if (!stock.canOrder || stock.maxQuantity <= 0) return;
     setCart((prev) => {
       const existing = prev[item.id];
+      const currentQty = existing ? existing.quantity : 0;
+      if (currentQty >= stock.maxQuantity) {
+        return prev;
+      }
       return {
         ...prev,
         [item.id]: {
           item,
-          quantity: existing ? existing.quantity + 1 : 1,
+          quantity: currentQty + 1,
         },
       };
     });
@@ -638,13 +644,16 @@ export default function DigitalShowcasePage({
             ) : (
               filteredItems.map((item, index) => {
                 const inCart = cart[item.id]?.quantity || 0;
+                const stock = getItemStockInfo(item);
+                const reachedMax = inCart >= stock.maxQuantity;
+
                 return (
                   <React.Fragment key={item.id}>
                     <div
                       className={`bg-[#121929]/75 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex gap-4 items-center justify-between transition shadow-sm ${
                         imageOnLeft ? 'flex-row-reverse' : 'flex-row'
                       } ${
-                        item.isAvailable
+                        stock.canOrder
                           ? 'hover:border-emerald-500/30'
                           : 'opacity-60 grayscale-[40%]'
                       }`}
@@ -654,12 +663,22 @@ export default function DigitalShowcasePage({
                           <h3 className="text-sm sm:text-base font-bold text-white">
                             {item.name}
                           </h3>
-                          {item.badge && item.isAvailable && (
+                          {item.badge && stock.canOrder && (
                             <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
                               {item.badge}
                             </span>
                           )}
-                          {!item.isAvailable && (
+                          {stock.canOrder && stock.isUnique && (
+                            <span className="bg-purple-500/15 border border-purple-500/35 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              💎 Peça Única
+                            </span>
+                          )}
+                          {stock.canOrder && stock.isLimited && stock.badgeText && (
+                            <span className="bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                              📦 {stock.badgeText}
+                            </span>
+                          )}
+                          {!stock.canOrder && (
                             <span className="bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                               Esgotado
                             </span>
@@ -683,25 +702,46 @@ export default function DigitalShowcasePage({
                           />
                         )}
 
-                        {!item.isAvailable ? (
+                        {!stock.canOrder ? (
                           <span className="text-[11px] font-semibold text-slate-500 px-3 py-1">
                             Indisponível
                           </span>
                         ) : inCart > 0 ? (
-                          <div className="flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-2 py-1 shadow-sm">
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="p-1 hover:bg-emerald-700 rounded-lg transition"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="text-xs font-bold px-1">{inCart}</span>
-                            <button
-                              onClick={() => addToCart(item)}
-                              className="p-1 hover:bg-emerald-700 rounded-lg transition"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-2 py-1 shadow-sm">
+                              <button
+                                onClick={() => removeFromCart(item.id)}
+                                className="p-1 hover:bg-emerald-700 rounded-lg transition"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="text-xs font-bold px-1">{inCart}</span>
+                              <button
+                                onClick={() => addToCart(item)}
+                                disabled={reachedMax}
+                                title={
+                                  reachedMax
+                                    ? stock.isUnique
+                                      ? 'Peça única — máximo 1 unidade'
+                                      : `Estoque máximo disponível: ${stock.maxQuantity}`
+                                    : 'Adicionar mais uma unidade'
+                                }
+                                className={`p-1 rounded-lg transition ${
+                                  reachedMax
+                                    ? 'opacity-35 cursor-not-allowed'
+                                    : 'hover:bg-emerald-700'
+                                }`}
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {reachedMax && (
+                              <span className="text-[9px] font-bold text-amber-300">
+                                {stock.isUnique
+                                  ? 'Peça única (máx. 1)'
+                                  : `Máx. ${stock.maxQuantity} disp.`}
+                              </span>
+                            )}
                           </div>
                         ) : (
                           <button
@@ -927,39 +967,62 @@ export default function DigitalShowcasePage({
 
             {/* Items List */}
             <div className="flex-1 overflow-y-auto py-2 space-y-3">
-              {Object.values(cart).map((c) => (
-                <div
-                  key={c.item.id}
-                  className="flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800"
-                >
-                  <div>
-                    <h4 className="text-xs font-bold text-white">
-                      {c.item.name}
-                    </h4>
-                    <span className="text-[11px] text-emerald-400 font-semibold">
-                      R$ {(c.item.price * c.quantity).toFixed(2)}
-                    </span>
-                  </div>
+              {Object.values(cart).map((c) => {
+                const stock = getItemStockInfo(c.item);
+                const reachedMax = c.quantity >= stock.maxQuantity;
+                return (
+                  <div
+                    key={c.item.id}
+                    className="flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-slate-800"
+                  >
+                    <div>
+                      <h4 className="text-xs font-bold text-white">
+                        {c.item.name}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-[11px] text-emerald-400 font-semibold">
+                          R$ {(c.item.price * c.quantity).toFixed(2)}
+                        </span>
+                        {(stock.isUnique || stock.isLimited) && (
+                          <span className="text-[10px] text-amber-300 font-semibold">
+                            {stock.isUnique
+                              ? '• Peça única (máx. 1)'
+                              : `• Limite: ${stock.maxQuantity} unid.`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-2 py-1">
-                    <button
-                      onClick={() => removeFromCart(c.item.id)}
-                      className="text-slate-400 hover:text-white p-0.5"
-                    >
-                      <Minus className="w-3 h-3" />
-                    </button>
-                    <span className="text-xs font-bold px-1 text-white">
-                      {c.quantity}
-                    </span>
-                    <button
-                      onClick={() => addToCart(c.item)}
-                      className="text-slate-400 hover:text-white p-0.5"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
+                    <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-2 py-1">
+                      <button
+                        onClick={() => removeFromCart(c.item.id)}
+                        className="text-slate-400 hover:text-white p-0.5"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs font-bold px-1 text-white">
+                        {c.quantity}
+                      </span>
+                      <button
+                        onClick={() => addToCart(c.item)}
+                        disabled={reachedMax}
+                        title={
+                          reachedMax
+                            ? 'Quantidade máxima disponível atingida'
+                            : 'Adicionar mais 1'
+                        }
+                        className={`p-0.5 transition ${
+                          reachedMax
+                            ? 'text-slate-600 cursor-not-allowed'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               {/* Dynamic Fields by Mode */}
               <div className="pt-2 space-y-3">

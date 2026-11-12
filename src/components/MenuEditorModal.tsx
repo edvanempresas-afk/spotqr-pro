@@ -25,9 +25,18 @@ import {
   ArrowUp,
   ArrowDown,
   Crop,
+  Download,
 } from 'lucide-react';
-import { RestaurantMenu, MenuItem, MenuCategory } from '@/lib/types';
+import {
+  RestaurantMenu,
+  MenuItem,
+  MenuCategory,
+  ProductStockMode,
+  QRConfig,
+} from '@/lib/types';
 import { ImageUploadPreset } from '@/lib/image-upload';
+import { getItemStockInfo } from '@/lib/stock';
+import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import ImageCropModal from './ImageCropModal';
 
 interface MenuEditorModalProps {
@@ -37,6 +46,7 @@ interface MenuEditorModalProps {
   mode?: 'menu' | 'catalog';
   defaultTitle?: string;
   onSaved?: () => void;
+  onDownloadQR?: () => void;
 }
 
 const FOOD_IMAGE_PRESETS = [
@@ -90,11 +100,13 @@ export default function MenuEditorModal({
   mode = 'menu',
   defaultTitle,
   onSaved,
+  onDownloadQR,
 }: MenuEditorModalProps) {
   const [menu, setMenu] = useState<RestaurantMenu | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openingPreview, setOpeningPreview] = useState(false);
+  const [downloadingQR, setDownloadingQR] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<
     'info' | 'categories' | 'items' | 'branding'
@@ -210,10 +222,71 @@ export default function MenuEditorModal({
       const ok = await persistShowcase();
       if (ok) {
         setSavedSuccess(true);
-        setTimeout(() => setSavedSuccess(false), 3000);
+        setTimeout(() => setSavedSuccess(false), 6000);
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDownloadQR = async () => {
+    if (!menu) return;
+    setDownloadingQR(true);
+    try {
+      await persistShowcase();
+      if (onDownloadQR) {
+        await onDownloadQR();
+        return;
+      }
+
+      const origin =
+        typeof window !== 'undefined'
+          ? window.location.origin
+          : 'https://spotqr.com.br';
+      const qrType = isCatalog ? 'catalog' : 'menu';
+      const frames = getDefaultFrameTexts(qrType);
+      const targetUrl = `${origin}/r/${slug}`;
+      const fallbackConfig: QRConfig = {
+        type: qrType,
+        url: targetUrl,
+        whatsappPhone: menu.whatsappNumber || '',
+        whatsappMessage: '',
+        pixKey: menu.pixKey || '',
+        pixKeyType: 'email',
+        pixName: menu.title,
+        pixCity: 'Sao Paulo',
+        wifiSSID: '',
+        wifiPassword: '',
+        wifiEncryption: 'WPA',
+        googleReviewUrl: '',
+        fgColor: '#000000',
+        bgColor: '#ffffff',
+        cornerColor: menu.themeColor || '#16a34a',
+        dotStyle: 'squares',
+        logoSize: 22,
+        frameStyle: 'bottom_tag',
+        frameTopText: frames.topText,
+        frameText: frames.bottomText,
+        frameColor: menu.themeColor || '#16a34a',
+        frameTextColor: '#ffffff',
+        isDynamic: Boolean((menu as RestaurantMenu & { isPaid?: boolean }).isPaid),
+        dynamicSlug: slug,
+        title: menu.title,
+      };
+      const offscreenCanvas = document.createElement('canvas');
+      await renderStyledQR({
+        config: fallbackConfig,
+        targetContent: targetUrl,
+        canvas: offscreenCanvas,
+        width: 1200,
+        height: 1200,
+      });
+      const a = document.createElement('a');
+      a.href = offscreenCanvas.toDataURL('image/png');
+      a.download = `spotqr-${slug}.png`;
+      a.click();
+    } finally {
+      setDownloadingQR(false);
     }
   };
 
@@ -397,7 +470,24 @@ export default function MenuEditorModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadQR}
+              disabled={downloadingQR || !menu}
+              className="flex items-center gap-1.5 px-3 py-2 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 rounded-xl text-xs font-bold border border-sky-500/40 transition disabled:opacity-50"
+              title="Baixar imagem do QR Code em PNG de alta resolução"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>
+                {downloadingQR
+                  ? 'Baixando...'
+                  : isCatalog
+                  ? 'Baixar QR do Catálogo'
+                  : 'Baixar QR do Cardápio'}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={handleOpenLivePreview}
@@ -469,6 +559,30 @@ export default function MenuEditorModal({
             </button>
           ))}
         </div>
+
+        {savedSuccess && (
+          <div className="px-6 py-2.5 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+              <Check className="w-4 h-4 shrink-0" />
+              <span>
+                {isCatalog ? 'Catálogo salvo!' : 'Cardápio salvo!'} Agora você já pode baixar o QR Code para divulgar ou imprimir:
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={handleDownloadQR}
+              disabled={downloadingQR}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold transition shadow-sm"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>
+                {isCatalog
+                  ? 'Baixar QR do Catálogo (PNG)'
+                  : 'Baixar QR do Cardápio (PNG)'}
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -871,6 +985,123 @@ export default function MenuEditorModal({
                                 />
                               )}
                             </div>
+
+                            {/* Stock / Quantity Control per Order */}
+                            {(() => {
+                              const currentStockMode: ProductStockMode =
+                                item.stockMode || 'unlimited';
+                              const stockInfo = getItemStockInfo(item);
+                              const setStockMode = (nextMode: ProductStockMode) => {
+                                if (nextMode === 'unlimited') {
+                                  handleUpdateItem(item.id, {
+                                    stockMode: 'unlimited',
+                                  });
+                                } else if (nextMode === 'unique') {
+                                  handleUpdateItem(item.id, {
+                                    stockMode: 'unique',
+                                    stockQuantity: 1,
+                                  });
+                                } else {
+                                  handleUpdateItem(item.id, {
+                                    stockMode: 'limited',
+                                    stockQuantity:
+                                      typeof item.stockQuantity === 'number' &&
+                                      item.stockQuantity >= 1
+                                        ? item.stockQuantity
+                                        : 5,
+                                  });
+                                }
+                              };
+                              return (
+                                <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                      Limite / Estoque Disponível:
+                                    </label>
+                                    {stockInfo.badgeText && item.isAvailable && (
+                                      <span
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                          stockInfo.isUnique
+                                            ? 'bg-purple-500/15 border-purple-500/35 text-purple-300'
+                                            : stockInfo.maxQuantity <= 0
+                                            ? 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+                                            : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                                        }`}
+                                      >
+                                        {stockInfo.isUnique
+                                          ? '💎 Peça Única (máx. 1 por pedido)'
+                                          : stockInfo.maxQuantity <= 0
+                                          ? '🚫 Sem estoque (Esgotado)'
+                                          : `📦 Cliente pode pedir até ${stockInfo.maxQuantity} unid.`}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setStockMode('unlimited')}
+                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                                        currentStockMode === 'unlimited'
+                                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                      }`}
+                                    >
+                                      ∞ Ilimitado
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setStockMode('limited')}
+                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                                        currentStockMode === 'limited'
+                                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                      }`}
+                                    >
+                                      📦 Limitar Qtd
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setStockMode('unique')}
+                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                                        currentStockMode === 'unique'
+                                          ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                      }`}
+                                    >
+                                      💎 Peça Única (Máx. 1)
+                                    </button>
+
+                                    {currentStockMode === 'limited' && (
+                                      <div className="flex items-center gap-1.5 ml-auto bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1">
+                                        <span className="text-[10px] font-semibold text-slate-400">
+                                          Qtd máx:
+                                        </span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={1}
+                                          value={
+                                            typeof item.stockQuantity === 'number'
+                                              ? item.stockQuantity
+                                              : 1
+                                          }
+                                          onChange={(e) => {
+                                            const parsed = parseInt(e.target.value, 10);
+                                            handleUpdateItem(item.id, {
+                                              stockQuantity: Number.isNaN(parsed)
+                                                ? 0
+                                                : Math.max(0, parsed),
+                                            });
+                                          }}
+                                          className="w-14 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {/* Availability & Delete Actions */}
