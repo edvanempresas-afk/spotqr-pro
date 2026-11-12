@@ -96,7 +96,7 @@ export default function TableTentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
       <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#101726] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
         {/* Header (hidden in print) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-800 no-print">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-800 no-print">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
               <Coffee className="w-5 h-5" />
@@ -176,7 +176,7 @@ export default function TableTentModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center bg-slate-950/50">
+        <div className="flex-1 min-h-0 overflow-y-auto p-6 flex flex-col items-center justify-center bg-slate-950/50">
           {/* Printable Sheet (Simulating an A4 sheet with 2 table tents side-by-side) */}
           <div className="w-full max-w-2xl bg-white text-slate-900 rounded-2xl p-8 shadow-2xl border border-slate-200 print-page">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

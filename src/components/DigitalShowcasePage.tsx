@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Utensils,
   ShoppingBag,
+  ShoppingCart,
   Plus,
   Minus,
   MessageCircle,
@@ -21,6 +22,8 @@ import {
   Bike,
   Store,
   Truck,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
@@ -71,6 +74,31 @@ export default function DigitalShowcasePage({
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [pixQrUrl, setPixQrUrl] = useState('');
   const [copiedPix, setCopiedPix] = useState(false);
+
+  // Product photo zoom / lightbox
+  const [zoomedItem, setZoomedItem] = useState<MenuItem | null>(null);
+  const [photoZoomScale, setPhotoZoomScale] = useState<number>(1);
+
+  const openPhotoZoom = (item: MenuItem) => {
+    setZoomedItem(item);
+    setPhotoZoomScale(1);
+  };
+
+  const closePhotoZoom = () => {
+    setZoomedItem(null);
+    setPhotoZoomScale(1);
+  };
+
+  useEffect(() => {
+    if (!zoomedItem) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closePhotoZoom();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedItem]);
 
   // Read ?mesa=XX from URL if customer scanned a numbered table plaque
   useEffect(() => {
@@ -412,6 +440,105 @@ export default function DigitalShowcasePage({
     ? '/catalogo/cover-loja.jpg'
     : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80';
 
+  const renderCartActionControl = (targetItem: MenuItem) => {
+    const itemInCart = cart[targetItem.id]?.quantity || 0;
+    const itemStock = getItemStockInfo(targetItem);
+    const itemReachedMax = itemInCart >= itemStock.maxQuantity;
+
+    if (!itemStock.canOrder) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-400/90 bg-rose-500/10 border border-rose-500/25 px-3 py-1.5 rounded-xl shrink-0">
+          Indisponível
+        </span>
+      );
+    }
+
+    if (itemInCart > 0) {
+      return (
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 rounded-xl px-1.5 py-1 shadow-md shadow-emerald-500/20 border border-emerald-300/40">
+            <ShoppingCart className="w-3.5 h-3.5 stroke-[2.3] ml-1 shrink-0 opacity-85" />
+            <button
+              type="button"
+              onClick={() => removeFromCart(targetItem.id)}
+              aria-label={`Remover 1 ${targetItem.name} do carrinho`}
+              className="p-1 bg-slate-950/10 hover:bg-slate-950/20 rounded-lg transition"
+            >
+              <Minus className="w-3.5 h-3.5 stroke-[2.6]" />
+            </button>
+            <span className="text-xs font-extrabold px-1 min-w-[1.25rem] text-center">
+              {itemInCart}
+            </span>
+            <button
+              type="button"
+              onClick={() => addToCart(targetItem)}
+              disabled={itemReachedMax}
+              aria-label={`Adicionar mais 1 ${targetItem.name} ao carrinho`}
+              title={
+                itemReachedMax
+                  ? itemStock.isUnique
+                    ? 'Peça única — máximo 1 unidade'
+                    : `Estoque máximo disponível: ${itemStock.maxQuantity}`
+                  : 'Adicionar mais uma unidade'
+              }
+              className={`p-1 rounded-lg transition ${
+                itemReachedMax
+                  ? 'opacity-35 cursor-not-allowed'
+                  : 'bg-slate-950/10 hover:bg-slate-950/20'
+              }`}
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[2.6]" />
+            </button>
+          </div>
+          {itemReachedMax && (
+            <span className="text-[9px] font-bold text-amber-300">
+              {itemStock.isUnique
+                ? 'Peça única (máx. 1)'
+                : `Máx. ${itemStock.maxQuantity} disp.`}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => addToCart(targetItem)}
+        aria-label={`Adicionar ${targetItem.name} ao carrinho`}
+        className="group/add shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 active:scale-[0.97] text-slate-950 shadow-md shadow-emerald-500/20 border border-emerald-300/40 transition-all whitespace-nowrap"
+      >
+        <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
+        <span>Adicionar</span>
+        <span className="inline-flex items-center justify-center w-4 h-4 rounded-md bg-slate-950/15">
+          <Plus className="w-3 h-3 stroke-[2.8]" />
+        </span>
+      </button>
+    );
+  };
+
+  const renderProductThumbnail = (targetItem: MenuItem, extraClass = '') => {
+    if (!targetItem.imageUrl) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => openPhotoZoom(targetItem)}
+        aria-label={`Ampliar foto de ${targetItem.name}`}
+        title="Clique para ampliar e ver a foto em detalhes"
+        className={`group/img relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border border-slate-700/60 hover:border-emerald-400/70 shadow-md shrink-0 cursor-zoom-in transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${extraClass}`}
+      >
+        <img
+          src={targetItem.imageUrl}
+          alt={targetItem.name}
+          className="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
+        />
+        <span className="absolute bottom-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md bg-black/70 backdrop-blur-sm border border-white/20 text-white group-hover/img:bg-emerald-500 group-hover/img:text-slate-950 transition shadow">
+          <ZoomIn className="w-3 h-3" />
+        </span>
+      </button>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#090d14] text-slate-100 pb-28">
       {/* Cover Banner */}
@@ -643,115 +770,69 @@ export default function DigitalShowcasePage({
               </div>
             ) : (
               filteredItems.map((item, index) => {
-                const inCart = cart[item.id]?.quantity || 0;
                 const stock = getItemStockInfo(item);
-                const reachedMax = inCart >= stock.maxQuantity;
+                const cartActionControl = renderCartActionControl(item);
 
                 return (
                   <React.Fragment key={item.id}>
                     <div
-                      className={`bg-[#121929]/75 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex gap-4 items-center justify-between transition shadow-sm ${
-                        imageOnLeft ? 'flex-row-reverse' : 'flex-row'
-                      } ${
+                      className={`bg-[#121929]/75 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex gap-3.5 sm:gap-4 items-stretch justify-between transition shadow-sm ${
                         stock.canOrder
-                          ? 'hover:border-emerald-500/30'
+                          ? 'hover:border-emerald-500/35'
                           : 'opacity-60 grayscale-[40%]'
                       }`}
                     >
-                      <div className={`flex-1 space-y-1.5 ${imageOnLeft ? 'pl-1' : 'pr-2'}`}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm sm:text-base font-bold text-white">
-                            {item.name}
-                          </h3>
-                          {item.badge && stock.canOrder && (
-                            <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              {item.badge}
-                            </span>
-                          )}
-                          {stock.canOrder && stock.isUnique && (
-                            <span className="bg-purple-500/15 border border-purple-500/35 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              💎 Peça Única
-                            </span>
-                          )}
-                          {stock.canOrder && stock.isLimited && stock.badgeText && (
-                            <span className="bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                              📦 {stock.badgeText}
-                            </span>
-                          )}
-                          {!stock.canOrder && (
-                            <span className="bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
-                              Esgotado
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                          {item.description}
-                        </p>
-                        <div className="pt-1 text-sm sm:text-base font-extrabold text-emerald-400">
-                          R$ {item.price.toFixed(2)}
-                        </div>
-                      </div>
+                      {imageOnLeft &&
+                        renderProductThumbnail(item, 'self-start sm:self-center')}
 
-                      {/* Right: Image and Cart Button */}
-                      <div className="flex flex-col items-center gap-2 shrink-0">
-                        {item.imageUrl && (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl border border-slate-700/60 shadow-md"
-                          />
-                        )}
-
-                        {!stock.canOrder ? (
-                          <span className="text-[11px] font-semibold text-slate-500 px-3 py-1">
-                            Indisponível
-                          </span>
-                        ) : inCart > 0 ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-2 py-1 shadow-sm">
-                              <button
-                                onClick={() => removeFromCart(item.id)}
-                                className="p-1 hover:bg-emerald-700 rounded-lg transition"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-                              <span className="text-xs font-bold px-1">{inCart}</span>
-                              <button
-                                onClick={() => addToCart(item)}
-                                disabled={reachedMax}
-                                title={
-                                  reachedMax
-                                    ? stock.isUnique
-                                      ? 'Peça única — máximo 1 unidade'
-                                      : `Estoque máximo disponível: ${stock.maxQuantity}`
-                                    : 'Adicionar mais uma unidade'
-                                }
-                                className={`p-1 rounded-lg transition ${
-                                  reachedMax
-                                    ? 'opacity-35 cursor-not-allowed'
-                                    : 'hover:bg-emerald-700'
-                                }`}
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                            {reachedMax && (
-                              <span className="text-[9px] font-bold text-amber-300">
-                                {stock.isUnique
-                                  ? 'Peça única (máx. 1)'
-                                  : `Máx. ${stock.maxQuantity} disp.`}
+                      <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-bold text-white">
+                              {item.name}
+                            </h3>
+                            {item.badge && stock.canOrder && (
+                              <span className="bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                {item.badge}
+                              </span>
+                            )}
+                            {stock.canOrder && stock.isUnique && (
+                              <span className="bg-purple-500/15 border border-purple-500/35 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                💎 Peça Única
+                              </span>
+                            )}
+                            {stock.canOrder && stock.isLimited && stock.badgeText && (
+                              <span className="bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                📦 {stock.badgeText}
+                              </span>
+                            )}
+                            {!stock.canOrder && (
+                              <span className="bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                                Esgotado
                               </span>
                             )}
                           </div>
-                        ) : (
-                          <button
-                            onClick={() => addToCart(item)}
-                            className="px-3.5 py-1.5 bg-slate-800 hover:bg-emerald-500 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 hover:border-emerald-400 transition shadow-sm"
-                          >
-                            + Adicionar
-                          </button>
-                        )}
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                            {item.description}
+                          </p>
+                        </div>
+
+                        <div className="pt-1 flex flex-wrap items-center justify-between gap-2.5">
+                          <span className="text-sm sm:text-base font-extrabold text-emerald-400">
+                            R$ {item.price.toFixed(2)}
+                          </span>
+                          {(imageOnLeft || !item.imageUrl) && (
+                            <div className="ml-auto">{cartActionControl}</div>
+                          )}
+                        </div>
                       </div>
+
+                      {!imageOnLeft && item.imageUrl && (
+                        <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
+                          {renderProductThumbnail(item)}
+                          {cartActionControl}
+                        </div>
+                      )}
                     </div>
 
                     {/* STRATEGIC AD FOR FREE SHOWCASES */}
@@ -902,7 +983,7 @@ export default function DigitalShowcasePage({
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4">
           <div className="relative w-full max-w-lg bg-[#121929] border border-slate-700 rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[92vh] flex flex-col">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+            <div className="shrink-0 flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-base font-bold text-white">
@@ -920,7 +1001,7 @@ export default function DigitalShowcasePage({
             {/* Order Mode Selector (only renders modes explicitly enabled by owner) */}
             {enabledModes.length > 0 && (
               <div
-                className={`grid gap-2 my-3 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 ${
+                className={`shrink-0 grid gap-2 my-3 bg-slate-900 p-1.5 rounded-2xl border border-slate-800 ${
                   enabledModes.length === 1
                     ? 'grid-cols-1'
                     : enabledModes.length === 2
@@ -966,7 +1047,7 @@ export default function DigitalShowcasePage({
             )}
 
             {/* Items List */}
-            <div className="flex-1 overflow-y-auto py-2 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto py-2 space-y-3">
               {Object.values(cart).map((c) => {
                 const stock = getItemStockInfo(c.item);
                 const reachedMax = c.quantity >= stock.maxQuantity;
@@ -1190,7 +1271,7 @@ export default function DigitalShowcasePage({
             </div>
 
             {/* Total and Submit */}
-            <div className="pt-4 border-t border-slate-800 space-y-3">
+            <div className="shrink-0 pt-4 border-t border-slate-800 space-y-3">
               {deliveryFee > 0 && (
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>{isCatalog ? 'Frete / Entrega:' : 'Taxa de Entrega:'}</span>
@@ -1213,6 +1294,128 @@ export default function DigitalShowcasePage({
                 <MessageCircle className="w-4 h-4" />
                 <span>Enviar Pedido pelo WhatsApp</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product Photo Zoom Modal */}
+      {zoomedItem && zoomedItem.imageUrl && (
+        <div
+          onClick={closePhotoZoom}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Foto ampliada de ${zoomedItem.name}`}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-2xl max-h-[92vh] flex flex-col bg-[#121929] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl"
+          >
+            {/* Header */}
+            <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b border-slate-800 bg-[#0d1320]">
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
+                  {zoomedItem.name}
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  Clique na foto ou use os botões para aproximar
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoZoomScale((prev) =>
+                      Math.max(1, Number((prev - 0.5).toFixed(2)))
+                    )
+                  }
+                  disabled={photoZoomScale <= 1}
+                  aria-label="Diminuir zoom"
+                  title="Diminuir zoom"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <span className="px-2 py-1 text-[11px] font-mono font-bold text-emerald-300 bg-slate-900 border border-slate-800 rounded-lg min-w-[3.2rem] text-center">
+                  {Math.round(photoZoomScale * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPhotoZoomScale((prev) =>
+                      Math.min(2.5, Number((prev + 0.5).toFixed(2)))
+                    )
+                  }
+                  disabled={photoZoomScale >= 2.5}
+                  aria-label="Aumentar zoom"
+                  title="Aumentar zoom"
+                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition disabled:opacity-35 disabled:cursor-not-allowed"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={closePhotoZoom}
+                  aria-label="Fechar foto ampliada"
+                  title="Fechar"
+                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition ml-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Interactive Zoom Image Stage */}
+            <div className="flex-1 min-h-0 overflow-auto bg-[#070a10] p-3 sm:p-5 flex">
+              <img
+                src={zoomedItem.imageUrl}
+                alt={zoomedItem.name}
+                onClick={() =>
+                  setPhotoZoomScale((prev) => (prev > 1 ? 1 : 1.75))
+                }
+                title={
+                  photoZoomScale > 1
+                    ? 'Clique para voltar ao tamanho normal'
+                    : 'Clique para dar zoom'
+                }
+                style={
+                  photoZoomScale > 1
+                    ? {
+                        height: `${Math.round(photoZoomScale * 56)}vh`,
+                        width: 'auto',
+                        maxWidth: 'none',
+                        maxHeight: 'none',
+                      }
+                    : undefined
+                }
+                className={
+                  photoZoomScale > 1
+                    ? 'm-auto rounded-2xl object-contain cursor-zoom-out select-none shadow-2xl transition-all duration-200'
+                    : 'm-auto max-h-[56vh] max-w-full w-auto h-auto rounded-2xl object-contain cursor-zoom-in select-none shadow-2xl transition-all duration-200'
+                }
+              />
+            </div>
+
+            {/* Product Details & Direct Add Footer */}
+            <div className="shrink-0 p-4 sm:px-5 sm:py-4 border-t border-slate-800 bg-[#0d1320] space-y-3">
+              {zoomedItem.description && (
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {zoomedItem.description}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">
+                    Preço
+                  </span>
+                  <span className="text-lg font-extrabold text-emerald-400">
+                    R$ {zoomedItem.price.toFixed(2)}
+                  </span>
+                </div>
+                {renderCartActionControl(zoomedItem)}
+              </div>
             </div>
           </div>
         </div>

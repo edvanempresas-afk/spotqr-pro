@@ -448,7 +448,7 @@ export default function MenuEditorModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-[#101726] border border-slate-700 rounded-3xl overflow-hidden shadow-2xl">
         {/* Top Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-800 bg-[#0d1320]">
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-slate-800 bg-[#0d1320]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
               {isCatalog ? (
@@ -526,7 +526,7 @@ export default function MenuEditorModal({
         </div>
 
         {/* Navigation Sub-Tabs */}
-        <div className="flex border-b border-slate-800 px-6 bg-slate-900/60 gap-4 overflow-x-auto">
+        <div className="shrink-0 flex sm:flex-wrap items-center border-b border-slate-800 px-4 sm:px-6 bg-slate-900/60 gap-2 sm:gap-5 overflow-x-auto sm:overflow-visible">
           {[
             {
               id: 'items',
@@ -548,8 +548,9 @@ export default function MenuEditorModal({
           ].map((tab) => (
             <button
               key={tab.id}
+              type="button"
               onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3 px-2 text-xs font-bold border-b-2 transition whitespace-nowrap ${
+              className={`shrink-0 py-3 px-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
                 activeTab === tab.id
                   ? 'border-emerald-500 text-emerald-400'
                   : 'border-transparent text-slate-400 hover:text-white'
@@ -561,7 +562,7 @@ export default function MenuEditorModal({
         </div>
 
         {savedSuccess && (
-          <div className="px-6 py-2.5 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-emerald-500/15 border-b border-emerald-500/30 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="font-bold text-emerald-300 flex items-center gap-1.5">
               <Check className="w-4 h-4 shrink-0" />
               <span>
@@ -585,7 +586,7 @@ export default function MenuEditorModal({
         )}
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
           {loading || !menu ? (
             <div className="py-20 text-center text-slate-400 text-xs">
               {isCatalog

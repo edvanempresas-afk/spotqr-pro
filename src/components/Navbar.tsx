@@ -13,6 +13,8 @@ import {
   UserCheck,
   LogIn,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useProPrice } from '@/lib/pro-price';
 
@@ -21,6 +23,7 @@ export default function Navbar() {
   const { proPriceLabel } = useProPrice();
   const [authUser, setAuthUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth')
@@ -47,14 +50,14 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-8 h-20 flex items-center justify-between gap-3">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group shrink-0">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-glow group-hover:scale-105 transition-transform shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-glow group-hover:scale-105 transition-transform shrink-0">
             <QrCode className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <div className="flex items-center gap-2 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="font-display font-extrabold text-lg sm:text-xl tracking-tight text-white">
                 Spot<span className="text-emerald-400">QR</span>
               </span>
@@ -62,14 +65,14 @@ export default function Navbar() {
                 PRO
               </span>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline">
+            <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap hidden sm:inline xl:hidden 2xl:inline">
               QR Codes, Cardápios & Catálogos
             </span>
           </div>
         </Link>
 
-        {/* Navigation Links - Single straight line with whitespace-nowrap */}
-        <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-semibold text-slate-300">
+        {/* Navigation Links - Balanced responsive spacing for 1280px+ */}
+        <nav className="hidden xl:flex items-center gap-2.5 2xl:gap-5 text-[11px] 2xl:text-xs font-semibold text-slate-300">
           <Link
             href="/#gerador"
             className="hover:text-emerald-400 transition-colors whitespace-nowrap"
@@ -78,44 +81,44 @@ export default function Navbar() {
           </Link>
           <Link
             href="/cardapio/demo-restaurante"
-            className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="hover:text-emerald-400 transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <Utensils className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Cardápio Demo</span>
           </Link>
           <Link
             href="/catalogo/demo-catalogo"
-            className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="hover:text-emerald-400 transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <ShoppingBag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Catálogo Demo</span>
           </Link>
           <Link
             href="/#precos"
-            className="hover:text-emerald-400 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            className="hover:text-emerald-400 transition-colors flex items-center gap-1 whitespace-nowrap"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>Vantagens PRO ({proPriceLabel})</span>
           </Link>
           <Link
             href="/#desenvolvedor"
-            className="hover:text-emerald-300 transition-colors flex items-center gap-1.5 text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-full whitespace-nowrap"
+            className="hover:text-emerald-300 transition-colors flex items-center gap-1 text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2.5 2xl:px-3 py-1.5 rounded-full whitespace-nowrap"
           >
             <Code2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>Contratar Desenvolvedor</span>
           </Link>
         </nav>
 
-        {/* Action Buttons - Single straight line with whitespace-nowrap */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 shrink-0">
           {authUser ? (
             <>
               <Link
                 href={isAdmin ? '/admin' : '/dashboard'}
-                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-xl border border-emerald-500/30 transition whitespace-nowrap"
+                className="flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-bold text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 rounded-xl border border-emerald-500/30 transition whitespace-nowrap"
               >
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="max-w-[150px] truncate">
+                <span className="max-w-[115px] 2xl:max-w-[150px] truncate">
                   {authUser.businessName || authUser.name}
                 </span>
               </Link>
@@ -131,7 +134,7 @@ export default function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 rounded-xl border border-slate-700 transition whitespace-nowrap"
+              className="flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-bold text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 rounded-xl border border-slate-700 transition whitespace-nowrap"
             >
               <LogIn className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Entrar / Criar Conta</span>
@@ -140,13 +143,78 @@ export default function Navbar() {
 
           <Link
             href={isAdmin ? '/admin' : '/dashboard'}
-            className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 rounded-xl border border-slate-700/60 transition whitespace-nowrap"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-semibold text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 rounded-xl border border-slate-700/60 transition whitespace-nowrap"
           >
             <LayoutDashboard className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{isAdmin ? 'Meu Painel' : 'Meus Catálogos & QRs'}</span>
           </Link>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="xl:hidden p-2 text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 rounded-xl border border-slate-700/60 transition shrink-0"
+            aria-label="Abrir menu de navegação"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Responsive Drawer for viewports below 1280px */}
+      {mobileMenuOpen && (
+        <div className="xl:hidden border-t border-slate-800/80 bg-[#0b101b]/95 backdrop-blur-md px-4 py-4 space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-200">
+            <Link
+              href="/#gerador"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-2"
+            >
+              <QrCode className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Gerador Grátis</span>
+            </Link>
+            <Link
+              href="/cardapio/demo-restaurante"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-2"
+            >
+              <Utensils className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Cardápio Demo</span>
+            </Link>
+            <Link
+              href="/catalogo/demo-catalogo"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-2"
+            >
+              <ShoppingBag className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Catálogo Demo</span>
+            </Link>
+            <Link
+              href="/#precos"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-2"
+            >
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Vantagens PRO ({proPriceLabel})</span>
+            </Link>
+            <Link
+              href="/#desenvolvedor"
+              onClick={() => setMobileMenuOpen(false)}
+              className="px-3 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 transition flex items-center gap-2"
+            >
+              <Code2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Contratar Desenvolvedor</span>
+            </Link>
+            <Link
+              href={isAdmin ? '/admin' : '/dashboard'}
+              onClick={() => setMobileMenuOpen(false)}
+              className="sm:hidden px-3 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 transition flex items-center gap-2"
+            >
+              <LayoutDashboard className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{isAdmin ? 'Meu Painel' : 'Meus Catálogos & QRs'}</span>
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }
