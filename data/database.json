@@ -192,7 +192,7 @@
       "allowPickup": false,
       "allowOnSite": false,
       "productImagePosition": "right",
-      "updatedAt": "2026-11-11T15:35:58.160Z",
+      "updatedAt": "2026-11-12T18:16:38.051Z",
       "categories": [
         {
           "id": "cat-3d",
@@ -220,7 +220,8 @@
           "category": "cat-3d",
           "imageUrl": "/catalogo/prod-3d.jpg",
           "badge": "Mais Vendido",
-          "isAvailable": true
+          "isAvailable": true,
+          "stockMode": "unlimited"
         },
         {
           "id": "cat-item-2",
@@ -281,5 +282,9 @@
   },
   "developerLeads": {},
   "developerNotifications": {},
-  "users": {}
+  "users": {},
+  "vouchers": {},
+  "slugRedirects": {},
+  "passwordResets": {},
+  "orders": {}
 }
