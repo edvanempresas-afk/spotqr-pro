@@ -9,6 +9,7 @@ import PixCheckoutModal from '@/components/PixCheckoutModal';
 import MenuEditorModal from '@/components/MenuEditorModal';
 import TableTentModal from '@/components/TableTentModal';
 import ClientAuthModal from '@/components/ClientAuthModal';
+import VoucherRedeemBox from '@/components/VoucherRedeemBox';
 import {
   QrCode,
   Sparkles,
@@ -29,8 +30,14 @@ import {
   LogOut,
   LogIn,
   UserPlus,
+  Clock,
 } from 'lucide-react';
 import { DynamicQRRecord, QRConfig } from '@/lib/types';
+import {
+  isProStillValid,
+  formatRemainingProTime,
+  computeStableStoreCode,
+} from '@/lib/pro-status';
 import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import Link from 'next/link';
 import { useProPrice } from '@/lib/pro-price';
@@ -73,6 +80,30 @@ export default function DashboardPage() {
   const [targetUpgradeSlug, setTargetUpgradeSlug] = useState<string>('');
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const expiredSyncTriggeredRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const hasTimedPro = qrs.some((q) => q.isPaid && Boolean(q.proExpiresAt));
+    if (!hasTimedPro) return;
+    const interval = setInterval(() => {
+      const currentNow = Date.now();
+      setNowMs(currentNow);
+      for (const q of qrs) {
+        if (
+          q.isPaid &&
+          q.proExpiresAt &&
+          !isProStillValid(q, currentNow) &&
+          !expiredSyncTriggeredRef.current.has(q.slug)
+        ) {
+          expiredSyncTriggeredRef.current.add(q.slug);
+          fetchQRs();
+          break;
+        }
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qrs]);
 
   useEffect(() => {
     // Check if returning from Mercado Pago Checkout Pro
@@ -182,7 +213,7 @@ export default function DashboardPage() {
   };
 
   const handleStartEdit = (qr: DynamicQRRecord) => {
-    if (!qr.isPaid) {
+    if (!isProStillValid(qr, nowMs)) {
       setTargetUpgradeSlug(qr.slug);
       setLockFeatureTitle('Edição de Link Dinâmico é Exclusiva do Plano PRO');
       setLockFeatureDescription(
@@ -205,6 +236,7 @@ export default function DashboardPage() {
   const buildFullConfig = (qr: DynamicQRRecord): QRConfig => {
     const resolvedType = qr.type || 'menu';
     const defaults = getDefaultFrameTexts(resolvedType);
+    const effectivePaid = isProStillValid(qr, nowMs);
     return {
       type: resolvedType,
       url: qr.targetUrl,
@@ -224,14 +256,14 @@ export default function DashboardPage() {
       bgColor: qr.qrConfig?.bgColor || '#ffffff',
       cornerColor: qr.qrConfig?.cornerColor || '#16a34a',
       dotStyle: qr.qrConfig?.dotStyle || 'rounded',
-      logoUrl: qr.isPaid ? qr.qrConfig?.logoUrl || '' : '',
+      logoUrl: effectivePaid ? qr.qrConfig?.logoUrl || '' : '',
       logoSize: qr.qrConfig?.logoSize || 22,
       frameStyle: qr.qrConfig?.frameStyle || 'table_tent',
       frameTopText: qr.qrConfig?.frameTopText || defaults.topText,
       frameText: qr.qrConfig?.frameText || defaults.bottomText,
       frameColor: qr.qrConfig?.frameColor || '#16a34a',
       frameTextColor: qr.qrConfig?.frameTextColor || '#ffffff',
-      isDynamic: qr.isPaid,
+      isDynamic: effectivePaid,
       dynamicSlug: qr.slug,
       title: qr.title,
     };
@@ -331,7 +363,8 @@ export default function DashboardPage() {
     setTimeout(() => setCopiedSlug(null), 2500);
   };
 
-  const hasAnyFreeQR = qrs.some((q) => !q.isPaid);
+  const hasAnyFreeQR = qrs.some((q) => !isProStillValid(q, nowMs));
+  const activeProCount = qrs.filter((q) => isProStillValid(q, nowMs)).length;
   const totalScans = qrs.reduce((acc, q) => acc + (q.scansCount || 0), 0);
 
   return (
@@ -483,7 +516,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="bg-[#121929] border border-slate-800 rounded-2xl p-5 relative overflow-hidden">
                 <div className="flex items-center justify-between text-slate-400 text-xs font-semibold mb-2">
                   <span>Total de Leituras (Scans)</span>
@@ -506,7 +539,7 @@ export default function DashboardPage() {
                   {qrs.length}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  {qrs.filter((q) => q.isPaid).length} Ativos no Plano PRO
+                  {activeProCount} Ativos no Plano PRO
                 </p>
               </div>
 
@@ -517,13 +550,20 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-3xl font-extrabold text-emerald-400">
                   R${' '}
-                  {(qrs.filter((q) => q.isPaid).length * 240 || 240).toFixed(0)}
+                  {(activeProCount * 240 || 240).toFixed(0)}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Em reimpressões de placas e adesivos
                 </p>
               </div>
             </div>
+
+            {/* Voucher Redeem Option (Visible for both Free and PRO accounts) */}
+            <VoucherRedeemBox
+              stores={qrs}
+              onRedeemed={() => fetchQRs()}
+              className="mb-8"
+            />
 
             {/* List of Dynamic QRs */}
             {loading ? (
@@ -569,12 +609,14 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {qrs.map((qr) => {
                   const isEditing = editingSlug === qr.slug;
+                  const effectivePaid = isProStillValid(qr, nowMs);
+                  const storeCode = computeStableStoreCode(qr);
 
                   return (
                     <div
                       key={qr.slug}
                       className={`border rounded-2xl p-5 sm:p-6 shadow-md transition ${
-                        qr.isPaid
+                        effectivePaid
                           ? 'bg-[#121929] border-slate-800 hover:border-slate-700'
                           : 'bg-slate-900/50 border-amber-500/30'
                       }`}
@@ -582,11 +624,14 @@ export default function DashboardPage() {
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         {/* Left: Info */}
                         <div className="space-y-2 flex-1">
-                          <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2.5">
                             <h3 className="text-base font-bold text-white">
                               {qr.title}
                             </h3>
-                            {qr.isPaid ? (
+                            <span className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
+                              ID #{storeCode}
+                            </span>
+                            {effectivePaid ? (
                               <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase flex items-center gap-1">
                                 <ShieldCheck className="w-3 h-3" />
                                 PRO Ativo (Com Logo Central & Sem Ads)
@@ -599,6 +644,14 @@ export default function DashboardPage() {
                                 <Lock className="w-3 h-3 text-amber-400" />
                                 Versão Grátis • Ativar PRO + Logo ({proPriceLabel})
                               </button>
+                            )}
+                            {effectivePaid && qr.proExpiresAt && (
+                              <span className="bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-sky-400" />
+                                <span>
+                                  Expira em {formatRemainingProTime(qr.proExpiresAt, nowMs)}
+                                </span>
+                              </span>
                             )}
                           </div>
 
@@ -640,7 +693,7 @@ export default function DashboardPage() {
 
                           {/* Metrics Rule */}
                           <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500 pt-1">
-                            {qr.isPaid ? (
+                            {effectivePaid ? (
                               <span className="text-emerald-400/90 font-medium">
                                 📊 <strong>{qr.scansCount || 0}</strong>{' '}
                                 leituras registradas nas mesas
@@ -734,12 +787,12 @@ export default function DashboardPage() {
                           <button
                             onClick={() => handleStartEdit(qr)}
                             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                              qr.isPaid
+                              effectivePaid
                                 ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                 : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30'
                             }`}
                           >
-                            {qr.isPaid ? (
+                            {effectivePaid ? (
                               <>
                                 <Edit3 className="w-3.5 h-3.5" />
                                 <span>Mudar Link</span>
@@ -755,7 +808,7 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Inline Edit Form for PRO users */}
-                      {isEditing && qr.isPaid && (
+                      {isEditing && effectivePaid && (
                         <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-12 gap-3 items-end animate-fade-in bg-slate-900/50 p-4 rounded-xl">
                           <div className="sm:col-span-4">
                             <label className="text-[11px] font-semibold text-slate-300 block mb-1">
@@ -827,6 +880,8 @@ export default function DashboardPage() {
         isOpen={isLockModalOpen}
         onClose={() => setIsLockModalOpen(false)}
         onUpgrade={() => handleTriggerProCheckout()}
+        onVoucherRedeemed={() => fetchQRs()}
+        targetSlug={targetUpgradeSlug}
         featureTitle={lockFeatureTitle}
         featureDescription={lockFeatureDescription}
       />
@@ -855,11 +910,35 @@ export default function DashboardPage() {
             currentUser?.businessName
           }
           onSaved={() => fetchQRs()}
-          onDownloadQR={() => {
+          onDownloadQR={async (editedMenu) => {
             const targetQr = qrs.find((q) => q.slug === menuEditorSlug);
             if (targetQr) {
-              handleOpenTableTentOrDownload(targetQr, 'download');
+              const mergedQr: DynamicQRRecord = editedMenu
+                ? {
+                    ...targetQr,
+                    title: editedMenu.title || targetQr.title,
+                    qrConfig: {
+                      fgColor: targetQr.qrConfig?.fgColor || '#0f172a',
+                      bgColor: targetQr.qrConfig?.bgColor || '#ffffff',
+                      dotStyle: targetQr.qrConfig?.dotStyle || 'rounded',
+                      frameStyle: targetQr.qrConfig?.frameStyle || 'table_tent',
+                      frameColor:
+                        targetQr.qrConfig?.frameColor ||
+                        editedMenu.themeColor ||
+                        '#16a34a',
+                      frameTextColor:
+                        targetQr.qrConfig?.frameTextColor || '#ffffff',
+                      ...(targetQr.qrConfig || {}),
+                      logoUrl:
+                        typeof editedMenu.logoImage === 'string'
+                          ? editedMenu.logoImage
+                          : targetQr.qrConfig?.logoUrl,
+                    },
+                  }
+                : targetQr;
+              await handleOpenTableTentOrDownload(mergedQr, 'download');
             }
+            await fetchQRs();
           }}
         />
       )}
@@ -871,7 +950,7 @@ export default function DashboardPage() {
           onClose={() => setActiveTentQR(null)}
           qrDataUrl={tentQrDataUrl}
           config={buildFullConfig(activeTentQR)}
-          isPro={activeTentQR.isPaid}
+          isPro={isProStillValid(activeTentQR, nowMs)}
           onUpgradeToPro={() => {
             const slug = activeTentQR.slug;
             setActiveTentQR(null);

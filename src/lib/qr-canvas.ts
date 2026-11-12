@@ -544,6 +544,23 @@ function drawFrame(
   }
 }
 
+function loadCanvasSafeImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const trimmed = (url || '').trim();
+    if (!trimmed || typeof Image === 'undefined') {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    if (!trimmed.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = trimmed;
+  });
+}
+
 async function drawLogo(
   ctx: CanvasRenderingContext2D,
   logoUrl: string,
@@ -553,64 +570,166 @@ async function drawLogo(
   qrSize: number,
   logoPercentage: number
 ): Promise<void> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
+  const img = await loadCanvasSafeImage(logoUrl);
+  if (!img) return;
 
-    img.onload = () => {
-      const centerX = qrX + qrSize / 2;
-      const centerY = qrY + qrSize / 2;
-      const logoBoxSize = qrSize * logoPercentage;
-      const padding = 10;
-      const bgBoxSize = logoBoxSize + padding * 2;
+  const centerX = qrX + qrSize / 2;
+  const centerY = qrY + qrSize / 2;
+  const logoBoxSize = qrSize * logoPercentage;
+  const padding = Math.max(6, Math.round(canvasWidth * 0.01));
+  const bgBoxSize = logoBoxSize + padding * 2;
 
-      ctx.save();
+  ctx.save();
 
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetY = 3;
-      ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.18)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = '#ffffff';
 
-      roundRect(
-        ctx,
-        centerX - bgBoxSize / 2,
-        centerY - bgBoxSize / 2,
-        bgBoxSize,
-        bgBoxSize,
-        bgBoxSize * 0.28
-      );
-      ctx.fill();
+  roundRect(
+    ctx,
+    centerX - bgBoxSize / 2,
+    centerY - bgBoxSize / 2,
+    bgBoxSize,
+    bgBoxSize,
+    bgBoxSize * 0.28
+  );
+  ctx.fill();
 
-      ctx.shadowColor = 'transparent';
+  ctx.shadowColor = 'transparent';
 
-      ctx.save();
-      roundRect(
-        ctx,
-        centerX - logoBoxSize / 2,
-        centerY - logoBoxSize / 2,
-        logoBoxSize,
-        logoBoxSize,
-        logoBoxSize * 0.22
-      );
-      ctx.clip();
+  ctx.save();
+  roundRect(
+    ctx,
+    centerX - logoBoxSize / 2,
+    centerY - logoBoxSize / 2,
+    logoBoxSize,
+    logoBoxSize,
+    logoBoxSize * 0.22
+  );
+  ctx.clip();
 
-      ctx.drawImage(
-        img,
-        centerX - logoBoxSize / 2,
-        centerY - logoBoxSize / 2,
-        logoBoxSize,
-        logoBoxSize
-      );
+  const natW = img.naturalWidth || img.width;
+  const natH = img.naturalHeight || img.height;
+  const sSide = Math.min(natW, natH);
+  if (sSide > 0) {
+    const sx = (natW - sSide) / 2;
+    const sy = (natH - sSide) / 2;
+    ctx.drawImage(
+      img,
+      sx,
+      sy,
+      sSide,
+      sSide,
+      centerX - logoBoxSize / 2,
+      centerY - logoBoxSize / 2,
+      logoBoxSize,
+      logoBoxSize
+    );
+  } else {
+    ctx.drawImage(
+      img,
+      centerX - logoBoxSize / 2,
+      centerY - logoBoxSize / 2,
+      logoBoxSize,
+      logoBoxSize
+    );
+  }
 
-      ctx.restore();
-      ctx.restore();
-      resolve();
-    };
+  ctx.restore();
+  ctx.restore();
+}
 
-    img.onerror = () => {
-      resolve();
-    };
+export interface RenderPixQrOptions {
+  payload: string;
+  logoUrl?: string;
+  isPro?: boolean;
+}
 
-    img.src = logoUrl;
+export interface RenderPixQrResult {
+  dataUrl: string;
+  hasEmbeddedLogo: boolean;
+}
+
+/**
+ * Renders a high-contrast EMVCo PIX QR Code using Level H error correction.
+ * For PRO showcases with a store/restaurant logo, embeds the centered logo inside
+ * the cleared quiet center zone so bank scanners read reliably.
+ */
+export async function renderPixQrDataUrl({
+  payload,
+  logoUrl,
+  isPro = false,
+}: RenderPixQrOptions): Promise<RenderPixQrResult> {
+  if (typeof document === 'undefined') {
+    const dataUrl = await QRCode.toDataURL(payload, {
+      errorCorrectionLevel: 'H',
+      width: 320,
+      margin: 2,
+    });
+    return { dataUrl, hasEmbeddedLogo: false };
+  }
+
+  const cleanLogo = isPro && logoUrl?.trim() ? logoUrl.trim() : '';
+  const preloadedLogo = cleanLogo ? await loadCanvasSafeImage(cleanLogo) : null;
+  const canEmbedLogo = Boolean(preloadedLogo);
+
+  const buildConfig = (withLogo: boolean): QRConfig => ({
+    type: 'pix',
+    url: '',
+    whatsappPhone: '',
+    whatsappMessage: '',
+    pixKey: '',
+    pixKeyType: 'email',
+    pixName: 'PIX',
+    pixCity: 'BRASIL',
+    wifiSSID: '',
+    wifiPassword: '',
+    wifiEncryption: 'WPA',
+    googleReviewUrl: '',
+    fgColor: '#000000',
+    bgColor: '#ffffff',
+    cornerColor: '#000000',
+    dotStyle: 'squares',
+    logoUrl: withLogo ? cleanLogo : undefined,
+    logoSize: 22,
+    frameStyle: 'none',
+    frameText: '',
+    frameColor: '#000000',
+    frameTextColor: '#ffffff',
+    isDynamic: withLogo,
   });
+
+  const canvas = document.createElement('canvas');
+
+  if (canEmbedLogo) {
+    try {
+      await renderStyledQR({
+        config: buildConfig(true),
+        targetContent: payload,
+        canvas,
+        width: 640,
+        height: 640,
+      });
+      return {
+        dataUrl: canvas.toDataURL('image/png'),
+        hasEmbeddedLogo: true,
+      };
+    } catch {
+      // Fallback cleanly to plain Level-H QR if canvas becomes tainted
+    }
+  }
+
+  await renderStyledQR({
+    config: buildConfig(false),
+    targetContent: payload,
+    canvas,
+    width: 640,
+    height: 640,
+  });
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    hasEmbeddedLogo: false,
+  };
 }

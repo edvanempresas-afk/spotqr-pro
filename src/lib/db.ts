@@ -10,8 +10,11 @@ import {
   DeveloperNotification,
   DeveloperNotificationType,
   PaymentRecord,
+  ProVoucher,
+  AdminStoreSummary,
 } from './types';
 import { DEMO_PAYMENTS } from './payments';
+import { computeStableStoreCode, isProStillValid } from './pro-status';
 
 interface DatabaseSchema {
   dynamicQRs: Record<string, DynamicQRRecord>;
@@ -21,6 +24,7 @@ interface DatabaseSchema {
   developerSettings?: DeveloperSettings;
   developerNotifications?: Record<string, DeveloperNotification>;
   users?: Record<string, ClientUser>;
+  vouchers?: Record<string, ProVoucher>;
 }
 
 export function hashClientPassword(password: string): string {
@@ -459,6 +463,11 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
+    if (!parsed.vouchers) {
+      parsed.vouchers = {};
+      modified = true;
+    }
+
     if (modified) {
       saveDb(parsed);
     }
@@ -499,7 +508,8 @@ export type CloudSliceKey =
   | 'payments'
   | 'leads'
   | 'notifications'
-  | 'settings';
+  | 'settings'
+  | 'vouchers';
 
 const CLOUD_KEYS: CloudSliceKey[] = [
   'users',
@@ -508,6 +518,7 @@ const CLOUD_KEYS: CloudSliceKey[] = [
   'leads',
   'notifications',
   'settings',
+  'vouchers',
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
@@ -641,6 +652,12 @@ export async function syncDbFromCloud(): Promise<void> {
     changed = true;
   }
 
+  const cloudVouchers = parseSlice<Record<string, ProVoucher>>(results[6]);
+  if (cloudVouchers) {
+    db.vouchers = cloudVouchers;
+    changed = true;
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -716,6 +733,7 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     leads: db.developerLeads || {},
     notifications: db.developerNotifications || {},
     settings: db.developerSettings || initialData.developerSettings,
+    vouchers: db.vouchers || {},
   };
   await kvRequest(['SET', `spotqr:${slice}`, JSON.stringify(map[slice])]);
 }
@@ -723,6 +741,74 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
 export async function persistMenuToCloud(menu: RestaurantMenu): Promise<void> {
   if (!menu?.slug || !getCloudKVConfig()) return;
   await kvRequest(['SET', `spotqr:menu:${menu.slug}`, JSON.stringify(menu)]);
+}
+
+function assignUniqueStoreCode(
+  db: DatabaseSchema,
+  record: DynamicQRRecord
+): string {
+  if (record.storeCode && /^\d+$/.test(record.storeCode)) {
+    return record.storeCode;
+  }
+  const used = new Set(
+    Object.values(db.dynamicQRs || {})
+      .map((q) => q.storeCode)
+      .filter(Boolean)
+  );
+  let candidate = computeStableStoreCode(record);
+  while (used.has(candidate)) {
+    candidate = String(100000 + Math.floor(Math.random() * 900000));
+  }
+  return candidate;
+}
+
+/**
+ * Checks all non-demo QRs and automatically reverts expired temporary/voucher PRO plans back to Free.
+ * Returns true if any record changed so callers can persist updated QR state to cloud.
+ */
+export function expireDueQRsIfAny(): boolean {
+  const db = ensureDb();
+  const nowMs = Date.now();
+  let changed = false;
+
+  for (const slug of Object.keys(db.dynamicQRs || {})) {
+    const qr = db.dynamicQRs[slug];
+    if (!qr) continue;
+    if (slug === 'demo-restaurante' || slug === 'demo-catalogo') continue;
+
+    if (!qr.storeCode) {
+      qr.storeCode = assignUniqueStoreCode(db, qr);
+      changed = true;
+    }
+
+    if (qr.isPaid && qr.proExpiresAt && !isProStillValid(qr, nowMs)) {
+      qr.isPaid = false;
+      qr.proExpiresAt = null;
+      qr.proGrantType = undefined;
+      qr.proGrantedHours = undefined;
+      qr.updatedAt = new Date(nowMs).toISOString();
+      changed = true;
+    }
+  }
+
+  // Also clear expired pre-store voucher credit on client users
+  for (const uid of Object.keys(db.users || {})) {
+    const user = db.users?.[uid];
+    if (user?.proCreditExpiresAt) {
+      const exp = new Date(user.proCreditExpiresAt).getTime();
+      if (Number.isFinite(exp) && nowMs >= exp) {
+        user.proCreditExpiresAt = null;
+        user.proCreditVoucherCode = undefined;
+        user.proCreditDays = undefined;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    saveDb(db);
+  }
+  return changed;
 }
 
 // DYNAMIC QR CRUD
@@ -738,6 +824,9 @@ export function getAllDynamicQRs(): DynamicQRRecord[] {
 
 export function saveDynamicQR(record: DynamicQRRecord): void {
   const db = ensureDb();
+  if (!record.storeCode && record.slug !== 'demo-restaurante' && record.slug !== 'demo-catalogo') {
+    record.storeCode = assignUniqueStoreCode(db, record);
+  }
   db.dynamicQRs[record.slug] = record;
 
   // If this QR is of type 'menu' or 'catalog' and no menu/catalog exists for this slug yet, auto-create!
@@ -939,6 +1028,8 @@ export function recordPayment(
 
   if (status === 'approved' && db.dynamicQRs[slug]) {
     db.dynamicQRs[slug].isPaid = true;
+    db.dynamicQRs[slug].proGrantType = 'paid';
+    db.dynamicQRs[slug].proExpiresAt = null;
     db.dynamicQRs[slug].paymentId = paymentId;
   }
   saveDb(db);
@@ -1033,7 +1124,9 @@ export function getSubscriptionAnalytics() {
     0
   );
 
-  const totalActiveProCount = realCustomerQRs.filter((q) => q.isPaid).length;
+  const totalActiveProCount = realCustomerQRs.filter((q) =>
+    isProStillValid(q)
+  ).length;
   const totalAllTimeRevenue = approvedPayments.reduce(
     (acc, p) => acc + (Number(p.amount) || 10.9),
     0
@@ -1268,6 +1361,331 @@ export function getDynamicQRsByOwner(
         qr.ownerEmail &&
         qr.ownerEmail.toLowerCase() === ownerEmail.toLowerCase())
   );
+}
+
+// ADMIN PRO GRANT / REVOKE & STORE DIRECTORY
+export function getAdminStoresList(): AdminStoreSummary[] {
+  expireDueQRsIfAny();
+  const db = ensureDb();
+  const usersById = db.users || {};
+  const usersByEmail = new Map<string, ClientUser>();
+  for (const u of Object.values(usersById)) {
+    if (u.email) usersByEmail.set(u.email.toLowerCase(), u);
+  }
+
+  return Object.values(db.dynamicQRs || {})
+    .filter((q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo')
+    .map((qr) => {
+      const owner =
+        (qr.ownerId && usersById[qr.ownerId]) ||
+        (qr.ownerEmail && usersByEmail.get(qr.ownerEmail.toLowerCase())) ||
+        null;
+      const effectivePaid = isProStillValid(qr);
+      return {
+        id: qr.id,
+        storeCode: qr.storeCode || assignUniqueStoreCode(db, qr),
+        slug: qr.slug,
+        title: qr.title || owner?.businessName || qr.slug,
+        type: qr.type,
+        isPaid: effectivePaid,
+        proGrantType: effectivePaid ? qr.proGrantType : undefined,
+        proExpiresAt: effectivePaid ? qr.proExpiresAt || null : null,
+        proGrantedAt: qr.proGrantedAt,
+        proGrantedHours: qr.proGrantedHours,
+        proVoucherCode: qr.proVoucherCode,
+        scansCount: qr.scansCount || 0,
+        ownerId: qr.ownerId || owner?.id,
+        ownerName: owner?.name || owner?.businessName || '',
+        ownerEmail: qr.ownerEmail || owner?.email || '',
+        ownerWhatsapp: owner?.whatsapp || '',
+        createdAt: qr.createdAt,
+        updatedAt: qr.updatedAt,
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() -
+        new Date(a.updatedAt || a.createdAt).getTime()
+    );
+}
+
+export function grantProToQR(input: {
+  slug: string;
+  mode: 'indeterminate' | 'days_30' | 'hours';
+  hours?: number;
+  minutes?: number;
+}): DynamicQRRecord | null {
+  const db = ensureDb();
+  const qr = db.dynamicQRs[input.slug];
+  if (!qr) return null;
+
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  let expiresAt: string | null = null;
+  let grantedHours: number | undefined = undefined;
+
+  if (input.mode === 'days_30') {
+    expiresAt = new Date(nowMs + 30 * 24 * 60 * 60 * 1000).toISOString();
+  } else if (input.mode === 'hours') {
+    const h = Math.max(0, Number(input.hours) || 0);
+    const m = Math.max(0, Number(input.minutes) || 0);
+    const totalMinutes = Math.max(1, Math.round(h * 60 + m));
+    expiresAt = new Date(nowMs + totalMinutes * 60 * 1000).toISOString();
+    grantedHours = Number((totalMinutes / 60).toFixed(2));
+  }
+
+  qr.isPaid = true;
+  qr.proGrantType = input.mode;
+  qr.proExpiresAt = expiresAt;
+  qr.proGrantedAt = nowIso;
+  qr.proGrantedHours = grantedHours;
+  qr.proVoucherCode = undefined;
+  qr.updatedAt = nowIso;
+  if (!qr.storeCode) {
+    qr.storeCode = assignUniqueStoreCode(db, qr);
+  }
+
+  db.dynamicQRs[input.slug] = qr;
+  saveDb(db);
+  return qr;
+}
+
+export function revokeProFromQR(slug: string): DynamicQRRecord | null {
+  const db = ensureDb();
+  const qr = db.dynamicQRs[slug];
+  if (!qr) return null;
+
+  qr.isPaid = false;
+  qr.proExpiresAt = null;
+  qr.proGrantType = undefined;
+  qr.proGrantedHours = undefined;
+  qr.proVoucherCode = undefined;
+  qr.updatedAt = new Date().toISOString();
+
+  db.dynamicQRs[slug] = qr;
+  saveDb(db);
+  return qr;
+}
+
+// PRO VOUCHERS CRUD & REDEMPTION
+function generateVoucherCode(days: number): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let suffix = '';
+  for (let i = 0; i < 4; i++) {
+    suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return `SPOT-${days}D-${suffix}`;
+}
+
+export function createProVoucher(input: {
+  days: number;
+  recipientHint?: string;
+}): ProVoucher {
+  const db = ensureDb();
+  if (!db.vouchers) db.vouchers = {};
+
+  const safeDays = Math.min(365, Math.max(1, Math.round(Number(input.days) || 7)));
+  const existingCodes = new Set(
+    Object.values(db.vouchers).map((v) => v.code.toUpperCase())
+  );
+
+  let code = generateVoucherCode(safeDays);
+  while (existingCodes.has(code)) {
+    code = generateVoucherCode(safeDays);
+  }
+
+  const id = `voucher-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const voucher: ProVoucher = {
+    id,
+    code,
+    days: safeDays,
+    recipientHint: input.recipientHint ? input.recipientHint.trim() : undefined,
+    createdAt: new Date().toISOString(),
+    createdBy: 'Edvan Dev',
+    isRedeemed: false,
+  };
+
+  db.vouchers[id] = voucher;
+  saveDb(db);
+  return voucher;
+}
+
+export function getAllProVouchers(): ProVoucher[] {
+  const db = ensureDb();
+  return Object.values(db.vouchers || {}).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function deleteProVoucher(id: string): boolean {
+  const db = ensureDb();
+  if (!db.vouchers || !db.vouchers[id]) return false;
+  delete db.vouchers[id];
+  saveDb(db);
+  return true;
+}
+
+export function consumeUserProCreditIfActive(
+  userId?: string,
+  userEmail?: string
+): {
+  isPaid: boolean;
+  proExpiresAt?: string | null;
+  proGrantType?: DynamicQRRecord['proGrantType'];
+  proVoucherCode?: string;
+} {
+  if (!userId && !userEmail) return { isPaid: false };
+  const db = ensureDb();
+  const user =
+    (userId && db.users?.[userId]) ||
+    (userEmail
+      ? Object.values(db.users || {}).find(
+          (u) => u.email.toLowerCase() === userEmail.toLowerCase()
+        )
+      : undefined);
+
+  if (!user || !user.proCreditExpiresAt) {
+    return { isPaid: false };
+  }
+
+  const expMs = new Date(user.proCreditExpiresAt).getTime();
+  if (!Number.isFinite(expMs) || Date.now() >= expMs) {
+    user.proCreditExpiresAt = null;
+    user.proCreditVoucherCode = undefined;
+    user.proCreditDays = undefined;
+    saveDb(db);
+    return { isPaid: false };
+  }
+
+  const result = {
+    isPaid: true,
+    proExpiresAt: user.proCreditExpiresAt,
+    proGrantType: 'voucher' as const,
+    proVoucherCode: user.proCreditVoucherCode,
+  };
+
+  user.proCreditExpiresAt = null;
+  user.proCreditVoucherCode = undefined;
+  user.proCreditDays = undefined;
+  saveDb(db);
+
+  return result;
+}
+
+export function redeemProVoucher(input: {
+  code: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  businessName?: string;
+  slug?: string;
+}): {
+  voucher: ProVoucher;
+  slug?: string;
+  storeName?: string;
+  proExpiresAt: string;
+  creditOnly: boolean;
+} {
+  expireDueQRsIfAny();
+  const db = ensureDb();
+  if (!db.vouchers) db.vouchers = {};
+
+  const normalizedCode = (input.code || '').trim().toUpperCase();
+  if (!normalizedCode) {
+    throw new Error('Digite o código do voucher.');
+  }
+
+  const voucher = Object.values(db.vouchers).find(
+    (v) => v.code.toUpperCase() === normalizedCode
+  );
+  if (!voucher) {
+    throw new Error('Código voucher não encontrado. Verifique e tente novamente.');
+  }
+  if (voucher.isRedeemed) {
+    throw new Error('Este código voucher já foi utilizado anteriormente.');
+  }
+
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const expiresIso = new Date(
+    nowMs + voucher.days * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  // Resolve target store/QR for this user
+  let targetQR: DynamicQRRecord | null = null;
+  if (input.slug && input.slug !== 'demo-restaurante' && input.slug !== 'demo-catalogo') {
+    const candidate = db.dynamicQRs[input.slug];
+    if (
+      candidate &&
+      (input.userId === 'admin' ||
+        candidate.ownerId === input.userId ||
+        (candidate.ownerEmail &&
+          candidate.ownerEmail.toLowerCase() === input.userEmail.toLowerCase()))
+    ) {
+      targetQR = candidate;
+    }
+  }
+
+  if (!targetQR) {
+    const userQRs = getDynamicQRsByOwner(input.userId, input.userEmail).filter(
+      (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
+    );
+    targetQR = userQRs.find((q) => !isProStillValid(q, nowMs)) || userQRs[0] || null;
+  }
+
+  let creditOnly = false;
+  if (targetQR) {
+    targetQR.isPaid = true;
+    targetQR.proGrantType = 'voucher';
+    targetQR.proExpiresAt = expiresIso;
+    targetQR.proGrantedAt = nowIso;
+    targetQR.proGrantedHours = undefined;
+    targetQR.proVoucherCode = voucher.code;
+    targetQR.updatedAt = nowIso;
+    if (!targetQR.storeCode) {
+      targetQR.storeCode = assignUniqueStoreCode(db, targetQR);
+    }
+    db.dynamicQRs[targetQR.slug] = targetQR;
+  } else {
+    // User logged in before creating their first store -> credit saved to account!
+    creditOnly = true;
+    if (db.users && db.users[input.userId]) {
+      db.users[input.userId].proCreditExpiresAt = expiresIso;
+      db.users[input.userId].proCreditVoucherCode = voucher.code;
+      db.users[input.userId].proCreditDays = voucher.days;
+    }
+  }
+
+  voucher.isRedeemed = true;
+  voucher.redeemedAt = nowIso;
+  voucher.redeemedByUserId = input.userId;
+  voucher.redeemedByEmail = input.userEmail;
+  voucher.redeemedByName = input.businessName || input.userName;
+  voucher.redeemedForSlug = targetQR?.slug;
+  voucher.redeemedStoreName = targetQR?.title || input.businessName || input.userName;
+  voucher.proExpiresAt = expiresIso;
+  db.vouchers[voucher.id] = voucher;
+
+  saveDb(db);
+
+  createDeveloperNotification({
+    type: 'voucher_redeemed',
+    title: `🎟️ Voucher PRO Resgatado (${voucher.days} dias)!`,
+    message: `${voucher.redeemedByName} (${input.userEmail}) ativou o código ${voucher.code}${
+      targetQR ? ` em /${targetQR.slug}` : ' na conta (próxima loja)'
+    }.`,
+    clientName: voucher.redeemedByName,
+    contact: input.userEmail,
+    slug: targetQR?.slug,
+  });
+
+  return {
+    voucher,
+    slug: targetQR?.slug,
+    storeName: targetQR?.title,
+    proExpiresAt: expiresIso,
+    creditOnly,
+  };
 }
 
 

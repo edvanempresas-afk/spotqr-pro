@@ -7,6 +7,7 @@ import QRCodeGenerator from '@/components/QRCodeGenerator';
 import AdBanner from '@/components/AdBanner';
 import ProFeatureLockModal from '@/components/ProFeatureLockModal';
 import DeveloperContactSection from '@/components/DeveloperContactSection';
+import VoucherRedeemBox from '@/components/VoucherRedeemBox';
 import {
   Sparkles,
   CheckCircle2,
@@ -562,6 +563,9 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+
+            {/* Redeem Voucher Code Box on Free vs PRO Screen */}
+            <VoucherRedeemBox className="mt-8" />
           </div>
         </section>
 

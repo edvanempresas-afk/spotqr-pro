@@ -5,10 +5,13 @@ import {
   getDynamicQRsByOwner,
   saveDynamicQR,
   getMenuBySlug,
+  expireDueQRsIfAny,
+  consumeUserProCreditIfActive,
   syncDbFromCloud,
   persistSliceToCloud,
   persistMenuToCloud,
 } from '@/lib/db';
+import { isProStillValid } from '@/lib/pro-status';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 import { DynamicQRRecord } from '@/lib/types';
@@ -17,6 +20,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   await syncDbFromCloud();
+  if (expireDueQRsIfAny()) {
+    await persistSliceToCloud('qrs');
+  }
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
 
@@ -80,8 +86,13 @@ export async function POST(request: NextRequest) {
       .trim()
       .replace(/[^a-z0-9_-]/g, '-');
 
+    expireDueQRsIfAny();
     const existing = getDynamicQRBySlug(cleanSlug);
+    const credit = !existing && clientUser
+      ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
+      : { isPaid: false };
     const record: DynamicQRRecord = {
+      ...(existing || {}),
       id: existing?.id || `qr_${Date.now()}`,
       slug: cleanSlug,
       title:
@@ -95,7 +106,10 @@ export async function POST(request: NextRequest) {
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       scansCount: existing?.scansCount || 0,
-      isPaid: existing?.isPaid || false,
+      isPaid: existing ? isProStillValid(existing) : credit.isPaid,
+      proGrantType: existing?.proGrantType || credit.proGrantType,
+      proExpiresAt: existing?.proExpiresAt ?? credit.proExpiresAt ?? null,
+      proVoucherCode: existing?.proVoucherCode || credit.proVoucherCode,
       qrConfig: qrConfig || existing?.qrConfig || {},
       linkedMenuId: cleanSlug,
       ownerId: clientUser?.id || existing?.ownerId || 'admin',
@@ -104,6 +118,9 @@ export async function POST(request: NextRequest) {
 
     saveDynamicQR(record);
     await persistSliceToCloud('qrs');
+    if (credit.isPaid) {
+      await persistSliceToCloud('users');
+    }
     if (record.type === 'menu' || record.type === 'catalog') {
       const m = getMenuBySlug(cleanSlug, record.type, record.title);
       if (m) await persistMenuToCloud(m);

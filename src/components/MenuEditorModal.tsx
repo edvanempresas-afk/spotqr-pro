@@ -41,6 +41,7 @@ import {
 } from '@/lib/types';
 import { ImageUploadPreset } from '@/lib/image-upload';
 import { getItemStockInfo } from '@/lib/stock';
+import { isProStillValid } from '@/lib/pro-status';
 import {
   SHOWCASE_PAYMENT_OPTIONS,
   getAcceptedPaymentsList,
@@ -62,7 +63,7 @@ interface MenuEditorModalProps {
   mode?: 'menu' | 'catalog';
   defaultTitle?: string;
   onSaved?: () => void;
-  onDownloadQR?: () => void;
+  onDownloadQR?: (menu?: RestaurantMenu) => void | Promise<void>;
 }
 
 const FOOD_IMAGE_PRESETS = [
@@ -184,7 +185,11 @@ export default function MenuEditorModal({
                 const draftTime = new Date(draft.updatedAt || 0).getTime();
                 const serverTime = new Date(data.updatedAt || 0).getTime();
                 if (draftTime > serverTime) {
-                  resolved = { ...draft, isPaid: data.isPaid } as RestaurantMenu;
+                  resolved = {
+                    ...draft,
+                    isPaid: data.isPaid,
+                    proExpiresAt: data.proExpiresAt || null,
+                  } as RestaurantMenu;
                 }
               }
             } catch {
@@ -267,7 +272,7 @@ export default function MenuEditorModal({
     try {
       await persistShowcase();
       if (onDownloadQR) {
-        await onDownloadQR();
+        await onDownloadQR(menu);
         return;
       }
 
@@ -278,6 +283,17 @@ export default function MenuEditorModal({
       const qrType = isCatalog ? 'catalog' : 'menu';
       const frames = getDefaultFrameTexts(qrType);
       const targetUrl = `${origin}/r/${slug}`;
+      const proMeta = menu as RestaurantMenu & {
+        isPaid?: boolean;
+        proExpiresAt?: string | null;
+      };
+      const isProShowcase = Boolean(
+        isProStillValid({
+          slug,
+          isPaid: proMeta.isPaid,
+          proExpiresAt: proMeta.proExpiresAt,
+        })
+      );
       const fallbackConfig: QRConfig = {
         type: qrType,
         url: targetUrl,
@@ -295,13 +311,14 @@ export default function MenuEditorModal({
         bgColor: '#ffffff',
         cornerColor: menu.themeColor || '#16a34a',
         dotStyle: 'squares',
+        logoUrl: isProShowcase ? menu.logoImage || undefined : undefined,
         logoSize: 22,
         frameStyle: 'bottom_tag',
         frameTopText: frames.topText,
         frameText: frames.bottomText,
         frameColor: menu.themeColor || '#16a34a',
         frameTextColor: '#ffffff',
-        isDynamic: Boolean((menu as RestaurantMenu & { isPaid?: boolean }).isPaid),
+        isDynamic: isProShowcase,
         dynamicSlug: slug,
         title: menu.title,
       };
@@ -993,11 +1010,19 @@ export default function MenuEditorModal({
                               </label>
                               <select
                                 value={item.badge || ''}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  const nextBadge = e.target.value || undefined;
                                   handleUpdateItem(item.id, {
-                                    badge: e.target.value || undefined,
-                                  })
-                                }
+                                    badge: nextBadge,
+                                    productionDays:
+                                      nextBadge === 'Sob Encomenda'
+                                        ? item.productionDays &&
+                                          item.productionDays > 0
+                                          ? item.productionDays
+                                          : 3
+                                        : undefined,
+                                  });
+                                }}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-amber-400"
                               >
                                 <option value="">Sem selo</option>
@@ -1162,6 +1187,77 @@ export default function MenuEditorModal({
                                       </div>
                                     )}
                                   </div>
+
+                                  {item.badge === 'Sob Encomenda' && (
+                                    <div className="mt-3 pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2.5">
+                                      <div>
+                                        <label className="text-[10px] font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                                          <span>⏱️ Prazo para ficar pronto (Sob Encomenda):</span>
+                                        </label>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                          Quantos dias leva para produzir e entregar ao cliente.
+                                        </p>
+                                      </div>
+
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {[2, 3, 5, 7, 15].map((daysOption) => {
+                                          const selected = item.productionDays === daysOption;
+                                          return (
+                                            <button
+                                              key={daysOption}
+                                              type="button"
+                                              onClick={() =>
+                                                handleUpdateItem(item.id, {
+                                                  productionDays: daysOption,
+                                                })
+                                              }
+                                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
+                                                selected
+                                                  ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                              }`}
+                                            >
+                                              {daysOption}d
+                                            </button>
+                                          );
+                                        })}
+                                        <div className="flex items-center gap-1.5 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1">
+                                          <input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            step={1}
+                                            placeholder="Ex: 5"
+                                            value={
+                                              typeof item.productionDays === 'number' &&
+                                              item.productionDays > 0
+                                                ? item.productionDays
+                                                : ''
+                                            }
+                                            onChange={(e) => {
+                                              const raw = e.target.value.trim();
+                                              if (!raw) {
+                                                handleUpdateItem(item.id, {
+                                                  productionDays: undefined,
+                                                });
+                                                return;
+                                              }
+                                              const parsed = parseInt(raw, 10);
+                                              handleUpdateItem(item.id, {
+                                                productionDays: Number.isNaN(parsed)
+                                                  ? undefined
+                                                  : Math.max(1, Math.min(365, parsed)),
+                                              });
+                                            }}
+                                            className="w-12 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
+                                          />
+                                          <span className="text-[10px] font-semibold text-slate-400">
+                                            {item.productionDays === 1 ? 'dia' : 'dias'}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}

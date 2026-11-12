@@ -10,7 +10,11 @@ import {
   DeveloperSettings,
   DeveloperNotification,
   PaymentRecord,
+  AdminStoreSummary,
+  ProVoucher,
 } from '@/lib/types';
+import AdminStoresProPanel from '@/components/AdminStoresProPanel';
+import AdminVouchersPanel from '@/components/AdminVouchersPanel';
 import {
   Inbox,
   MessageCircle,
@@ -52,6 +56,8 @@ import {
   CreditCard,
   Download,
   Volume2,
+  Store,
+  Ticket,
 } from 'lucide-react';
 import Link from 'next/link';
 import { broadcastProPriceUpdate } from '@/lib/pro-price';
@@ -108,11 +114,18 @@ export default function DeveloperAdminDashboard() {
 
   // Main Navigation Tab for Mobile App & Desktop
   const [activeAppSection, setActiveAppSection] = useState<
-    'overview' | 'subscriptions' | 'proposals' | 'notifications'
+    | 'overview'
+    | 'stores'
+    | 'vouchers'
+    | 'subscriptions'
+    | 'proposals'
+    | 'notifications'
   >('overview');
 
   // Dashboard Data State
   const [leads, setLeads] = useState<DeveloperLead[]>([]);
+  const [stores, setStores] = useState<AdminStoreSummary[]>([]);
+  const [vouchers, setVouchers] = useState<ProVoucher[]>([]);
   const [notifications, setNotifications] = useState<DeveloperNotification[]>(
     []
   );
@@ -515,6 +528,12 @@ export default function DeveloperAdminDashboard() {
         }
         if (data.subscriptionAnalytics) {
           setSubscriptionAnalytics(data.subscriptionAnalytics);
+        }
+        if (Array.isArray(data.stores)) {
+          setStores(data.stores);
+        }
+        if (Array.isArray(data.vouchers)) {
+          setVouchers(data.vouchers);
         }
         if (data.notifications) {
           const incoming: DeveloperNotification[] = data.notifications;
@@ -950,30 +969,56 @@ export default function DeveloperAdminDashboard() {
           </div>
 
           {/* APP NAVIGATION TABS (Desktop Pills + Mobile Bottom Bar) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
-              className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
                 activeAppSection === 'overview'
                   ? 'bg-emerald-500 text-slate-950 shadow-glow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <TrendingUp className="w-4 h-4" />
-              <span>📊 Resumo do Mês</span>
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              <span>📊 Resumo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('stores')}
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+                activeAppSection === 'stores'
+                  ? 'bg-emerald-500 text-slate-950 shadow-glow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Store className="w-4 h-4 shrink-0" />
+              <span>🏪 Lojas &amp; PRO ({stores.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('vouchers')}
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+                activeAppSection === 'vouchers'
+                  ? 'bg-emerald-500 text-slate-950 shadow-glow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Ticket className="w-4 h-4 shrink-0" />
+              <span>🎟️ Vouchers ({vouchers.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveAppSection('subscriptions')}
-              className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
                 activeAppSection === 'subscriptions'
                   ? 'bg-emerald-500 text-slate-950 shadow-glow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <CreditCard className="w-4 h-4" />
+              <CreditCard className="w-4 h-4 shrink-0" />
               <span>
                 💰 Assinaturas ({subscriptionAnalytics.monthlyApprovedCount})
               </span>
@@ -982,13 +1027,13 @@ export default function DeveloperAdminDashboard() {
             <button
               type="button"
               onClick={() => setActiveAppSection('proposals')}
-              className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
                 activeAppSection === 'proposals'
                   ? 'bg-emerald-500 text-slate-950 shadow-glow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <MessageCircle className="w-4 h-4" />
+              <MessageCircle className="w-4 h-4 shrink-0" />
               <span>💬 Propostas ({leads.length})</span>
             </button>
 
@@ -998,14 +1043,14 @@ export default function DeveloperAdminDashboard() {
                 setActiveAppSection('notifications');
                 handleMarkAllRead();
               }}
-              className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
                 activeAppSection === 'notifications'
                   ? 'bg-emerald-500 text-slate-950 shadow-glow'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Bell className="w-4 h-4" />
-              <span>🔔 Alertas & App ({notifications.length})</span>
+              <Bell className="w-4 h-4 shrink-0" />
+              <span>🔔 Alertas ({notifications.length})</span>
             </button>
           </div>
 
@@ -1415,6 +1460,24 @@ export default function DeveloperAdminDashboard() {
                 </p>
               </div>
             </div>
+          )}
+
+          {/* SECTION: STORES & IN-PERSON PRO ACTIVATION */}
+          {(activeAppSection === 'stores' || activeAppSection === 'overview') && (
+            <AdminStoresProPanel
+              stores={stores}
+              onStoresUpdated={setStores}
+              onRefresh={() => fetchDashboardData(true)}
+            />
+          )}
+
+          {/* SECTION: PRINTABLE VOUCHERS GENERATOR */}
+          {(activeAppSection === 'vouchers' ||
+            activeAppSection === 'overview') && (
+            <AdminVouchersPanel
+              vouchers={vouchers}
+              onVouchersUpdated={setVouchers}
+            />
           )}
 
           {/* SECTION: SUBSCRIPTIONS & MONTHLY REVENUE BREAKDOWN */}
@@ -2063,11 +2126,11 @@ export default function DeveloperAdminDashboard() {
           )}
 
           {/* FIXED BOTTOM NAVIGATION BAR FOR SMARTPHONES (Native Mobile App Feel) */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-2 py-2 grid grid-cols-4 gap-1">
+          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-1.5 py-2 grid grid-cols-6 gap-1">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-bold ${
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
                 activeAppSection === 'overview'
                   ? 'text-emerald-400 bg-emerald-500/10'
                   : 'text-slate-400'
@@ -2079,21 +2142,47 @@ export default function DeveloperAdminDashboard() {
 
             <button
               type="button"
+              onClick={() => setActiveAppSection('stores')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
+                activeAppSection === 'stores'
+                  ? 'text-emerald-400 bg-emerald-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
+              <Store className="w-4 h-4 mb-0.5" />
+              <span>Lojas</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('vouchers')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
+                activeAppSection === 'vouchers'
+                  ? 'text-emerald-400 bg-emerald-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
+              <Ticket className="w-4 h-4 mb-0.5" />
+              <span>Vouchers</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveAppSection('subscriptions')}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-bold ${
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
                 activeAppSection === 'subscriptions'
                   ? 'text-emerald-400 bg-emerald-500/10'
                   : 'text-slate-400'
               }`}
             >
               <CreditCard className="w-4 h-4 mb-0.5" />
-              <span>Assinaturas</span>
+              <span>Vendas</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveAppSection('proposals')}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-bold relative ${
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold relative ${
                 activeAppSection === 'proposals'
                   ? 'text-emerald-400 bg-emerald-500/10'
                   : 'text-slate-400'
@@ -2102,7 +2191,7 @@ export default function DeveloperAdminDashboard() {
               <MessageCircle className="w-4 h-4 mb-0.5" />
               <span>Propostas</span>
               {newLeadsCount > 0 && (
-                <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-amber-400" />
+                <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-400" />
               )}
             </button>
 
@@ -2112,7 +2201,7 @@ export default function DeveloperAdminDashboard() {
                 setActiveAppSection('notifications');
                 handleMarkAllRead();
               }}
-              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[10px] font-bold relative ${
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold relative ${
                 activeAppSection === 'notifications'
                   ? 'text-emerald-400 bg-emerald-500/10'
                   : 'text-slate-400'
@@ -2121,7 +2210,7 @@ export default function DeveloperAdminDashboard() {
               <Bell className="w-4 h-4 mb-0.5" />
               <span>Alertas</span>
               {unreadNotifsCount > 0 && (
-                <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               )}
             </button>
           </div>

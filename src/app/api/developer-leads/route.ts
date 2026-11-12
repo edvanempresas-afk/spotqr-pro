@@ -11,10 +11,14 @@ import {
   markAllDeveloperNotificationsRead,
   createDeveloperNotification,
   getSubscriptionAnalytics,
+  expireDueQRsIfAny,
+  getAdminStoresList,
+  getAllProVouchers,
   syncDbFromCloud,
   persistSliceToCloud,
   isCloudPersistenceConfigured,
 } from '@/lib/db';
+import { isProStillValid } from '@/lib/pro-status';
 import { DeveloperServiceType } from '@/lib/types';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 
@@ -30,6 +34,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (expireDueQRsIfAny()) {
+      await persistSliceToCloud('qrs');
+    }
+
     const leads = getAllDeveloperLeads();
     const settings = getDeveloperSettings();
     const qrs = getAllDynamicQRs().filter(
@@ -37,8 +45,10 @@ export async function GET(req: NextRequest) {
     );
     const notifications = getAllDeveloperNotifications();
     const subscriptionAnalytics = getSubscriptionAnalytics();
+    const stores = getAdminStoresList();
+    const vouchers = getAllProVouchers();
 
-    const paidQRs = qrs.filter((q) => q.isPaid).length;
+    const paidQRs = qrs.filter((q) => isProStillValid(q)).length;
     const totalScans = qrs.reduce((acc, q) => acc + (q.scansCount || 0), 0);
 
     // Strip password before returning settings to client
@@ -52,6 +62,8 @@ export async function GET(req: NextRequest) {
       settings: safeSettings,
       notifications,
       subscriptionAnalytics,
+      stores,
+      vouchers,
       cloudPersistenceEnabled: isCloudPersistenceConfigured(),
       platformStats: {
         totalQRs: qrs.length,

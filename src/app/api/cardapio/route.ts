@@ -4,11 +4,14 @@ import {
   saveMenu,
   getDynamicQRBySlug,
   saveDynamicQR,
+  expireDueQRsIfAny,
+  consumeUserProCreditIfActive,
   syncDbFromCloud,
   syncMenuFromCloud,
   persistMenuToCloud,
   persistSliceToCloud,
 } from '@/lib/db';
+import { isProStillValid } from '@/lib/pro-status';
 import { RestaurantMenu, DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
@@ -26,6 +29,9 @@ export async function GET(request: NextRequest) {
   }
 
   await syncDbFromCloud();
+  if (expireDueQRsIfAny()) {
+    await persistSliceToCloud('qrs');
+  }
   await syncMenuFromCloud(slug);
 
   const menu = getMenuBySlug(slug, modeParam, titleParam);
@@ -38,13 +44,15 @@ export async function GET(request: NextRequest) {
 
   const qr = getDynamicQRBySlug(slug);
   const isPaid = Boolean(
-    qr?.isPaid || slug === 'demo-restaurante' || slug === 'demo-catalogo'
+    isProStillValid(qr) || slug === 'demo-restaurante' || slug === 'demo-catalogo'
   );
 
   return NextResponse.json(
     {
       ...menu,
       isPaid,
+      proGrantType: isPaid ? qr?.proGrantType || null : null,
+      proExpiresAt: isPaid ? qr?.proExpiresAt || null : null,
     },
     {
       headers: {
@@ -100,10 +108,30 @@ export async function POST(request: NextRequest) {
     saveMenu(updatedMenu);
 
     // Ensure a corresponding DynamicQRRecord exists and is linked to this client!
+    expireDueQRsIfAny();
     const existingQR = getDynamicQRBySlug(cleanSlug);
+    const credit = !existingQR && clientUser
+      ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
+      : { isPaid: false };
     const qrType = isCatalog ? 'catalog' : 'menu';
     const routePrefix = isCatalog ? '/catalogo/' : '/cardapio/';
+    const baseQrConfig = existingQR?.qrConfig || {
+      fgColor: '#0f172a',
+      bgColor: '#ffffff',
+      cornerColor: body.themeColor || '#16a34a',
+      dotStyle: 'rounded',
+      frameStyle: 'table_tent',
+      frameTopText: isCatalog ? '🛍️ CATÁLOGO DIGITAL' : '📱 CARDÁPIO NA MESA',
+      frameText: isCatalog ? 'VER PRODUTOS & PEDIR' : 'VER CARDÁPIO & PEDIR',
+      frameColor: body.themeColor || '#16a34a',
+      frameTextColor: '#ffffff',
+    };
+    const syncedLogoUrl =
+      typeof body.logoImage === 'string'
+        ? body.logoImage
+        : baseQrConfig.logoUrl;
     const qrRecord: DynamicQRRecord = {
+      ...(existingQR || {}),
       id: existingQR?.id || `qr_${Date.now()}`,
       slug: cleanSlug,
       title: body.title,
@@ -112,26 +140,23 @@ export async function POST(request: NextRequest) {
       createdAt: existingQR?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       scansCount: existingQR?.scansCount || 0,
-      isPaid: existingQR?.isPaid || false,
+      isPaid: existingQR ? isProStillValid(existingQR) : credit.isPaid,
+      proGrantType: existingQR?.proGrantType || credit.proGrantType,
+      proExpiresAt: existingQR?.proExpiresAt ?? credit.proExpiresAt ?? null,
+      proVoucherCode: existingQR?.proVoucherCode || credit.proVoucherCode,
       linkedMenuId: cleanSlug,
       ownerId: clientUser?.id || existingQR?.ownerId,
       ownerEmail: clientUser?.email || existingQR?.ownerEmail,
-      qrConfig: existingQR?.qrConfig || {
-        fgColor: '#0f172a',
-        bgColor: '#ffffff',
-        cornerColor: body.themeColor || '#16a34a',
-        dotStyle: 'rounded',
-        frameStyle: 'table_tent',
-        frameTopText: isCatalog ? '🛍️ CATÁLOGO DIGITAL' : '📱 CARDÁPIO NA MESA',
-        frameText: isCatalog ? 'VER PRODUTOS & PEDIR' : 'VER CARDÁPIO & PEDIR',
-        frameColor: body.themeColor || '#16a34a',
-        frameTextColor: '#ffffff',
+      qrConfig: {
+        ...baseQrConfig,
+        logoUrl: syncedLogoUrl,
       },
     };
     saveDynamicQR(qrRecord);
     await Promise.all([
       persistMenuToCloud(updatedMenu),
       persistSliceToCloud('qrs'),
+      ...(credit.isPaid ? [persistSliceToCloud('users')] : []),
     ]);
 
     return NextResponse.json({ success: true, menu: updatedMenu });

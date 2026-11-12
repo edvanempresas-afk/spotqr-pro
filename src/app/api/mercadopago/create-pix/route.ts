@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Register QR in DB linked to the client account
     const qrRecord: DynamicQRRecord = {
+      ...(existing || {}),
       id: existing?.id || `qr_${Date.now()}`,
       slug: cleanSlug,
       title:

@@ -13,26 +13,50 @@ import {
 } from '@/lib/admin-auth';
 import {
   createClientUser,
+  getDynamicQRsByOwner,
+  expireDueQRsIfAny,
   syncDbFromCloud,
   persistSliceToCloud,
   isCloudPersistenceConfigured,
 } from '@/lib/db';
+import { isProStillValid } from '@/lib/pro-status';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   await syncDbFromCloud();
+  if (expireDueQRsIfAny()) {
+    await persistSliceToCloud('qrs');
+  }
   const clientUser = getAuthenticatedClientUser(req);
   const isAdmin = isAdminRequestAuthenticated(req);
   const cloudPersistenceEnabled = isCloudPersistenceConfigured();
 
   if (clientUser) {
     const { passwordHash, ...safeUser } = clientUser;
+    const userQRs = getDynamicQRsByOwner(clientUser.id, clientUser.email).filter(
+      (q) => q.slug !== 'demo-restaurante' && q.slug !== 'demo-catalogo'
+    );
+    const activeProQR = userQRs.find((q) => isProStillValid(q)) || null;
+    const creditExpMs = safeUser.proCreditExpiresAt
+      ? new Date(safeUser.proCreditExpiresAt).getTime()
+      : 0;
+    const hasAccountCredit =
+      Boolean(safeUser.proCreditExpiresAt) &&
+      Number.isFinite(creditExpMs) &&
+      Date.now() < creditExpMs;
+
     return NextResponse.json({
       authenticated: true,
       role: 'client',
       isAdmin,
       cloudPersistenceEnabled,
+      hasActivePro: Boolean(activeProQR || hasAccountCredit),
+      activeProSlug: activeProQR?.slug || null,
+      activeProExpiresAt:
+        activeProQR?.proExpiresAt ||
+        (hasAccountCredit ? safeUser.proCreditExpiresAt : null) ||
+        null,
       user: safeUser,
     });
   }

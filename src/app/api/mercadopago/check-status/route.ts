@@ -4,12 +4,17 @@ import {
   getPayment,
   recordPayment,
   getDynamicQRBySlug,
+  expireDueQRsIfAny,
   syncDbFromCloud,
   persistSliceToCloud,
 } from '@/lib/db';
+import { isProStillValid } from '@/lib/pro-status';
 
 export async function GET(request: Request) {
   await syncDbFromCloud();
+  if (expireDueQRsIfAny()) {
+    await persistSliceToCloud('qrs');
+  }
   const { searchParams } = new URL(request.url);
   const paymentId = searchParams.get('paymentId');
   const slug = searchParams.get('slug');
@@ -31,7 +36,7 @@ export async function GET(request: Request) {
 
   if (slug) {
     const qr = getDynamicQRBySlug(slug);
-    if (qr && qr.isPaid) {
+    if (isProStillValid(qr)) {
       return NextResponse.json({ status: 'approved' });
     }
   }

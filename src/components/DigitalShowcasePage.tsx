@@ -28,13 +28,14 @@ import {
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
+import { isProStillValid } from '@/lib/pro-status';
 import {
   getAcceptedPaymentOptions,
   getAcceptedPaymentsList,
 } from '@/lib/payments';
 import { resolveShowcaseTheme } from '@/lib/theme';
 import { generatePixPayload } from '@/lib/pix-brcode';
-import QRCode from 'qrcode';
+import { renderPixQrDataUrl } from '@/lib/qr-canvas';
 import Link from 'next/link';
 import AdBanner from '@/components/AdBanner';
 
@@ -63,9 +64,10 @@ export default function DigitalShowcasePage({
   slug,
   defaultMode = 'menu',
 }: DigitalShowcasePageProps) {
-  const [menu, setMenu] = useState<(RestaurantMenu & { isPaid?: boolean }) | null>(
-    null
-  );
+  const [menu, setMenu] = useState<
+    (RestaurantMenu & { isPaid?: boolean; proExpiresAt?: string | null }) | null
+  >(null);
+  const [proClockMs, setProClockMs] = useState<number>(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -88,6 +90,7 @@ export default function DigitalShowcasePage({
     null
   );
   const [pixQrUrl, setPixQrUrl] = useState('');
+  const [pixQrEmbeddedLogo, setPixQrEmbeddedLogo] = useState(false);
   const [copiedPix, setCopiedPix] = useState(false);
 
   // Product photo zoom / lightbox
@@ -172,7 +175,11 @@ export default function DigitalShowcasePage({
             (isPreviewParam || draftTime > serverTime);
 
           const finalMenu = shouldUseLocal
-            ? { ...localDraft!, isPaid: data.isPaid }
+            ? {
+                ...localDraft!,
+                isPaid: data.isPaid,
+                proExpiresAt: data.proExpiresAt || null,
+              }
             : data;
 
           setMenu(finalMenu);
@@ -255,8 +262,36 @@ export default function DigitalShowcasePage({
     }
   }, [acceptedPaymentOptions, paymentMethod]);
 
+  useEffect(() => {
+    if (!menu?.isPaid || !menu?.proExpiresAt) return;
+    const expMs = new Date(menu.proExpiresAt).getTime();
+    if (!Number.isFinite(expMs)) return;
+    const delay = expMs - Date.now();
+    if (delay <= 0) {
+      setProClockMs(Date.now());
+      setMenu((prev) =>
+        prev ? { ...prev, isPaid: false, proExpiresAt: null } : prev
+      );
+      return;
+    }
+    const timer = setTimeout(() => {
+      setProClockMs(Date.now());
+      setMenu((prev) =>
+        prev ? { ...prev, isPaid: false, proExpiresAt: null } : prev
+      );
+    }, Math.min(delay + 200, 2147483647));
+    return () => clearTimeout(timer);
+  }, [menu?.isPaid, menu?.proExpiresAt]);
+
   const isPro = Boolean(
-    menu?.isPaid || slug === 'demo-restaurante' || slug === 'demo-catalogo'
+    isProStillValid(
+      {
+        slug,
+        isPaid: menu?.isPaid,
+        proExpiresAt: menu?.proExpiresAt,
+      },
+      proClockMs
+    )
   );
 
   const theme = useMemo(
@@ -364,14 +399,27 @@ export default function DigitalShowcasePage({
   }, [menu?.pixKey, menu?.title, isCatalog, closedPixOrder]);
 
   useEffect(() => {
+    let active = true;
     if (closedPixOrder && pixPayload) {
-      QRCode.toDataURL(pixPayload, { width: 260, margin: 2 })
-        .then((url) => setPixQrUrl(url))
+      renderPixQrDataUrl({
+        payload: pixPayload,
+        logoUrl: menu?.logoImage,
+        isPro,
+      })
+        .then(({ dataUrl, hasEmbeddedLogo }) => {
+          if (!active) return;
+          setPixQrUrl(dataUrl);
+          setPixQrEmbeddedLogo(hasEmbeddedLogo);
+        })
         .catch(() => {});
     } else {
       setPixQrUrl('');
+      setPixQrEmbeddedLogo(false);
     }
-  }, [closedPixOrder, pixPayload]);
+    return () => {
+      active = false;
+    };
+  }, [closedPixOrder, pixPayload, menu?.logoImage, isPro]);
 
   const handleCopyWifi = () => {
     if (menu?.wifiInfo) {
@@ -399,12 +447,19 @@ export default function DigitalShowcasePage({
     if (!menu?.whatsappNumber) return '';
 
     const itemsSummary = Object.values(cart)
-      .map(
-        (c) =>
-          `• ${c.quantity}x ${c.item.name} — R$ ${(
-            c.quantity * c.item.price
-          ).toFixed(2)}`
-      )
+      .map((c) => {
+        const prodDaysInfo =
+          c.item.badge === 'Sob Encomenda' &&
+          c.item.productionDays &&
+          c.item.productionDays > 0
+            ? ` (Sob encomenda • pronto em ${c.item.productionDays} ${
+                c.item.productionDays === 1 ? 'dia' : 'dias'
+              })`
+            : '';
+        return `• ${c.quantity}x ${c.item.name}${prodDaysInfo} — R$ ${(
+          c.quantity * c.item.price
+        ).toFixed(2)}`;
+      })
       .join('\n');
 
     const hasActiveModes = enabledModes.length > 0;
@@ -838,7 +893,12 @@ export default function DigitalShowcasePage({
         {/* LEFT LATERAL AD (Only on Free / Non-PRO Showcases) */}
         {!isPro && (
           <div className="hidden lg:block lg:col-span-3 sticky top-6 pt-16">
-            <AdBanner format="skyscraper" side="left" isPro={isPro} />
+            <AdBanner
+              format="skyscraper"
+              side="left"
+              isPro={isPro}
+              themeMode={theme.themeMode}
+            />
           </div>
         )}
 
@@ -1207,6 +1267,21 @@ export default function DigitalShowcasePage({
                                 {item.badge}
                               </span>
                             )}
+                            {stock.canOrder &&
+                              item.badge === 'Sob Encomenda' &&
+                              item.productionDays &&
+                              item.productionDays > 0 && (
+                                <span
+                                  className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                    isLight
+                                      ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                      : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
+                                  }`}
+                                >
+                                  ⏱️ Pronto em {item.productionDays}{' '}
+                                  {item.productionDays === 1 ? 'dia' : 'dias'}
+                                </span>
+                              )}
                             {stock.canOrder && stock.isUnique && (
                               <span
                                 className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1277,6 +1352,7 @@ export default function DigitalShowcasePage({
                           format="in-feed"
                           isPro={isPro}
                           offerIndexOverride={Math.floor(index / 2)}
+                          themeMode={theme.themeMode}
                           className="my-3"
                         />
                       )}
@@ -1314,7 +1390,12 @@ export default function DigitalShowcasePage({
         {/* RIGHT LATERAL AD (Only on Free / Non-PRO Showcases) */}
         {!isPro && (
           <div className="hidden lg:block lg:col-span-3 sticky top-6 pt-16">
-            <AdBanner format="skyscraper" side="right" isPro={isPro} />
+            <AdBanner
+              format="skyscraper"
+              side="right"
+              isPro={isPro}
+              themeMode={theme.themeMode}
+            />
           </div>
         )}
       </div>
@@ -1433,16 +1514,37 @@ export default function DigitalShowcasePage({
             </div>
 
             {pixQrUrl && (
-              <div
-                className={`bg-white p-3 rounded-2xl inline-block mx-auto ${
-                  isLight ? 'border border-slate-200 shadow-md' : 'shadow-lg'
-                }`}
-              >
-                <img
-                  src={pixQrUrl}
-                  alt={`QR Code PIX no valor de R$ ${closedPixOrder.amount.toFixed(2)}`}
-                  className="w-44 h-44 object-contain"
-                />
+              <div className="space-y-1.5">
+                <div
+                  className={`relative bg-white p-1.5 rounded-2xl inline-block mx-auto ${
+                    isLight ? 'border border-slate-200 shadow-md' : 'shadow-lg'
+                  }`}
+                >
+                  <img
+                    src={pixQrUrl}
+                    alt={`QR Code PIX no valor de R$ ${closedPixOrder.amount.toFixed(2)}`}
+                    className="w-48 h-48 object-contain"
+                  />
+                  {isPro && menu.logoImage && !pixQrEmbeddedLogo && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-white p-1 shadow-md border border-slate-100 overflow-hidden">
+                        <img
+                          src={menu.logoImage}
+                          alt={`Logo de ${menu.title}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {isPro && menu.logoImage && (
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider block"
+                    style={{ color: theme.readableAccentText }}
+                  >
+                    ✦ PRO • PIX Oficial com Logomarca
+                  </span>
+                )}
               </div>
             )}
 
@@ -1646,6 +1748,18 @@ export default function DigitalShowcasePage({
                               : `• Limite: ${stock.maxQuantity} unid.`}
                           </span>
                         )}
+                        {c.item.badge === 'Sob Encomenda' &&
+                          c.item.productionDays &&
+                          c.item.productionDays > 0 && (
+                            <span
+                              className={`text-[10px] font-semibold ${
+                                isLight ? 'text-orange-700' : 'text-orange-300'
+                              }`}
+                            >
+                              • Pronto em {c.item.productionDays}{' '}
+                              {c.item.productionDays === 1 ? 'dia' : 'dias'}
+                            </span>
+                          )}
                       </div>
                     </div>
 
@@ -2019,6 +2133,20 @@ export default function DigitalShowcasePage({
             <div
               className={`shrink-0 p-4 sm:px-5 sm:py-4 border-t space-y-3 ${modalSubBarClass}`}
             >
+              {zoomedItem.badge === 'Sob Encomenda' &&
+                zoomedItem.productionDays &&
+                zoomedItem.productionDays > 0 && (
+                  <span
+                    className={`inline-block border text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                      isLight
+                        ? 'bg-orange-50 border-orange-200 text-orange-700'
+                        : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
+                    }`}
+                  >
+                    🛠️ Sob Encomenda • Pronto em {zoomedItem.productionDays}{' '}
+                    {zoomedItem.productionDays === 1 ? 'dia' : 'dias'}
+                  </span>
+                )}
               {zoomedItem.description && (
                 <p className={`text-xs leading-relaxed ${labelTextClass}`}>
                   {zoomedItem.description}

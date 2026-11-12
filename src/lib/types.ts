@@ -82,7 +82,8 @@ export interface MenuItem {
   price: number;
   category: string;
   imageUrl?: string;
-  badge?: string; // 'Mais Vendido' | 'Novo' | 'Promoção' | 'Vegetariano' | 'Chef Especial'
+  badge?: string; // 'Mais Vendido' | 'Novo' | 'Promoção' | 'Sob Encomenda' | 'Vegetariano' | 'Chef Especial'
+  productionDays?: number;
   isAvailable: boolean;
   stockMode?: ProductStockMode;
   stockQuantity?: number;
@@ -127,6 +128,7 @@ export interface RestaurantMenu {
 
 export interface DynamicQRRecord {
   id: string;
+  storeCode?: string;
   slug: string;
   title: string;
   targetUrl: string;
@@ -136,6 +138,11 @@ export interface DynamicQRRecord {
   scansCount: number;
   lastScannedAt?: string;
   isPaid: boolean;
+  proGrantType?: 'paid' | 'indeterminate' | 'days_30' | 'hours' | 'voucher';
+  proExpiresAt?: string | null;
+  proGrantedAt?: string;
+  proGrantedHours?: number;
+  proVoucherCode?: string;
   paymentId?: string;
   qrConfig: Partial<QRConfig>;
   linkedMenuId?: string;
@@ -151,6 +158,47 @@ export interface ClientUser {
   whatsapp: string;
   passwordHash: string;
   createdAt: string;
+  proCreditExpiresAt?: string | null;
+  proCreditVoucherCode?: string;
+  proCreditDays?: number;
+}
+
+export interface ProVoucher {
+  id: string;
+  code: string;
+  days: number;
+  recipientHint?: string;
+  createdAt: string;
+  createdBy?: string;
+  isRedeemed: boolean;
+  redeemedAt?: string;
+  redeemedByUserId?: string;
+  redeemedByEmail?: string;
+  redeemedByName?: string;
+  redeemedForSlug?: string;
+  redeemedStoreName?: string;
+  proExpiresAt?: string;
+}
+
+export interface AdminStoreSummary {
+  id: string;
+  storeCode: string;
+  slug: string;
+  title: string;
+  type: QRType;
+  isPaid: boolean;
+  proGrantType?: DynamicQRRecord['proGrantType'];
+  proExpiresAt?: string | null;
+  proGrantedAt?: string;
+  proGrantedHours?: number;
+  proVoucherCode?: string;
+  scansCount: number;
+  ownerId?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerWhatsapp?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PixPaymentResponse {
@@ -218,7 +266,8 @@ export type DeveloperNotificationType =
   | 'subscription_paid'
   | 'subscription_pending'
   | 'new_lead'
-  | 'new_client';
+  | 'new_client'
+  | 'voucher_redeemed';
 
 export interface DeveloperNotification {
   id: string;

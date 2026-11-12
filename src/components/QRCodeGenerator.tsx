@@ -32,6 +32,7 @@ import MenuEditorModal from './MenuEditorModal';
 import ProFeatureLockModal from './ProFeatureLockModal';
 import ClientAuthModal from './ClientAuthModal';
 import AdBanner from './AdBanner';
+import VoucherRedeemBox from './VoucherRedeemBox';
 import { useRouter } from 'next/navigation';
 import { useProPrice } from '@/lib/pro-price';
 
@@ -127,6 +128,8 @@ export default function QRCodeGenerator() {
     'menu' | 'checkout' | null
   >(null);
 
+  const [proExpiresAt, setProExpiresAt] = useState<string | null>(null);
+
   useEffect(() => {
     setBaseOrigin(window.location.origin);
     fetch('/api/auth')
@@ -134,10 +137,33 @@ export default function QRCodeGenerator() {
       .then((data) => {
         if (data.authenticated && data.user) {
           setClientUser(data.user);
+          if (data.hasActivePro) {
+            setIsProPurchased(true);
+            setProExpiresAt(data.activeProExpiresAt || null);
+          }
         }
       })
       .catch(() => { });
   }, []);
+
+  useEffect(() => {
+    if (!isProPurchased || !proExpiresAt) return;
+    const expMs = new Date(proExpiresAt).getTime();
+    if (!Number.isFinite(expMs)) return;
+    const delay = expMs - Date.now();
+    if (delay <= 0) {
+      setIsProPurchased(false);
+      setProExpiresAt(null);
+      setConfig((prev) => ({ ...prev, isDynamic: false, logoUrl: '' }));
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsProPurchased(false);
+      setProExpiresAt(null);
+      setConfig((prev) => ({ ...prev, isDynamic: false, logoUrl: '' }));
+    }, Math.min(delay, 2147483647));
+    return () => clearTimeout(timer);
+  }, [isProPurchased, proExpiresAt]);
 
   const [config, setConfig] = useState<QRConfig>({
     type: 'menu',
@@ -1545,6 +1571,28 @@ export default function QRCodeGenerator() {
                     </button>
                   </div>
                 )}
+
+                {/* Voucher code input available in both Free & PRO states */}
+                <VoucherRedeemBox
+                  compact
+                  targetSlug={
+                    config.dynamicSlug &&
+                    config.dynamicSlug !== 'demo-restaurante' &&
+                    config.dynamicSlug !== 'demo-catalogo'
+                      ? config.dynamicSlug
+                      : undefined
+                  }
+                  onRedeemed={(res) => {
+                    setIsProPurchased(true);
+                    setProExpiresAt(res.proExpiresAt || null);
+                    setConfig((prev) => ({
+                      ...prev,
+                      isDynamic: true,
+                      dynamicSlug: res.slug || prev.dynamicSlug,
+                    }));
+                  }}
+                  className="mt-4"
+                />
               </div>
             </div>
 
@@ -1563,6 +1611,10 @@ export default function QRCodeGenerator() {
         isOpen={isLockModalOpen}
         onClose={() => setIsLockModalOpen(false)}
         onUpgrade={() => handleInitiateProCheckout()}
+        onVoucherRedeemed={() => {
+          setIsProPurchased(true);
+          setConfig((prev) => ({ ...prev, isDynamic: true }));
+        }}
         featureTitle={lockModalTitle}
         featureDescription={
           lockModalDesc ||

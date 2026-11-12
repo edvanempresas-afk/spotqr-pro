@@ -3,11 +3,14 @@
 import React from 'react';
 import { Sparkles, Check, X, ShieldCheck, Lock, ArrowRight } from 'lucide-react';
 import { useProPrice } from '@/lib/pro-price';
+import VoucherRedeemBox from './VoucherRedeemBox';
 
 interface ProFeatureLockModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpgrade: () => void;
+  onVoucherRedeemed?: () => void;
+  targetSlug?: string;
   featureTitle?: string;
   featureDescription?: string;
 }
@@ -16,6 +19,8 @@ export default function ProFeatureLockModal({
   isOpen,
   onClose,
   onUpgrade,
+  onVoucherRedeemed,
+  targetSlug,
   featureTitle = 'Recurso Exclusivo do Plano PRO',
   featureDescription = 'Inserir sua logomarca ou imagem no centro do QR Code e poder alterar o link de destino sem reimprimir adesivos são recursos exclusivos da versão PRO.',
 }: ProFeatureLockModalProps) {
@@ -148,6 +153,16 @@ export default function ProFeatureLockModal({
           >
             Continuar usando a versão gratuita (sem logo no centro)
           </button>
+
+          <VoucherRedeemBox
+            compact
+            targetSlug={targetSlug}
+            onRedeemed={() => {
+              onVoucherRedeemed?.();
+              onClose();
+            }}
+            className="mt-2"
+          />
         </div>
       </div>
     </div>
