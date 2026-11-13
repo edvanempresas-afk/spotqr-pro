@@ -149,7 +149,9 @@ const applyRegisteredStoreToConfig = (
   const isDemoPixKey =
     !prev.pixKey || prev.pixKey === 'financeiro@seurestaurante.com.br';
   const isDemoPixName =
-    !prev.pixName || prev.pixName === 'Smash & Grill Burger';
+    !prev.pixName ||
+    prev.pixName === 'Smash & Grill Burger' ||
+    prev.pixName === 'Studio Criativo & Loja';
 
   return {
     ...prev,
@@ -244,7 +246,9 @@ export default function QRCodeGenerator() {
             const isDemoPhone =
               !cleanWhatsapp || cleanWhatsapp === '5511999998888';
             const isDemoPixName =
-              !prev.pixName || prev.pixName === 'Smash & Grill Burger';
+              !prev.pixName ||
+              prev.pixName === 'Smash & Grill Burger' ||
+              prev.pixName === 'Studio Criativo & Loja';
 
             next = {
               ...prev,
@@ -295,13 +299,13 @@ export default function QRCodeGenerator() {
   }, [isProPurchased, proExpiresAt]);
 
   const [config, setConfig] = useState<QRConfig>({
-    type: 'menu',
+    type: 'catalog',
     url: 'https://seurestaurante.com.br',
     whatsappPhone: '5511999998888',
-    whatsappMessage: 'Olá! Gostaria de ver o cardápio e fazer um pedido.',
+    whatsappMessage: 'Olá! Gostaria de ver os produtos e fazer um pedido.',
     pixKey: 'financeiro@seurestaurante.com.br',
     pixKeyType: 'email',
-    pixName: 'Smash & Grill Burger',
+    pixName: 'Studio Criativo & Loja',
     pixCity: 'SAO PAULO',
     pixAmount: '',
     wifiSSID: 'Restaurante_Clientes',
@@ -326,14 +330,14 @@ export default function QRCodeGenerator() {
     logoSize: 22,
 
     frameStyle: 'table_tent',
-    frameTopText: '📱 CARDÁPIO NA MESA',
-    frameText: 'VER CARDÁPIO & PEDIR',
+    frameTopText: '🛍️ CATÁLOGO DIGITAL',
+    frameText: 'VER PRODUTOS & PEDIR',
     frameColor: '#16a34a',
     frameTextColor: '#ffffff',
 
     isDynamic: false,
-    dynamicSlug: 'demo-restaurante',
-    title: 'Smash & Grill Burger',
+    dynamicSlug: 'demo-catalogo',
+    title: 'Studio Criativo & Loja',
   });
 
   const [activeTab, setActiveTab] = useState<
@@ -553,10 +557,10 @@ export default function QRCodeGenerator() {
         <div className="text-center max-w-3xl mx-auto mb-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-3">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>ESTÚDIO 3 EM 1 • QR CODE, CARDÁPIO & CATÁLOGO DIGITAL</span>
+            <span>ESTÚDIO 3 EM 1 • CATÁLOGO DIGITAL, CARDÁPIO & QR CODE</span>
           </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight">
-            Crie QR Codes com Logo, Cardápios ou Catálogos Online
+            Crie Catálogos Online, Cardápios & QR Codes com Logo
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-400">
             Crie grátis e gere seu QR Code pronto para imprimir — ou ative o{' '}
@@ -583,18 +587,17 @@ export default function QRCodeGenerator() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {[
                     {
-                      id: 'menu',
-                      label: 'Cardápio Digital',
-                      sub: 'Alimentação & Mesas',
-                      icon: UtensilsCrossed,
-                      badge: 'Top #1',
-                    },
-                    {
                       id: 'catalog',
                       label: 'Catálogo / Loja',
                       sub: 'Roupas, 3D & Artesanato',
                       icon: ShoppingBag,
-                      badge: 'Novo',
+                      badge: 'Top #1',
+                    },
+                    {
+                      id: 'menu',
+                      label: 'Cardápio Digital',
+                      sub: 'Alimentação & Mesas',
+                      icon: UtensilsCrossed,
                     },
                     {
                       id: 'pix',
@@ -1966,7 +1969,7 @@ export default function QRCodeGenerator() {
         defaultWhatsapp={config.whatsappPhone}
         contextMessage={
           pendingAuthAction === 'menu'
-            ? 'Crie seu login e senha grátis para salvar seu Cardápio ou Catálogo Digital e alterar itens e preços a qualquer hora.'
+            ? 'Crie seu login e senha grátis para salvar seu Catálogo Digital ou Cardápio e alterar itens e preços a qualquer hora.'
             : `Crie seu login e senha de cliente para vincular seu QR Code Dinâmico PRO (${proPriceLabel}) à sua conta exclusiva.`
         }
         onAuthSuccess={(user) => {

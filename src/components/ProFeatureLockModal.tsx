@@ -86,7 +86,7 @@ export default function ProFeatureLockModal({
               pro: '100% Sem Anúncios',
             },
             {
-              name: 'Cardápio Digital WhatsApp',
+              name: 'Catálogo & Cardápio WhatsApp',
               free: 'Demonstração',
               pro: 'Ativo & Sem Taxas',
             },

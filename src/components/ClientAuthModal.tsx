@@ -35,7 +35,7 @@ export default function ClientAuthModal({
   defaultTab = 'register',
   defaultBusinessName = '',
   defaultWhatsapp = '',
-  contextMessage = 'Cadastre seu login e senha para salvar seus Cardápios, Catálogos Digitais e QR Codes quando quiser.',
+  contextMessage = 'Cadastre seu login e senha para salvar seus Catálogos Digitais, Cardápios e QR Codes quando quiser.',
 }: ClientAuthModalProps) {
   const [tab, setTab] = useState<'register' | 'login'>(defaultTab);
   const [name, setName] = useState('');
@@ -107,13 +107,6 @@ export default function ClientAuthModal({
     }
   };
 
-  const handleFillDemoClient = () => {
-    setTab('login');
-    setEmail('cliente@restaurante.com.br');
-    setPassword('123456');
-    setErrorMsg('');
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-md bg-[#101726] border-2 border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl overflow-hidden">
@@ -130,7 +123,7 @@ export default function ClientAuthModal({
         <div className="text-center mb-5">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>CONTA DO CLIENTE • CARDÁPIO & QR PRO</span>
+            <span>CONTA DO CLIENTE • CATÁLOGO & QR PRO</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-extrabold text-white">
             {tab === 'register'
@@ -318,7 +311,7 @@ export default function ClientAuthModal({
         {/* Security Footer */}
         <div className="mt-4 pt-3.5 border-t border-slate-800/80 text-center">
           <span className="text-[11px] text-slate-400">
-            🔒 Acesso seguro e exclusivo para gerenciar seu Cardápio Digital e QR Codes.
+            🔒 Acesso seguro e exclusivo para gerenciar seus Catálogos Digitais, Cardápios e QR Codes.
           </span>
         </div>
       </div>

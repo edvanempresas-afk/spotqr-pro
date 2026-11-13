@@ -5,36 +5,36 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.spotqr.com.br'),
   applicationName: 'SpotQR Pro',
   title:
-    'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
+    'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
   description:
-    'Crie QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos digitais com pedidos no WhatsApp e PIX para lojas, moda, artesanato e serviços.',
+    'Crie Catálogos Digitais para lojas, roupas, artesanato e produtos com pedidos no WhatsApp e PIX sem taxas, além de Cardápios Digitais e QR Codes dinâmicos com logomarca no centro.',
   manifest: '/manifest.json',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
+    title: 'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
     description:
-      'Crie QR Codes dinâmicos com sua logomarca, cardápios digitais e catálogos online de produtos sem taxas ou comissões — ideal para restaurantes, lojas, moda, artesanato e comércios.',
+      'Crie Catálogos Digitais online de produtos sem taxas ou comissões, Cardápios Digitais e QR Codes dinâmicos com sua logomarca no centro.',
     url: 'https://www.spotqr.com.br',
-    siteName: 'SpotQR Pro — QR Codes, Cardápios & Catálogos Digitais',
+    siteName: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes',
     locale: 'pt_BR',
     type: 'website',
     images: [
       {
-        url: '/catalogo/cover-loja.jpg',
+        url: '/og-spotqr.png',
         width: 1200,
         height: 630,
-        alt: 'SpotQR Pro — QR Code Dinâmico com Logo, Cardápio e Catálogo Digital',
+        alt: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes com Logo',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SpotQR Pro | QR Code com Logo, Cardápio & Catálogo Digital',
+    title: 'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
     description:
-      'Crie QR Codes profissionais com logo no centro, cardápios digitais e catálogos online com carrinho, PIX e WhatsApp sem comissões.',
-    images: ['/catalogo/cover-loja.jpg'],
+      'Crie Catálogos Digitais online com carrinho, PIX e WhatsApp sem comissões, Cardápios Digitais e QR Codes profissionais com logo no centro.',
+    images: ['/og-spotqr.png'],
   },
   appleWebApp: {
     capable: true,
@@ -42,21 +42,21 @@ export const metadata: Metadata = {
     title: 'SpotQR App',
   },
   keywords: [
-    'gerador de qr code',
-    'qr code com logo no centro',
-    'qr code dinamico',
     'catalogo digital',
     'catalogo digital gratis',
     'catalogo online para loja',
     'criar catalogo whatsapp',
     'vitrine digital de produtos',
     'catalogo sem comissoes',
+    'gerador de catalogo digital',
+    'gerador de qr code',
+    'qr code com logo no centro',
+    'qr code dinamico',
     'cardapio digital para restaurante',
     'cardapio digital sem taxas',
     'qr code mesa restaurante',
     'qr code pix oficial',
     'gerador de cardapio digital',
-    'gerador de catalogo digital',
     'sistema para loja restaurante e barbearia',
   ],
   authors: [{ name: 'SpotQR Pro Tecnologia' }],
@@ -75,7 +75,7 @@ export const viewport: Viewport = {
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'SpotQR Pro — QR Codes, Cardápios & Catálogos Digitais',
+  name: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes',
   url: 'https://www.spotqr.com.br',
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'All',
@@ -84,10 +84,10 @@ const jsonLd = {
     price: '10.90',
     priceCurrency: 'BRL',
     description:
-      'Assinatura SpotQR PRO com QR Dinâmico, Logomarca no Centro, Cardápio e Catálogo Digital',
+      'Assinatura SpotQR PRO com Catálogo Digital, Cardápio, Logomarca no Centro e QR Dinâmico',
   },
   description:
-    'Plataforma completa para criar QR Codes dinâmicos com logomarca no centro, cardápios digitais para restaurantes e catálogos digitais de produtos com pedidos via WhatsApp e PIX sem taxas.',
+    'Plataforma completa para criar Catálogos Digitais de produtos com pedidos via WhatsApp e PIX sem taxas, Cardápios Digitais e QR Codes dinâmicos com logomarca no centro.',
 };
 
 export default function RootLayout({

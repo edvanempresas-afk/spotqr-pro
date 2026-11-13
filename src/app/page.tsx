@@ -83,23 +83,23 @@ export default function HomePage() {
             {/* Top Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-6">
               <Flame className="w-3.5 h-3.5 text-amber-400" />
-              <span>Plataforma 3 em 1 • QR Codes, Cardápios & Catálogos Digitais</span>
+              <span>Plataforma 3 em 1 • Catálogos Digitais, Cardápios & QR Codes</span>
             </div>
 
             {/* Hero Highlight */}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight max-w-4xl mx-auto leading-tight sm:leading-none">
               Crie{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500">
-                QR Codes, Cardápios & Catálogos Digitais
+                Catálogos Digitais, Cardápios & QR Codes
               </span>{' '}
               Sem Taxas
             </h1>
 
             {/* Sub-headline */}
             <p className="mt-5 text-base sm:text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed">
-              Muito além de um gerador de QR Code: monte na hora{' '}
-              <strong className="text-white">Cardápios para Restaurantes</strong>,{' '}
-              <strong className="text-white">Catálogos de Produtos</strong> (Roupas, Artesanato, Impressões 3D e Lojas) e{' '}
+              Seu produto no celular do cliente em 1 segundo: crie na hora{' '}
+              <strong className="text-white">Catálogos Digitais de Produtos</strong> (Lojas, Roupas, Artesanato, Impressões 3D e Comércios),{' '}
+              <strong className="text-white">Cardápios para Restaurantes</strong> e{' '}
               <strong className="text-white">QR Codes com Logomarca & Link Editável</strong>.
             </p>
 
@@ -107,17 +107,20 @@ export default function HomePage() {
             <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl mx-auto text-left">
               <a
                 href="#gerador"
-                className="p-4 rounded-2xl bg-[#101726]/90 border border-slate-800 hover:border-emerald-500/50 transition flex items-start gap-3 shadow-lg"
+                className="p-4 rounded-2xl bg-[#101726]/90 border border-emerald-500/50 hover:border-emerald-400 transition flex items-start gap-3 shadow-lg"
               >
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-                  <QrCode className="w-5 h-5" />
+                  <ShoppingBag className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-white">
-                    QR Codes Personalizados
+                  <h3 className="text-sm font-extrabold text-white flex items-center gap-1.5">
+                    <span>Catálogos Digitais</span>
+                    <span className="text-[9px] font-extrabold bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded-full uppercase">
+                      Carro-Chefe
+                    </span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    PIX Banco Central, WhatsApp, Wi-Fi, Instagram, Google 5★ e Links Dinâmicos com logo no centro.
+                    Para lojas, roupas, artesanato, impressões 3D e comércios: vitrine própria, fotos, PIX e carrinho no WhatsApp sem comissões.
                   </p>
                 </div>
               </a>
@@ -126,7 +129,7 @@ export default function HomePage() {
                 href="#gerador"
                 className="p-4 rounded-2xl bg-[#101726]/90 border border-slate-800 hover:border-emerald-500/50 transition flex items-start gap-3 shadow-lg"
               >
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
                   <Utensils className="w-5 h-5" />
                 </div>
                 <div>
@@ -141,20 +144,17 @@ export default function HomePage() {
 
               <a
                 href="#gerador"
-                className="p-4 rounded-2xl bg-[#101726]/90 border border-amber-500/30 hover:border-amber-400/60 transition flex items-start gap-3 shadow-lg"
+                className="p-4 rounded-2xl bg-[#101726]/90 border border-slate-800 hover:border-emerald-500/50 transition flex items-start gap-3 shadow-lg"
               >
-                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
-                  <ShoppingBag className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                  <QrCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-white flex items-center gap-1.5">
-                    <span>Catálogos Digitais</span>
-                    <span className="text-[9px] font-extrabold bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded-full uppercase">
-                      Novo
-                    </span>
+                  <h3 className="text-sm font-extrabold text-white">
+                    QR Codes Personalizados
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    Para lojas de roupas, artesanato, impressões 3D e comércio: suas fotos, logo própria e carrinho WhatsApp.
+                    PIX Banco Central, WhatsApp, Wi-Fi, Instagram, Google 5★ e Links Dinâmicos com logo no centro.
                   </p>
                 </div>
               </a>
@@ -202,25 +202,25 @@ export default function HomePage() {
                 </div>
 
                 <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
-                  Por que restaurantes perdem até <span className="text-amber-400">R$ 810 por ano</span> com QR Codes estáticos?
+                  Por que lojas e negócios perdem até <span className="text-amber-400">R$ 810 por ano</span> com QR Codes estáticos?
                 </h2>
 
                 <p className="text-sm text-slate-400 leading-relaxed">
-                  Quando você imprime uma placa de acrílico ou adesivo com um QR Code estático comum (gratuito básico), aquele código é gravado fisicamente para sempre.
+                  Quando você imprime placas de balcão, etiquetas de embalagem ou displays com um QR Code estático comum (gratuito básico), aquele endereço fica gravado fisicamente para sempre.
                 </p>
 
                 <div className="space-y-3">
                   <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
                     <span className="font-bold text-rose-400">❌ O Erro Caro:</span>
                     <span>
-                      Trocou o WhatsApp, mudou a promoção do mês ou atualizou os preços do cardápio? Todas as plaquinhas das suas mesas viram lixo.
+                      Mudou o catálogo, lançou nova coleção, trocou o WhatsApp ou atualizou os preços? Todas as plaquinhas, cartões e etiquetas impressas viram lixo.
                     </span>
                   </div>
 
                   <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
                     <span className="font-bold text-emerald-400">✅ A Solução Inteligente (PRO {proPriceLabel}):</span>
                     <span>
-                      Com o QR Code Dinâmico SpotQR, o adesivo físico fica nas mesas para sempre. Você acessa seu celular e muda o destino em 1 segundo.
+                      Com o QR Code Dinâmico SpotQR, o adesivo ou display impresso fica na loja ou mesa para sempre. Você acessa seu celular e muda o destino em 1 segundo.
                     </span>
                   </div>
                 </div>
@@ -233,14 +233,14 @@ export default function HomePage() {
                   Calculadora de Economia para seu Negócio
                 </h3>
                 <p className="text-xs text-slate-400 mb-6">
-                  Arraste para simular o tamanho do seu estabelecimento:
+                  Arraste para simular a quantidade de displays, embalagens ou mesas do seu negócio:
                 </p>
 
                 {/* Slider */}
                 <div className="space-y-2 mb-6">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-300">
-                    <span>Número de Mesas / Balcões:</span>
-                    <span className="text-base font-extrabold text-emerald-400">{tableCount} mesas</span>
+                    <span>Displays / Balcões / Mesas:</span>
+                    <span className="text-base font-extrabold text-emerald-400">{tableCount} pontos</span>
                   </div>
                   <input
                     type="range"
@@ -251,9 +251,9 @@ export default function HomePage() {
                     className="w-full accent-emerald-500 cursor-pointer"
                   />
                   <div className="flex justify-between text-[10px] text-slate-500">
-                    <span>4 mesas (Pequeno)</span>
-                    <span>25 mesas (Médio)</span>
-                    <span>50 mesas (Grande)</span>
+                    <span>4 pontos (Pequeno)</span>
+                    <span>25 pontos (Médio)</span>
+                    <span>50 pontos (Grande)</span>
                   </div>
                 </div>
 
@@ -282,19 +282,19 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* DIGITAL MENU HIGHLIGHT */}
+        {/* DIGITAL CATALOG & MENU HIGHLIGHT */}
         <section className="py-20 bg-[#0b0f17]">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-14">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-3">
                 <ShoppingBag className="w-3.5 h-3.5" />
-                <span>CARDÁPIOS & CATÁLOGOS DIGITAIS SEM COMISSÕES</span>
+                <span>CATÁLOGOS & CARDÁPIOS DIGITAIS SEM COMISSÕES</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-                Cardápios e Catálogos Digitais que Vendem pelo WhatsApp
+                Catálogos Digitais e Cardápios que Vendem pelo WhatsApp
               </h2>
               <p className="mt-3 text-sm text-slate-400 leading-relaxed">
-                Pare de perder até 27% do seu faturamento com taxas de marketplaces. Seja um restaurante ou loja de roupas, artesanato e impressões 3D, apresente seus produtos na internet com link próprio, carrinho e PIX.
+                Pare de perder até 27% do seu faturamento com taxas de marketplaces. Seja uma loja de roupas, artesanato, impressões 3D, comércio local ou restaurante, apresente seus produtos na internet com link próprio, carrinho e PIX.
               </p>
             </div>
 
@@ -306,7 +306,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-base font-bold text-white">Zero Aplicativos para Baixar</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  O cliente apenas aponta a câmera nativa do iPhone ou Android e o cardápio abre em menos de 1 segundo direto no navegador.
+                  O cliente apenas aponta a câmera do celular ou clica no seu link da bio e o catálogo digital abre em menos de 1 segundo direto no navegador.
                 </p>
               </div>
 
@@ -314,9 +314,9 @@ export default function HomePage() {
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                   <Zap className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-bold text-white">Comanda Direta no WhatsApp</h3>
+                <h3 className="text-base font-bold text-white">Pedido Direto no WhatsApp</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Os itens escolhidos na mesa chegam prontos e formatados no WhatsApp da cozinha ou do balcão, com número da mesa e valor total somado.
+                  Os produtos escolhidos no catálogo chegam prontos e formatados no WhatsApp da sua loja ou balcão, com entrega, retirada ou mesa e valor total somado.
                 </p>
               </div>
 
@@ -324,14 +324,14 @@ export default function HomePage() {
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                   <Award className="w-5 h-5" />
                 </div>
-                <h3 className="text-base font-bold text-white">Display de Mesa para Imprimir</h3>
+                <h3 className="text-base font-bold text-white">Display de Balcão e Mesa para Imprimir</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Gerador automático de folhas A4 com linha de corte e vinco para suportes de mesa em acrílico nos formatos A6 e A5.
+                  Gerador automático de folhas A4 com linha de corte e vinco para suportes em acrílico de balcão, caixa e mesa nos formatos A6 e A5.
                 </p>
               </div>
             </div>
 
-            {/* STRATEGIC AD 3: In-Feed Banner within Digital Menu */}
+            {/* STRATEGIC AD 3: In-Feed Banner within Digital Catalog */}
             <AdBanner
               format="in-feed"
               isPro={isClientPro}
@@ -339,20 +339,20 @@ export default function HomePage() {
               className="max-w-4xl mx-auto"
             />
 
-            {/* Demo Links (Menu + Non-Food Catalog) */}
+            {/* Demo Links (Catalog First + Restaurant Menu Second) */}
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/catalogo/demo-catalogo"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/40 transition shadow-md"
+              >
+                <span>🛍️ Ver Demo de Catálogo (Lojas, Roupas, 3D & Artesanato)</span>
+                <ArrowRight className="w-4 h-4 text-emerald-400" />
+              </Link>
               <Link
                 href="/cardapio/demo-restaurante"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition shadow-md"
               >
                 <span>🍔 Ver Demo de Cardápio (Restaurante)</span>
-                <ArrowRight className="w-4 h-4 text-emerald-400" />
-              </Link>
-              <Link
-                href="/catalogo/demo-catalogo"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/40 transition shadow-md"
-              >
-                <span>🛍️ Ver Demo de Catálogo (Roupas, 3D & Artesanato)</span>
                 <ArrowRight className="w-4 h-4 text-emerald-400" />
               </Link>
             </div>
@@ -519,17 +519,21 @@ export default function HomePage() {
 
                 <div className="space-y-4">
                   <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-                    QR Dinâmico + Cardápio PRO
+                    Catálogo Digital + QR Dinâmico PRO
                   </span>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-extrabold text-white">{proPriceLabel}</span>
                     <span className="text-xs text-slate-400 font-semibold">/ ativação única</span>
                   </div>
                   <p className="text-xs text-slate-300">
-                    O adesivo ou acrílico que você imprime nunca mais vai para o lixo. Mude o destino sempre que quiser.
+                    Sua vitrine online completa sem comissões e QR Code com link editável que nunca vai para o lixo.
                   </p>
 
                   <div className="pt-4 border-t border-slate-800 space-y-2.5 text-xs text-slate-200">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span><strong>Catálogo Digital & Cardápio Mobile Interativo</strong></span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                       <span><strong>Logomarca ou Imagem Personalizada no Centro do QR</strong></span>
@@ -544,15 +548,11 @@ export default function HomePage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span><strong>Cardápio Digital Mobile Interativo</strong></span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                       <span>Receba Pedidos Formatados no WhatsApp</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>Display de Mesa A6/A5 White-Label sem marca d'água</span>
+                      <span>Display de Balcão e Mesa A6/A5 sem marca d&apos;água</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -595,23 +595,23 @@ export default function HomePage() {
               {[
                 {
                   q: 'Por que o site tem anúncios na versão gratuita?',
-                  a: `Os anúncios viabilizam manter a infraestrutura 100% gratuita para quem precisa apenas de um QR Code estático básico. Ao assinar a versão PRO por ${proPriceLabel}, todos os anúncios são completamente removidos do seu painel e do cardápio visualizado pelos seus clientes.`,
+                  a: `Os anúncios viabilizam manter a infraestrutura 100% gratuita para quem precisa apenas de um QR Code estático básico. Ao assinar a versão PRO por ${proPriceLabel}, todos os anúncios são completamente removidos do seu painel e do catálogo ou cardápio visualizado pelos seus clientes.`,
                 },
                 {
                   q: 'Qual a diferença entre o QR Code Estático e o Dinâmico?',
-                  a: 'No QR Code Estático, o link é codificado de forma fixa dentro dos pontos pretos. Se você mudar seu WhatsApp, seu site ou os preços, precisa imprimir novas plaquinhas. No QR Code Dinâmico PRO, o QR aponta para o seu link inteligente SpotQR (ex: spotqr.pro/r/seu-restaurante), permitindo que você altere o destino quantas vezes quiser pelo painel, sem nunca precisar reimprimir.',
+                  a: 'No QR Code Estático, o link é codificado de forma fixa dentro dos pontos pretos. Se você mudar seu WhatsApp, seu site ou os preços, precisa imprimir novas plaquinhas. No QR Code Dinâmico PRO, o QR aponta para o seu link inteligente SpotQR (ex: spotqr.pro/r/sua-loja), permitindo que você altere o destino quantas vezes quiser pelo painel, sem nunca precisar reimprimir.',
                 },
                 {
                   q: `Como funciona o pagamento de ${proPriceLabel}?`,
-                  a: 'O pagamento é processado oficialmente via Mercado Pago através do PIX instantâneo. Assim que o Pix é pago, o sistema libera imediatamente a ativação do seu QR Code Dinâmico e o painel de gerenciamento.',
+                  a: 'O pagamento é processado oficialmente via Mercado Pago através do PIX instantâneo. Assim que o Pix é pago, o sistema libera imediatamente a ativação do seu Catálogo Digital / QR Code Dinâmico e o painel de gerenciamento.',
                 },
                 {
                   q: 'Eu preciso pagar mensalidade para manter meu QR Code funcionando?',
                   a: `Não! A taxa de ${proPriceLabel} é um valor de ativação única para o QR Code criado. Não cobramos taxas surpresas nem mensalidades ocultas.`,
                 },
                 {
-                  q: 'Como meus clientes fazem pedidos pelo Cardápio Digital?',
-                  a: 'O cliente aponta a câmera para o QR na mesa e o cardápio abre no celular. Ele escolhe os pratos, adiciona ao carrinho, digita o número da mesa e clica em "Enviar Pedido pelo WhatsApp". O restaurante recebe a mensagem com o pedido pronto, economizando tempo dos garçons e sem pagar comissões para aplicativos de terceiros.',
+                  q: 'Como meus clientes fazem pedidos pelo Catálogo Digital ou Cardápio?',
+                  a: 'O cliente acessa seu link da bio ou aponta a câmera para o QR no balcão/mesa e o catálogo abre direto no celular. Ele escolhe os produtos, adiciona ao carrinho, informa entrega, retirada ou mesa e clica em "Enviar Pedido pelo WhatsApp". Sua loja recebe a mensagem com o pedido formatado, sem pagar comissões para marketplaces.',
                 },
                 {
                   q: 'O QR Code funciona em qualquer celular?',

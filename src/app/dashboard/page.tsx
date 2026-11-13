@@ -595,15 +595,21 @@ export default function DashboardPage() {
                   : 'border-slate-800/80 text-slate-500'
               }`}
             >
-              Conta de demonstração para teste rápido:{' '}
-              <strong className={isLight ? 'text-slate-800' : 'text-slate-300'}>
-                cliente@restaurante.com.br
-              </strong>{' '}
-              (Senha:{' '}
-              <strong className={isLight ? 'text-slate-800' : 'text-slate-300'}>
-                123456
-              </strong>
-              )
+              Quer conhecer a vitrine primeiro?{' '}
+              <Link
+                href="/catalogo/demo-catalogo"
+                className="font-bold text-emerald-500 hover:underline"
+              >
+                Ver Catálogo Demo
+              </Link>{' '}
+              ou{' '}
+              <Link
+                href="/cardapio/demo-restaurante"
+                className="font-bold text-emerald-500 hover:underline"
+              >
+                Ver Cardápio Demo
+              </Link>
+              .
             </div>
           </div>
         </main>

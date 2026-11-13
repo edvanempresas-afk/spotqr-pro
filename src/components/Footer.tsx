@@ -37,7 +37,7 @@ export default function Footer({
               </span>
             </div>
             <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-              Plataforma 3 em 1 para criar QR Codes com Logo, Cardápios Digitais e Catálogos Online para lojas, roupas, artesanato, impressões 3D e restaurantes.
+              Plataforma 3 em 1 para criar Catálogos Digitais para lojas, roupas, artesanato e impressões 3D, além de Cardápios Digitais e QR Codes com Logo.
             </p>
             <div
               className={`flex items-center gap-2 text-xs border px-3 py-1.5 rounded-lg w-fit ${
@@ -69,9 +69,9 @@ export default function Footer({
             <ul className="space-y-2 text-xs">
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Logomarca ou Imagem no Centro do QR</a></li>
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>QR Code Dinâmico (Link Editável)</a></li>
-              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Cardápios & Catálogos Digitais</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Catálogos & Cardápios Digitais</a></li>
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Pedidos sem Taxa pelo WhatsApp</a></li>
-              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Gerador de Plaquinhas A6/A5 para Mesas</a></li>
+              <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Display de Balcão e Mesa A6/A5</a></li>
             </ul>
           </div>
 

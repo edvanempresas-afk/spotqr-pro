@@ -102,13 +102,6 @@ export default function ClientLoginPage() {
     }
   };
 
-  const fillDemoCustomer = () => {
-    setTab('login');
-    setEmail('cliente@restaurante.com.br');
-    setPassword('123456');
-    setErrorMsg('');
-  };
-
   return (
     <div className="min-h-screen flex flex-col bg-[#0b0f17]">
       <Navbar />

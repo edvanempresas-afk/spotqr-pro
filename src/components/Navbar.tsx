@@ -91,7 +91,7 @@ export default function Navbar({
                 isLight ? 'text-slate-500' : 'text-slate-400'
               }`}
             >
-              QR Codes, Cardápios & Catálogos
+              Catálogos, Cardápios & QR Codes
             </span>
           </div>
         </Link>
@@ -111,19 +111,6 @@ export default function Navbar({
             Gerador Grátis
           </Link>
           <Link
-            href="/cardapio/demo-restaurante"
-            className={`transition-colors flex items-center gap-1 whitespace-nowrap ${
-              isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'
-            }`}
-          >
-            <Utensils
-              className={`w-3.5 h-3.5 shrink-0 ${
-                isLight ? 'text-emerald-600' : 'text-emerald-400'
-              }`}
-            />
-            <span>Cardápio Demo</span>
-          </Link>
-          <Link
             href="/catalogo/demo-catalogo"
             className={`transition-colors flex items-center gap-1 whitespace-nowrap ${
               isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'
@@ -131,10 +118,23 @@ export default function Navbar({
           >
             <ShoppingBag
               className={`w-3.5 h-3.5 shrink-0 ${
-                isLight ? 'text-amber-600' : 'text-amber-400'
+                isLight ? 'text-emerald-600' : 'text-emerald-400'
               }`}
             />
             <span>Catálogo Demo</span>
+          </Link>
+          <Link
+            href="/cardapio/demo-restaurante"
+            className={`transition-colors flex items-center gap-1 whitespace-nowrap ${
+              isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'
+            }`}
+          >
+            <Utensils
+              className={`w-3.5 h-3.5 shrink-0 ${
+                isLight ? 'text-amber-600' : 'text-amber-400'
+              }`}
+            />
+            <span>Cardápio Demo</span>
           </Link>
           <Link
             href="/#precos"
@@ -276,18 +276,6 @@ export default function Navbar({
               <span>Gerador Grátis</span>
             </Link>
             <Link
-              href="/cardapio/demo-restaurante"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`px-3 py-2.5 rounded-xl border transition flex items-center gap-2 ${
-                isLight
-                  ? 'bg-slate-50 border-slate-200 hover:border-emerald-400'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
-              }`}
-            >
-              <Utensils className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span>Cardápio Demo</span>
-            </Link>
-            <Link
               href="/catalogo/demo-catalogo"
               onClick={() => setMobileMenuOpen(false)}
               className={`px-3 py-2.5 rounded-xl border transition flex items-center gap-2 ${
@@ -296,8 +284,20 @@ export default function Navbar({
                   : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
               }`}
             >
-              <ShoppingBag className="w-4 h-4 text-amber-500 shrink-0" />
+              <ShoppingBag className="w-4 h-4 text-emerald-500 shrink-0" />
               <span>Catálogo Demo</span>
+            </Link>
+            <Link
+              href="/cardapio/demo-restaurante"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3 py-2.5 rounded-xl border transition flex items-center gap-2 ${
+                isLight
+                  ? 'bg-slate-50 border-slate-200 hover:border-emerald-400'
+                  : 'bg-slate-900/80 border-slate-800 hover:border-emerald-500/40'
+              }`}
+            >
+              <Utensils className="w-4 h-4 text-amber-500 shrink-0" />
+              <span>Cardápio Demo</span>
             </Link>
             <Link
               href="/#precos"

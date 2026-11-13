@@ -53,7 +53,7 @@ export const FEATURES_MATRIX: FeatureRule[] = [
   {
     id: 'ad_free',
     name: 'Experiência Livre de Anúncios (Ad-Free)',
-    description: 'Navegação sem banners, sem anúncios nos cardápios e sem esperas.',
+    description: 'Navegação sem banners, sem anúncios nos catálogos e cardápios e sem esperas.',
     freeAccess: false,
     proAccess: true,
     freeLimitText: 'Com anúncios estratégicos',
@@ -70,12 +70,12 @@ export const FEATURES_MATRIX: FeatureRule[] = [
   },
   {
     id: 'digital_menu',
-    name: 'Cardápio Digital Mobile Interativo',
-    description: 'Cardápio para mesas com fotos, categorias e pedidos no WhatsApp.',
+    name: 'Catálogo Digital & Cardápio Interativo',
+    description: 'Vitrine online de produtos ou cardápio com fotos, categorias e pedidos no WhatsApp.',
     freeAccess: false,
     proAccess: true,
     freeLimitText: 'Demonstração com Ads',
-    proLimitText: 'Cardápio Completo & Sem Taxas',
+    proLimitText: 'Catálogo / Cardápio Sem Taxas',
   },
   {
     id: 'scan_analytics',

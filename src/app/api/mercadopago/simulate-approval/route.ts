@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   recordPayment,
   getDynamicQRBySlug,
@@ -7,9 +7,17 @@ import {
   syncDbFromCloud,
   persistSliceToCloud,
 } from '@/lib/db';
+import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    if (!isAdminRequestAuthenticated(request)) {
+      return NextResponse.json(
+        { error: 'Modo de demonstração desativado em produção.' },
+        { status: 403 }
+      );
+    }
+
     await syncDbFromCloud();
     const { paymentId, slug } = await request.json();
 

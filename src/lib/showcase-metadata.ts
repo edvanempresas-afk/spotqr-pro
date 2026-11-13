@@ -49,7 +49,7 @@ function resolveShareImageUrl(
     return rawCover;
   }
 
-  return '/catalogo/cover-loja.jpg';
+  return '/og-spotqr.png';
 }
 
 export async function buildShowcaseMetadata(

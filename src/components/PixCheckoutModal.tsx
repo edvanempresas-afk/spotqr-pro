@@ -7,7 +7,6 @@ import {
   ExternalLink,
   QrCode,
   ShieldCheck,
-  Sparkles,
   Clock,
   CreditCard,
   Lock,
@@ -36,7 +35,6 @@ export default function PixCheckoutModal({
   const [paymentTab, setPaymentTab] = useState<'pix' | 'mercadolivre'>('pix');
   const [copied, setCopied] = useState(false);
   const [pixQrDataUrl, setPixQrDataUrl] = useState<string>('');
-  const [isApproving, setIsApproving] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
   const [countdown, setCountdown] = useState(1800); // 30 minutes in seconds
 
@@ -108,28 +106,6 @@ export default function PixCheckoutModal({
     }
   };
 
-  const handleSimulateApproval = async () => {
-    if (!paymentData?.paymentId) return;
-    setIsApproving(true);
-    try {
-      const res = await fetch('/api/mercadopago/simulate-approval', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          paymentId: paymentData.paymentId,
-          slug,
-        }),
-      });
-      if (res.ok) {
-        triggerSuccess();
-      }
-    } catch (err) {
-      console.error('Failed to simulate approval:', err);
-    } finally {
-      setIsApproving(false);
-    }
-  };
-
   if (!isOpen || !paymentData) return null;
 
   const minutes = Math.floor(countdown / 60);
@@ -153,7 +129,7 @@ export default function PixCheckoutModal({
               Assinatura PRO Confirmada!
             </h3>
             <p className="text-sm text-slate-300 max-w-sm mx-auto">
-              Seu QR Code Dinâmico e Cardápio{' '}
+              Seu QR Code Dinâmico e Catálogo/Cardápio{' '}
               <span className="font-semibold text-emerald-400">/{slug}</span>{' '}
               foram ativados com sucesso (Logo no Centro liberada & 100% Sem
               Anúncios)!
@@ -174,8 +150,8 @@ export default function PixCheckoutModal({
                 Assinatura SpotQR PRO — R$ {priceFormatted}
               </h3>
               <p className="text-xs text-slate-400">
-                Libere Logomarca no Centro do QR, Link Dinâmico Editável e
-                Cardápio Digital sem anúncios.
+                Libere Catálogo Digital & Cardápio sem anúncios, Logomarca no
+                Centro do QR e Link Dinâmico Editável.
               </p>
             </div>
 
@@ -362,27 +338,8 @@ export default function PixCheckoutModal({
               </div>
             )}
 
-            {/* Footer & Simulator (Simulator only shown when live token isn't active yet) */}
+            {/* Footer */}
             <div className="pt-3 border-t border-slate-800/80 space-y-3">
-              {!paymentData.isLiveProduction && (
-                <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/70 px-3 py-2 rounded-xl border border-slate-800">
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Teste Rápido (Modo Demonstração):</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleSimulateApproval}
-                    disabled={isApproving}
-                    className="text-emerald-400 hover:text-emerald-300 font-extrabold underline underline-offset-4 cursor-pointer whitespace-nowrap"
-                  >
-                    {isApproving
-                      ? 'Aprovando...'
-                      : '⚡ Simular Pagamento Aprovado'}
-                  </button>
-                </div>
-              )}
-
               <button
                 type="button"
                 onClick={onClose}
