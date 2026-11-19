@@ -82,6 +82,7 @@ export interface MenuItem {
   price: number;
   category: string;
   imageUrl?: string;
+  galleryImages?: string[]; // Fotos extras / ângulos (recurso PRO)
   badge?: string; // 'Mais Vendido' | 'Novo' | 'Promoção' | 'Sob Encomenda' | 'Vegetariano' | 'Chef Especial'
   productionDays?: number;
   isAvailable: boolean;

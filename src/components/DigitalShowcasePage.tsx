@@ -12,6 +12,7 @@ import {
   MapPin,
   Check,
   Copy,
+  ChevronLeft,
   ChevronRight,
   ArrowLeft,
   X,
@@ -41,6 +42,26 @@ import { generatePixPayload } from '@/lib/pix-brcode';
 import { renderPixQrDataUrl } from '@/lib/qr-canvas';
 import Link from 'next/link';
 import AdBanner from '@/components/AdBanner';
+import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
+
+function extractItemPhotos(
+  targetItem: MenuItem | null | undefined,
+  allowExtra: boolean
+): string[] {
+  if (!targetItem) return [];
+  const photos: string[] = [];
+  if (typeof targetItem.imageUrl === 'string' && targetItem.imageUrl.trim()) {
+    photos.push(targetItem.imageUrl.trim());
+  }
+  if (allowExtra && Array.isArray(targetItem.galleryImages)) {
+    for (const url of targetItem.galleryImages) {
+      if (typeof url === 'string' && url.trim() && !photos.includes(url.trim())) {
+        photos.push(url.trim());
+      }
+    }
+  }
+  return photos;
+}
 
 interface CartItem {
   item: MenuItem;
@@ -100,6 +121,7 @@ export default function DigitalShowcasePage({
 
   // Product photo zoom / lightbox
   const [zoomedItem, setZoomedItem] = useState<MenuItem | null>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
   const [photoZoomScale, setPhotoZoomScale] = useState<number>(1);
   const [videoCoverFailed, setVideoCoverFailed] = useState(false);
 
@@ -107,26 +129,35 @@ export default function DigitalShowcasePage({
     setVideoCoverFailed(false);
   }, [menu?.coverVideo]);
 
-  const openPhotoZoom = (item: MenuItem) => {
+  const openPhotoZoom = (item: MenuItem, initialIndex = 0) => {
     setZoomedItem(item);
+    setActivePhotoIndex(initialIndex);
     setPhotoZoomScale(1);
   };
 
   const closePhotoZoom = () => {
     setZoomedItem(null);
+    setActivePhotoIndex(0);
     setPhotoZoomScale(1);
   };
 
   useEffect(() => {
     if (!zoomedItem) return;
+    const total = extractItemPhotos(zoomedItem, Boolean(menu?.isPaid)).length;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         closePhotoZoom();
+      } else if (e.key === 'ArrowRight' && total > 1) {
+        setActivePhotoIndex((prev) => (prev + 1) % total);
+        setPhotoZoomScale(1);
+      } else if (e.key === 'ArrowLeft' && total > 1) {
+        setActivePhotoIndex((prev) => (prev - 1 + total) % total);
+        setPhotoZoomScale(1);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomedItem]);
+  }, [zoomedItem, menu?.isPaid]);
 
   // Read ?mesa=XX from URL if customer scanned a numbered table plaque
   const [isNearBottom, setIsNearBottom] = useState(false);
@@ -862,13 +893,23 @@ export default function DigitalShowcasePage({
   };
 
   const renderProductThumbnail = (targetItem: MenuItem, extraClass = '') => {
-    if (!targetItem.imageUrl) return null;
+    const photos = extractItemPhotos(targetItem, isPro);
+    if (photos.length === 0) return null;
+    const hasMultiple = photos.length > 1;
     return (
       <button
         type="button"
-        onClick={() => openPhotoZoom(targetItem)}
-        aria-label={`Ampliar foto de ${targetItem.name}`}
-        title="Clique para ampliar e ver a foto em detalhes"
+        onClick={() => openPhotoZoom(targetItem, 0)}
+        aria-label={
+          hasMultiple
+            ? `Ver ${photos.length} fotos de ${targetItem.name}`
+            : `Ampliar foto de ${targetItem.name}`
+        }
+        title={
+          hasMultiple
+            ? `Clique para ver todos os ${photos.length} ângulos / fotos`
+            : 'Clique para ampliar e ver a foto em detalhes'
+        }
         className={`group/img relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border shadow-md shrink-0 cursor-zoom-in transition focus:outline-none ${
           isLight
             ? 'border-slate-200 hover:border-slate-400'
@@ -876,10 +917,15 @@ export default function DigitalShowcasePage({
         } ${extraClass}`}
       >
         <img
-          src={targetItem.imageUrl}
+          src={photos[0]}
           alt={targetItem.name}
           className="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
         />
+        {hasMultiple && (
+          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-sm border border-white/20 text-[9px] font-extrabold text-white shadow">
+            📷 {photos.length}
+          </span>
+        )}
         <span className="absolute bottom-1.5 right-1.5 inline-flex items-center justify-center w-5 h-5 rounded-md bg-black/75 backdrop-blur-sm border border-white/20 text-white group-hover/img:scale-110 transition shadow">
           <ZoomIn className="w-3 h-3" />
         </span>
@@ -978,17 +1024,11 @@ export default function DigitalShowcasePage({
       {/* Cover Banner (PRO animated video when enabled & valid, or static image fallback) */}
       <div className="relative w-full h-44 sm:h-56 bg-slate-900 overflow-hidden">
         {isPro && menu.coverVideo && !videoCoverFailed ? (
-          <video
-            key={menu.coverVideo}
+          <AutoPlayLoopVideo
             src={menu.coverVideo}
             poster={menu.coverImage || fallbackCover}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
             onError={() => setVideoCoverFailed(true)}
-            className={`w-full h-full object-cover pointer-events-none ${
+            className={`w-full h-full object-cover ${
               isLight ? 'opacity-85' : 'opacity-60'
             }`}
           />
@@ -1359,7 +1399,11 @@ export default function DigitalShowcasePage({
                 }`}
               >
                 <p className={`text-sm ${mutedTextClass}`}>
-                  Nenhum item encontrado para sua busca.
+                  {menu.items.length === 0
+                    ? isCatalog
+                      ? 'Em breve! Este catálogo está sendo preparado com novos produtos.'
+                      : 'Em breve! Este cardápio está sendo preparado com novos itens.'
+                    : 'Nenhum item encontrado para sua busca.'}
                 </p>
               </div>
             ) : (
@@ -1498,13 +1542,13 @@ export default function DigitalShowcasePage({
                           >
                             R$ {item.price.toFixed(2)}
                           </span>
-                          {(imageOnLeft || !item.imageUrl) && (
+                          {(imageOnLeft || extractItemPhotos(item, isPro).length === 0) && (
                             <div className="ml-auto">{cartActionControl}</div>
                           )}
                         </div>
                       </div>
 
-                      {!imageOnLeft && item.imageUrl && (
+                      {!imageOnLeft && extractItemPhotos(item, isPro).length > 0 && (
                         <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
                           {renderProductThumbnail(item)}
                           {cartActionControl}
@@ -2491,191 +2535,291 @@ export default function DigitalShowcasePage({
         </div>
       )}
 
-      {/* Product Photo Zoom Modal */}
-      {zoomedItem && zoomedItem.imageUrl && (
-        <div
-          onClick={closePhotoZoom}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Foto ampliada de ${zoomedItem.name}`}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-2xl max-h-[92vh] flex flex-col border rounded-3xl overflow-hidden shadow-2xl ${modalBoxClass}`}
-          >
-            {/* Header */}
+      {/* Product Photo Gallery & Zoom Modal */}
+      {zoomedItem &&
+        (() => {
+          const zoomedPhotos = extractItemPhotos(zoomedItem, isPro);
+          if (zoomedPhotos.length === 0) return null;
+          const safeIndex = Math.min(activePhotoIndex, zoomedPhotos.length - 1);
+          const currentZoomedPhoto = zoomedPhotos[safeIndex];
+          const hasGallery = zoomedPhotos.length > 1;
+
+          return (
             <div
-              className={`shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b ${modalSubBarClass}`}
+              onClick={closePhotoZoom}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Foto ampliada de ${zoomedItem.name}`}
+              className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-fade-in"
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3
-                    className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
-                  >
-                    {zoomedItem.name}
-                  </h3>
-                  {(() => {
-                    const catName =
-                      menu.categories.find(
-                        (c) =>
-                          c.id === zoomedItem.category ||
-                          c.name === zoomedItem.category
-                      )?.name || zoomedItem.category;
-                    return catName ? (
-                      <span
-                        className={`inline-flex items-center gap-1 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          isLight
-                            ? 'bg-slate-100 border-slate-200 text-slate-700'
-                            : 'bg-slate-800/80 border-slate-700 text-slate-300'
-                        }`}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className={`relative w-full max-w-3xl max-h-[92vh] flex flex-col border rounded-3xl overflow-hidden shadow-2xl ${modalBoxClass}`}
+              >
+                {/* Header */}
+                <div
+                  className={`shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 py-3.5 border-b ${modalSubBarClass}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3
+                        className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
                       >
-                        <Layers className="w-2.5 h-2.5 opacity-70" />
-                        <span>{catName}</span>
-                      </span>
-                    ) : null;
-                  })()}
-                </div>
-                <p className={`text-[11px] ${mutedTextClass}`}>
-                  Clique na foto ou use os botões para aproximar
-                </p>
-              </div>
+                        {zoomedItem.name}
+                      </h3>
+                      {hasGallery && (
+                        <span
+                          style={{
+                            color: theme.readableAccentText,
+                            backgroundColor: theme.accentSoftBg,
+                            borderColor: theme.accentBorder,
+                          }}
+                          className="border text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        >
+                          Foto {safeIndex + 1} de {zoomedPhotos.length}
+                        </span>
+                      )}
+                      {(() => {
+                        const catName =
+                          menu.categories.find(
+                            (c) =>
+                              c.id === zoomedItem.category ||
+                              c.name === zoomedItem.category
+                          )?.name || zoomedItem.category;
+                        return catName ? (
+                          <span
+                            className={`inline-flex items-center gap-1 border text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              isLight
+                                ? 'bg-slate-100 border-slate-200 text-slate-700'
+                                : 'bg-slate-800/80 border-slate-700 text-slate-300'
+                            }`}
+                          >
+                            <Layers className="w-2.5 h-2.5 opacity-70" />
+                            <span>{catName}</span>
+                          </span>
+                        ) : null;
+                      })()}
+                    </div>
+                    <p className={`text-[11px] ${mutedTextClass}`}>
+                      {hasGallery
+                        ? 'Escolha o ângulo nas miniaturas ou clique na foto para aproximar'
+                        : 'Clique na foto ou use os botões para aproximar'}
+                    </p>
+                  </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPhotoZoomScale((prev) =>
-                      Math.max(1, Number((prev - 0.5).toFixed(2)))
-                    )
-                  }
-                  disabled={photoZoomScale <= 1}
-                  aria-label="Diminuir zoom"
-                  title="Diminuir zoom"
-                  className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
-                    isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
-                  }`}
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </button>
-                <span
-                  style={{
-                    color: theme.readableAccentText,
-                    backgroundColor: isLight ? '#ffffff' : '#0f172a',
-                    borderColor: theme.accentBorder,
-                  }}
-                  className="px-2 py-1 text-[11px] font-mono font-bold border rounded-lg min-w-[3.2rem] text-center"
-                >
-                  {Math.round(photoZoomScale * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPhotoZoomScale((prev) =>
-                      Math.min(2.5, Number((prev + 0.5).toFixed(2)))
-                    )
-                  }
-                  disabled={photoZoomScale >= 2.5}
-                  aria-label="Aumentar zoom"
-                  title="Aumentar zoom"
-                  className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
-                    isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
-                  }`}
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={closePhotoZoom}
-                  aria-label="Fechar foto ampliada"
-                  title="Fechar"
-                  className={`p-2 rounded-xl border transition ml-1 ${
-                    isLight
-                      ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-200'
-                      : 'bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border-slate-700'
-                  }`}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Interactive Zoom Image Stage */}
-            <div
-              className={`flex-1 min-h-0 overflow-auto p-3 sm:p-5 flex ${
-                isLight ? 'bg-slate-100' : 'bg-[#070a10]'
-              }`}
-            >
-              <img
-                src={zoomedItem.imageUrl}
-                alt={zoomedItem.name}
-                onClick={() =>
-                  setPhotoZoomScale((prev) => (prev > 1 ? 1 : 1.75))
-                }
-                title={
-                  photoZoomScale > 1
-                    ? 'Clique para voltar ao tamanho normal'
-                    : 'Clique para dar zoom'
-                }
-                style={
-                  photoZoomScale > 1
-                    ? {
-                        height: `${Math.round(photoZoomScale * 56)}vh`,
-                        width: 'auto',
-                        maxWidth: 'none',
-                        maxHeight: 'none',
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoZoomScale((prev) =>
+                          Math.max(1, Number((prev - 0.5).toFixed(2)))
+                        )
                       }
-                    : undefined
-                }
-                className={
-                  photoZoomScale > 1
-                    ? 'm-auto rounded-2xl object-contain cursor-zoom-out select-none shadow-2xl transition-all duration-200'
-                    : 'm-auto max-h-[56vh] max-w-full w-auto h-auto rounded-2xl object-contain cursor-zoom-in select-none shadow-2xl transition-all duration-200'
-                }
-              />
-            </div>
-
-            {/* Product Details & Direct Add Footer */}
-            <div
-              className={`shrink-0 p-4 sm:px-5 sm:py-4 border-t space-y-3 ${modalSubBarClass}`}
-            >
-              {getItemProductionDays(zoomedItem) > 0 && (
-                  <span
-                    className={`inline-block border text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                      isLight
-                        ? 'bg-orange-50 border-orange-200 text-orange-700'
-                        : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
-                    }`}
-                  >
-                    🛠️ Sob Encomenda •{' '}
-                    {formatProductionDaysLabel(getItemProductionDays(zoomedItem))}
-                  </span>
-                )}
-              {zoomedItem.description && (
-                <p className={`text-xs leading-relaxed ${labelTextClass}`}>
-                  {zoomedItem.description}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span
-                    className={`text-[10px] uppercase tracking-wider font-semibold block ${mutedTextClass}`}
-                  >
-                    Preço
-                  </span>
-                  <span
-                    className="text-lg font-extrabold"
-                    style={{ color: theme.readableAccentText }}
-                  >
-                    R$ {zoomedItem.price.toFixed(2)}
-                  </span>
+                      disabled={photoZoomScale <= 1}
+                      aria-label="Diminuir zoom"
+                      title="Diminuir zoom"
+                      className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
+                        isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
+                      }`}
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span
+                      style={{
+                        color: theme.readableAccentText,
+                        backgroundColor: isLight ? '#ffffff' : '#0f172a',
+                        borderColor: theme.accentBorder,
+                      }}
+                      className="px-2 py-1 text-[11px] font-mono font-bold border rounded-lg min-w-[3.2rem] text-center"
+                    >
+                      {Math.round(photoZoomScale * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPhotoZoomScale((prev) =>
+                          Math.min(2.5, Number((prev + 0.5).toFixed(2)))
+                        )
+                      }
+                      disabled={photoZoomScale >= 2.5}
+                      aria-label="Aumentar zoom"
+                      title="Aumentar zoom"
+                      className={`p-2 rounded-xl border transition disabled:opacity-35 disabled:cursor-not-allowed ${pillMutedClass} ${
+                        isLight ? 'hover:bg-slate-200' : 'hover:bg-slate-700'
+                      }`}
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closePhotoZoom}
+                      aria-label="Fechar foto ampliada"
+                      title="Fechar"
+                      className={`p-2 rounded-xl border transition ml-1 ${
+                        isLight
+                          ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-200'
+                          : 'bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border-slate-700'
+                      }`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-                {renderCartActionControl(zoomedItem)}
+
+                {/* Interactive Gallery Thumbnails + Zoom Image Stage */}
+                <div
+                  className={`flex-1 min-h-0 flex flex-col sm:flex-row overflow-hidden ${
+                    isLight ? 'bg-slate-100' : 'bg-[#070a10]'
+                  }`}
+                >
+                  {hasGallery && (
+                    <div
+                      className={`order-2 sm:order-1 shrink-0 flex sm:flex-col gap-2 p-2.5 sm:p-3 border-t sm:border-t-0 sm:border-r overflow-x-auto sm:overflow-y-auto sm:w-24 justify-start ${modalSubBarClass}`}
+                    >
+                      {zoomedPhotos.map((photoUrl, pIdx) => {
+                        const isSelected = pIdx === safeIndex;
+                        return (
+                          <button
+                            key={`${photoUrl}-${pIdx}`}
+                            type="button"
+                            onClick={() => {
+                              setActivePhotoIndex(pIdx);
+                              setPhotoZoomScale(1);
+                            }}
+                            aria-label={`Ver foto ${pIdx + 1} de ${zoomedPhotos.length}`}
+                            style={
+                              isSelected
+                                ? {
+                                    borderColor: theme.accentHex,
+                                    boxShadow: `0 0 0 2px ${theme.accentSoftBg}`,
+                                  }
+                                : undefined
+                            }
+                            className={`relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden border-2 shrink-0 transition ${
+                              isSelected
+                                ? 'scale-105'
+                                : isLight
+                                ? 'border-slate-200 opacity-75 hover:opacity-100'
+                                : 'border-slate-700 opacity-70 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={photoUrl}
+                              alt={`${zoomedItem.name} - ângulo ${pIdx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="order-1 sm:order-2 relative flex-1 min-h-0 overflow-auto p-3 sm:p-5 flex">
+                    {hasGallery && photoZoomScale === 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePhotoIndex(
+                              (prev) =>
+                                (prev - 1 + zoomedPhotos.length) %
+                                zoomedPhotos.length
+                            );
+                            setPhotoZoomScale(1);
+                          }}
+                          aria-label="Foto anterior"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/60 hover:bg-black/85 text-white border border-white/20 backdrop-blur-sm transition shadow-lg"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePhotoIndex(
+                              (prev) => (prev + 1) % zoomedPhotos.length
+                            );
+                            setPhotoZoomScale(1);
+                          }}
+                          aria-label="Próxima foto"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/60 hover:bg-black/85 text-white border border-white/20 backdrop-blur-sm transition shadow-lg"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+
+                    <img
+                      src={currentZoomedPhoto}
+                      alt={`${zoomedItem.name} - foto ${safeIndex + 1}`}
+                      onClick={() =>
+                        setPhotoZoomScale((prev) => (prev > 1 ? 1 : 1.75))
+                      }
+                      title={
+                        photoZoomScale > 1
+                          ? 'Clique para voltar ao tamanho normal'
+                          : 'Clique para dar zoom'
+                      }
+                      style={
+                        photoZoomScale > 1
+                          ? {
+                              height: `${Math.round(photoZoomScale * 54)}vh`,
+                              width: 'auto',
+                              maxWidth: 'none',
+                              maxHeight: 'none',
+                            }
+                          : undefined
+                      }
+                      className={
+                        photoZoomScale > 1
+                          ? 'm-auto rounded-2xl object-contain cursor-zoom-out select-none shadow-2xl transition-all duration-200'
+                          : 'm-auto max-h-[54vh] max-w-full w-auto h-auto rounded-2xl object-contain cursor-zoom-in select-none shadow-2xl transition-all duration-200'
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Product Details & Direct Add Footer */}
+                <div
+                  className={`shrink-0 p-4 sm:px-5 sm:py-4 border-t space-y-3 ${modalSubBarClass}`}
+                >
+                  {getItemProductionDays(zoomedItem) > 0 && (
+                    <span
+                      className={`inline-block border text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                        isLight
+                          ? 'bg-orange-50 border-orange-200 text-orange-700'
+                          : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
+                      }`}
+                    >
+                      🛠️ Sob Encomenda •{' '}
+                      {formatProductionDaysLabel(getItemProductionDays(zoomedItem))}
+                    </span>
+                  )}
+                  {zoomedItem.description && (
+                    <p className={`text-xs leading-relaxed ${labelTextClass}`}>
+                      {zoomedItem.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <span
+                        className={`text-[10px] uppercase tracking-wider font-semibold block ${mutedTextClass}`}
+                      >
+                        Preço
+                      </span>
+                      <span
+                        className="text-lg font-extrabold"
+                        style={{ color: theme.readableAccentText }}
+                      >
+                        R$ {zoomedItem.price.toFixed(2)}
+                      </span>
+                    </div>
+                    {renderCartActionControl(zoomedItem)}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 }

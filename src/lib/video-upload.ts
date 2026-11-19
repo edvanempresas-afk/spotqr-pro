@@ -53,6 +53,8 @@ function transcodeShortClipToWebm(
     }
 
     const mimeCandidates = [
+      'video/mp4;codecs=avc1',
+      'video/mp4',
       'video/webm;codecs=vp9',
       'video/webm;codecs=vp8',
       'video/webm',
@@ -63,11 +65,14 @@ function transcodeShortClipToWebm(
     if (!supportedMime) {
       reject(
         new Error(
-          'Compactação WebM indisponível neste navegador. Envie um vídeo MP4 curto de até 2 MB ou cole uma URL.'
+          'Compactação de vídeo indisponível neste navegador. Envie um vídeo MP4 curto de até 2 MB ou cole uma URL.'
         )
       );
       return;
     }
+    const outputMime = supportedMime.startsWith('video/mp4')
+      ? 'video/mp4'
+      : 'video/webm';
 
     const maxW = 854;
     const maxH = 480;
@@ -117,7 +122,7 @@ function transcodeShortClipToWebm(
       cleanup();
       if (finished) return;
       finished = true;
-      resolve(new Blob(chunks, { type: 'video/webm' }));
+      resolve(new Blob(chunks, { type: outputMime }));
     };
 
     recorder.onerror = () => {

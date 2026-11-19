@@ -71,3 +71,16 @@ body {
   }
 }
 
+/* Safari iOS/macOS: garante banner em vídeo sem botão de play nativo sobreposto */
+video.cover-loop-video::-webkit-media-controls,
+video.cover-loop-video::-webkit-media-controls-panel,
+video.cover-loop-video::-webkit-media-controls-play-button,
+video.cover-loop-video::-webkit-media-controls-start-playback-button,
+video.cover-loop-video::-webkit-media-controls-overlay-play-button,
+video.cover-loop-video::-webkit-media-controls-enclosure {
+  display: none !important;
+  -webkit-appearance: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+

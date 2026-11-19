@@ -303,6 +303,67 @@ export function createStarterCatalog(
   };
 }
 
+const DEMO_PLACEHOLDER_PHONES = new Set(['5511999998888', '11999998888']);
+const DEMO_PLACEHOLDER_PIX = new Set([
+  'pix@minhaloja.com.br',
+  'pix@restaurante.com.br',
+  'pix@seurestaurante.com.br',
+  'financeiro@seurestaurante.com.br',
+]);
+
+export function createEmptyShowcase(
+  slug: string,
+  mode: 'menu' | 'catalog' = 'menu',
+  title?: string,
+  whatsappNumber?: string,
+  pixKey?: string
+): RestaurantMenu {
+  const isCatalog = mode === 'catalog';
+  const cleanPhone =
+    whatsappNumber && !DEMO_PLACEHOLDER_PHONES.has(whatsappNumber.trim())
+      ? whatsappNumber.trim()
+      : '';
+  const cleanPix =
+    pixKey && !DEMO_PLACEHOLDER_PIX.has(pixKey.trim().toLowerCase())
+      ? pixKey.trim()
+      : '';
+
+  return {
+    id: slug,
+    slug,
+    mode: isCatalog ? 'catalog' : 'menu',
+    title:
+      title ||
+      (isCatalog ? 'Meu Catálogo Digital' : 'Meu Cardápio Digital'),
+    description: '',
+    whatsappNumber: cleanPhone,
+    currency: 'R$',
+    tableNumberPrompt: !isCatalog,
+    themeColor: isCatalog ? '#10b981' : '#16a34a',
+    themeMode: 'dark',
+    coverImage: isCatalog ? '/catalogo/cover-loja.jpg' : undefined,
+    address: '',
+    wifiInfo: '',
+    pixKey: cleanPix,
+    openingHours: '',
+    isOpen: true,
+    deliveryFee: 0,
+    allowDelivery: !isCatalog,
+    allowPickup: isCatalog,
+    allowOnSite: !isCatalog,
+    acceptedPayments: [],
+    productImagePosition: 'right',
+    updatedAt: new Date().toISOString(),
+    categories: [
+      {
+        id: 'cat-1',
+        name: isCatalog ? 'Produtos' : 'Cardápio Principal',
+      },
+    ],
+    items: [],
+  };
+}
+
 // Initial data: ONLY the public visitor demos (/cardapio/demo-restaurante and /catalogo/demo-catalogo). Zero fictional leads, payments, notifications or users.
 const initialData: DatabaseSchema = {
   dynamicQRs: {
@@ -1194,19 +1255,30 @@ export function saveDynamicQR(record: DynamicQRRecord): void {
 
   // If this QR is of type 'menu' or 'catalog' and no menu/catalog exists for this slug yet, auto-create!
   if ((record.type === 'menu' || record.type === 'catalog') && !db.menus[record.slug]) {
-    if (record.type === 'catalog') {
+    if (record.slug === 'demo-catalogo') {
       db.menus[record.slug] = createStarterCatalog(
         record.slug,
-        record.title || `Catálogo ${record.slug}`,
+        record.title || 'Studio Criativo & Loja',
         record.qrConfig?.whatsappPhone || '5511999998888',
         record.qrConfig?.pixKey || 'pix@minhaloja.com.br'
       );
-    } else {
+    } else if (record.slug === 'demo-restaurante') {
       db.menus[record.slug] = createStarterMenu(
         record.slug,
-        record.title || `Cardápio ${record.slug}`,
+        record.title || 'Smash & Grill Burger',
         record.qrConfig?.whatsappPhone || '5511999998888',
         record.qrConfig?.pixKey || 'pix@restaurante.com.br'
+      );
+    } else {
+      db.menus[record.slug] = createEmptyShowcase(
+        record.slug,
+        record.type === 'catalog' ? 'catalog' : 'menu',
+        record.title ||
+          (record.type === 'catalog'
+            ? `Catálogo ${record.slug}`
+            : `Cardápio ${record.slug}`),
+        record.qrConfig?.whatsappPhone,
+        record.qrConfig?.pixKey
       );
     }
   }
@@ -1251,18 +1323,26 @@ export function getMenuBySlug(
       .join(' ');
 
   const autoMenu =
-    resolvedMode === 'catalog'
+    slug === 'demo-catalogo'
       ? createStarterCatalog(
           slug,
           formattedTitle,
           qr?.qrConfig?.whatsappPhone || '5511999998888',
           qr?.qrConfig?.pixKey || 'pix@minhaloja.com.br'
         )
-      : createStarterMenu(
+      : slug === 'demo-restaurante'
+      ? createStarterMenu(
           slug,
           formattedTitle,
           qr?.qrConfig?.whatsappPhone || '5511999998888',
           qr?.qrConfig?.pixKey || 'pix@restaurante.com.br'
+        )
+      : createEmptyShowcase(
+          slug,
+          resolvedMode,
+          formattedTitle,
+          qr?.qrConfig?.whatsappPhone,
+          qr?.qrConfig?.pixKey
         );
   db.menus[slug] = autoMenu;
   saveDb(db);

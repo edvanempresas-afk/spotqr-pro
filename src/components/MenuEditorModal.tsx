@@ -34,8 +34,10 @@ import {
   Lock,
   Loader2,
   Package,
+  Star,
 } from 'lucide-react';
 import { StoreOrdersModal } from './StoreOrdersModal';
+import AutoPlayLoopVideo from './AutoPlayLoopVideo';
 import {
   RestaurantMenu,
   MenuItem,
@@ -118,32 +120,32 @@ const COVER_IMAGE_PRESETS = [
 const COVER_VIDEO_PRESETS = [
   {
     label: '🥩 Churrascaria',
-    url: '/videos/churrascaria.webm',
+    url: '/videos/churrascaria.mp4',
     poster: '/catalogo/cover-churrascaria.jpg',
   },
   {
     label: '🍺 Cervejaria Artesanal',
-    url: '/videos/cervejaria.webm',
+    url: '/videos/cervejaria.mp4',
     poster: '/catalogo/cover-cervejaria.jpg',
   },
   {
     label: '🍔 Restaurante Gourmet',
-    url: '/videos/restaurante.webm',
+    url: '/videos/restaurante.mp4',
     poster: '/catalogo/cover-restaurante.jpg',
   },
   {
     label: '🛍️ Ateliê & Loja',
-    url: '/videos/atelie-loja.webm',
+    url: '/videos/atelie-loja.mp4',
     poster: '/catalogo/cover-loja.jpg',
   },
   {
     label: '🧶 Artesanato Decor',
-    url: '/videos/artesanato.webm',
+    url: '/videos/artesanato.mp4',
     poster: '/catalogo/prod-artesanato.jpg',
   },
   {
     label: '👕 Boutique Minimal',
-    url: '/videos/boutique.webm',
+    url: '/videos/boutique.mp4',
     poster: '/catalogo/prod-roupa.jpg',
   },
 ];
@@ -203,6 +205,7 @@ export default function MenuEditorModal({
     preset: ImageUploadPreset;
     target:
       | { kind: 'item'; itemId: string }
+      | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
       | { kind: 'brand'; field: 'logoImage' | 'coverImage' };
   } | null>(null);
 
@@ -565,14 +568,12 @@ export default function MenuEditorModal({
     const defaultCat = menu.categories[0]?.id || 'cat-1';
     const newItem: MenuItem = {
       id: `item-${Date.now()}`,
-      name: isCatalog ? 'Novo Produto da Loja' : 'Novo Prato ou Bebida',
-      description: isCatalog
-        ? 'Informe detalhes como material, tamanhos, cores disponíveis ou personalização.'
-        : 'Descrição saborosa dos ingredientes e acompanhamento.',
-      price: isCatalog ? 59.9 : 29.9,
+      name: '',
+      description: '',
+      price: isCatalog ? 49.9 : 29.9,
       category: defaultCat,
-      imageUrl: activePresets[0].url,
-      badge: 'Novo',
+      imageUrl: '',
+      badge: undefined,
       isAvailable: true,
     };
     setMenu({
@@ -612,6 +613,7 @@ export default function MenuEditorModal({
     preset: ImageUploadPreset,
     target:
       | { kind: 'item'; itemId: string }
+      | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
       | { kind: 'brand'; field: 'logoImage' | 'coverImage' }
   ) => {
     if (!file.type || !file.type.startsWith('image/')) {
@@ -635,6 +637,51 @@ export default function MenuEditorModal({
     e.target.value = '';
     if (!file) return;
     openCropForFile(file, 'product', { kind: 'item', itemId });
+  };
+
+  const handleGalleryPhotoUpload = (
+    itemId: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+    galleryIndex?: number
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !isProShowcase) return;
+    openCropForFile(file, 'product', {
+      kind: 'item-gallery',
+      itemId,
+      galleryIndex,
+    });
+  };
+
+  const handleRemoveGalleryPhoto = (itemId: string, galleryIndex: number) => {
+    if (!menu) return;
+    const item = menu.items.find((it) => it.id === itemId);
+    if (!item) return;
+    const nextGallery = (item.galleryImages || []).filter(
+      (_, idx) => idx !== galleryIndex
+    );
+    handleUpdateItem(itemId, {
+      galleryImages: nextGallery.length > 0 ? nextGallery : undefined,
+    });
+  };
+
+  const handlePromoteGalleryPhotoToMain = (
+    itemId: string,
+    galleryIndex: number
+  ) => {
+    if (!menu) return;
+    const item = menu.items.find((it) => it.id === itemId);
+    if (!item || !item.galleryImages?.[galleryIndex]) return;
+    const chosen = item.galleryImages[galleryIndex];
+    const nextGallery = item.galleryImages.filter((_, i) => i !== galleryIndex);
+    if (item.imageUrl) {
+      nextGallery.splice(galleryIndex, 0, item.imageUrl);
+    }
+    handleUpdateItem(itemId, {
+      imageUrl: chosen,
+      galleryImages: nextGallery.slice(0, 4),
+    });
   };
 
   const handleBrandImageUpload = (
@@ -690,6 +737,25 @@ export default function MenuEditorModal({
     if (!cropSession) return;
     if (cropSession.target.kind === 'item') {
       handleUpdateItem(cropSession.target.itemId, { imageUrl: croppedDataUrl });
+    } else if (cropSession.target.kind === 'item-gallery') {
+      const targetItemId = cropSession.target.itemId;
+      const targetIdx = cropSession.target.galleryIndex;
+      setMenu((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((it) => {
+            if (it.id !== targetItemId) return it;
+            const current = [...(it.galleryImages || [])];
+            if (typeof targetIdx === 'number' && targetIdx >= 0 && targetIdx < current.length) {
+              current[targetIdx] = croppedDataUrl;
+            } else if (current.length < 4) {
+              current.push(croppedDataUrl);
+            }
+            return { ...it, galleryImages: current };
+          }),
+        };
+      });
     } else {
       const field = cropSession.target.field;
       setMenu((prev) => (prev ? { ...prev, [field]: croppedDataUrl } : prev));
@@ -1020,6 +1086,37 @@ export default function MenuEditorModal({
                   </div>
 
                   <div className="space-y-4">
+                    {menu.items.length === 0 && (
+                      <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-center space-y-3">
+                        <div className="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                          <Package className="w-6 h-6" />
+                        </div>
+                        <div className="space-y-1 max-w-md mx-auto">
+                          <h4 className="text-sm font-extrabold text-white">
+                            {isCatalog
+                              ? 'Nenhum produto cadastrado ainda'
+                              : 'Nenhum prato ou bebida cadastrado ainda'}
+                          </h4>
+                          <p className="text-xs text-slate-400">
+                            {isCatalog
+                              ? 'Adicione seus próprios produtos reais clicando no botão abaixo.'
+                              : 'Adicione seus próprios pratos e bebidas reais clicando no botão abaixo.'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddItem}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-extrabold transition shadow-sm"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>
+                            {isCatalog
+                              ? 'Cadastrar Primeiro Produto'
+                              : 'Cadastrar Primeiro Item'}
+                          </span>
+                        </button>
+                      </div>
+                    )}
                     {menu.items.map((item, idx) => {
                       const isBeingDragged = draggingId === item.id;
                       const isDropTarget =
@@ -1132,12 +1229,21 @@ export default function MenuEditorModal({
                           <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                             {/* Image preview + Direct Upload + Crop Framing */}
                             <div className="md:col-span-2 flex flex-col items-center gap-2">
-                              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0">
-                                <img
-                                  src={item.imageUrl || activePresets[0].url}
-                                  alt={item.name}
-                                  className="w-full h-full object-cover"
-                                />
+                              <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0 flex items-center justify-center">
+                                {item.imageUrl ? (
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name || 'Produto'}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center text-slate-500 gap-1 p-2 text-center">
+                                    <ImageIcon className="w-6 h-6 opacity-60" />
+                                    <span className="text-[9px] font-semibold">
+                                      Sem foto
+                                    </span>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="w-full max-w-[120px] flex flex-col gap-1">
@@ -1154,12 +1260,12 @@ export default function MenuEditorModal({
                                   />
                                 </label>
 
-                                {(item.imageUrl || activePresets[0].url) && (
+                                {item.imageUrl && (
                                   <button
                                     type="button"
                                     onClick={() =>
                                       setCropSession({
-                                        src: item.imageUrl || activePresets[0].url,
+                                        src: item.imageUrl!,
                                         isObjectUrl: false,
                                         preset: 'product',
                                         target: { kind: 'item', itemId: item.id },
@@ -1200,10 +1306,15 @@ export default function MenuEditorModal({
                               <input
                                 type="text"
                                 value={item.name}
+                                placeholder={
+                                  isCatalog
+                                    ? 'Ex: Camiseta, Caneca, Luminária 3D...'
+                                    : 'Ex: X-Bacon Especial, Pizza Calabresa...'
+                                }
                                 onChange={(e) =>
                                   handleUpdateItem(item.id, { name: e.target.value })
                                 }
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
                               />
                             </div>
 
@@ -1233,17 +1344,28 @@ export default function MenuEditorModal({
                               <input
                                 type="text"
                                 value={item.description}
+                                placeholder={
+                                  isCatalog
+                                    ? 'Informe detalhes como material, tamanhos, cores disponíveis ou personalização...'
+                                    : 'Descreva os ingredientes e acompanhamento...'
+                                }
                                 onChange={(e) =>
                                   handleUpdateItem(item.id, {
                                     description: e.target.value,
                                   })
                                 }
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300"
+                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600"
                               />
                             </div>
 
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
+                            <div
+                              className={
+                                creatingCategoryForItemId === item.id
+                                  ? 'sm:col-span-3 min-w-0'
+                                  : 'min-w-0'
+                              }
+                            >
+                              <div className="flex items-center justify-between gap-2 mb-1">
                                 <label className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1">
                                   <span>Categoria:</span>
                                 </label>
@@ -1254,7 +1376,7 @@ export default function MenuEditorModal({
                                       setCreatingCategoryForItemId(item.id);
                                       setInlineCategoryName('');
                                     }}
-                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline transition"
+                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline transition shrink-0"
                                     title="Criar nova categoria sem sair deste produto"
                                   >
                                     <Plus className="w-3 h-3" />
@@ -1264,12 +1386,12 @@ export default function MenuEditorModal({
                               </div>
 
                               {creatingCategoryForItemId === item.id ? (
-                                <div className="p-2 bg-slate-950 border border-emerald-500/60 rounded-xl space-y-1.5 shadow-lg animate-fade-in">
-                                  <div className="flex items-center gap-1.5">
+                                <div className="p-2.5 bg-slate-950 border border-emerald-500/60 rounded-xl space-y-2 shadow-lg animate-fade-in">
+                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                     <input
                                       type="text"
                                       autoFocus
-                                      placeholder="Nome da categoria..."
+                                      placeholder="Digite o nome da nova categoria..."
                                       value={inlineCategoryName}
                                       onChange={(e) => setInlineCategoryName(e.target.value)}
                                       onKeyDown={(e) => {
@@ -1281,32 +1403,34 @@ export default function MenuEditorModal({
                                           setInlineCategoryName('');
                                         }
                                       }}
-                                      className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                                      className="w-full min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
                                     />
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleCreateCategoryForProduct(item.id, inlineCategoryName)
-                                      }
-                                      disabled={!inlineCategoryName.trim()}
-                                      className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold rounded-lg transition shrink-0"
-                                    >
-                                      Criar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setCreatingCategoryForItemId(null);
-                                        setInlineCategoryName('');
-                                      }}
-                                      className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition shrink-0"
-                                      title="Cancelar"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleCreateCategoryForProduct(item.id, inlineCategoryName)
+                                        }
+                                        disabled={!inlineCategoryName.trim()}
+                                        className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-extrabold rounded-lg transition whitespace-nowrap"
+                                      >
+                                        Salvar Categoria
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setCreatingCategoryForItemId(null);
+                                          setInlineCategoryName('');
+                                        }}
+                                        className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition shrink-0"
+                                        title="Cancelar"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                   <p className="text-[10px] text-emerald-400 font-medium">
-                                    ✓ Cria a categoria e vincula imediatamente a este item.
+                                    ✓ Cria a categoria e já vincula imediatamente a este produto.
                                   </p>
                                 </div>
                               ) : (
@@ -1412,6 +1536,124 @@ export default function MenuEditorModal({
                                   placeholder="https://... ou use Enviar Foto"
                                   className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono"
                                 />
+                              )}
+                            </div>
+
+                            {/* PRO Multi-Photo / Extra Angles Gallery */}
+                            <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
+                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">
+                                    📸 Fotos Extras / Outros Ângulos do Produto
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    (até 4 fotos extras + principal)
+                                  </span>
+                                </div>
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                    isProShowcase
+                                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                      : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                                  }`}
+                                >
+                                  {isProShowcase ? (
+                                    <>
+                                      <Sparkles className="w-2.5 h-2.5" />
+                                      <span>PRO Liberado</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Lock className="w-2.5 h-2.5" />
+                                      <span>Exclusivo PRO</span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
+
+                              {isProShowcase ? (
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                  {(item.galleryImages || []).map((gUrl, gIdx) => (
+                                    <div
+                                      key={`${item.id}-gal-${gIdx}`}
+                                      className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0"
+                                    >
+                                      <img
+                                        src={gUrl}
+                                        alt={`Ângulo ${gIdx + 2}`}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <span className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-black/75 text-[8px] font-bold text-slate-200">
+                                        #{gIdx + 2}
+                                      </span>
+                                      <div className="absolute inset-x-0 bottom-0 p-0.5 bg-black/80 flex items-center justify-around gap-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handlePromoteGalleryPhotoToMain(item.id, gIdx)
+                                          }
+                                          title="Definir como foto principal"
+                                          className="p-0.5 text-amber-300 hover:text-amber-200 transition"
+                                        >
+                                          <Star className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setCropSession({
+                                              src: gUrl,
+                                              isObjectUrl: false,
+                                              preset: 'product',
+                                              target: {
+                                                kind: 'item-gallery',
+                                                itemId: item.id,
+                                                galleryIndex: gIdx,
+                                              },
+                                            })
+                                          }
+                                          title="Enquadrar este ângulo"
+                                          className="p-0.5 text-sky-300 hover:text-sky-200 transition"
+                                        >
+                                          <Crop className="w-2.5 h-2.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleRemoveGalleryPhoto(item.id, gIdx)
+                                          }
+                                          title="Remover foto extra"
+                                          className="p-0.5 text-rose-400 hover:text-rose-300 transition"
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+
+                                  {(item.galleryImages?.length || 0) < 4 && (
+                                    <label className="h-16 px-3 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center">
+                                      <Plus className="w-4 h-4" />
+                                      <span className="text-[10px] font-bold leading-tight">
+                                        + Foto / Ângulo
+                                      </span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) =>
+                                          handleGalleryPhotoUpload(item.id, e)
+                                        }
+                                        className="hidden"
+                                      />
+                                    </label>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-amber-500/25 flex items-center gap-2 text-[11px] text-slate-400">
+                                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                  <span>
+                                    Ative o <strong className="text-amber-300">Plano PRO</strong> para adicionar até 4 fotos extras de outros ângulos em cada produto (galeria interativa).
+                                  </span>
+                                </div>
                               )}
                             </div>
 
@@ -2133,14 +2375,9 @@ export default function MenuEditorModal({
                               <div className="space-y-2">
                                 {menu.coverVideo && (
                                   <div className="relative h-24 rounded-xl overflow-hidden border border-violet-500/40 bg-slate-950">
-                                    <video
-                                      key={menu.coverVideo}
+                                    <AutoPlayLoopVideo
                                       src={menu.coverVideo}
                                       poster={menu.coverImage || defaultCover}
-                                      autoPlay
-                                      loop
-                                      muted
-                                      playsInline
                                       className="w-full h-full object-cover opacity-80"
                                     />
                                     <div className="absolute inset-x-0 bottom-0 px-2.5 py-1 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-transparent flex items-center justify-between text-[10px]">
@@ -2203,7 +2440,10 @@ export default function MenuEditorModal({
                                   </span>
                                   <div className="flex flex-wrap gap-1.5">
                                     {COVER_VIDEO_PRESETS.map((preset) => {
-                                      const active = menu.coverVideo === preset.url;
+                                      const active =
+                                        menu.coverVideo === preset.url ||
+                                        menu.coverVideo?.replace(/\.webm$/i, '.mp4') ===
+                                          preset.url;
                                       return (
                                         <button
                                           key={preset.url}
@@ -2307,21 +2547,28 @@ export default function MenuEditorModal({
               {/* TAB 2: CATEGORIES */}
               {activeTab === 'categories' && (
                 <div className="space-y-4 max-w-xl">
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       value={newCategoryName}
                       onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCategory();
+                        }
+                      }}
                       placeholder={
                         isCatalog
                           ? 'Ex: 🖨️ Impressões 3D • 👕 Camisetas'
                           : 'Ex: 🍕 Pizzas Artesanais'
                       }
-                      className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white"
+                      className="w-full min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white"
                     />
                     <button
+                      type="button"
                       onClick={handleAddCategory}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0"
                     >
                       <Plus className="w-4 h-4" />
                       <span>Adicionar</span>

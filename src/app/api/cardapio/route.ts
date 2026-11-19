@@ -57,9 +57,19 @@ export async function GET(request: NextRequest) {
       effectiveSlug === 'demo-catalogo'
   );
 
+  const sanitizedItems = (menu.items || []).map((it) =>
+    isPaid
+      ? it
+      : {
+          ...it,
+          galleryImages: undefined,
+        }
+  );
+
   return NextResponse.json(
     {
       ...menu,
+      items: sanitizedItems,
       coverVideo: isPaid ? menu.coverVideo : undefined,
       isPaid,
       proGrantType: isPaid ? qr?.proGrantType || null : null,
@@ -229,8 +239,32 @@ export async function POST(request: NextRequest) {
     const isCatalog = body.mode === 'catalog';
     const { pixPasswordConfirmation: _ignoredConfirm, ...cleanMenuBody } = body;
     void _ignoredConfirm;
+
+    const existingItemsById = new Map(
+      (existingMenu?.items || []).map((it) => [it.id, it])
+    );
+    const sanitizedIncomingItems = (cleanMenuBody.items || []).map((item) => {
+      const cleanGallery = Array.isArray(item.galleryImages)
+        ? item.galleryImages
+            .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+            .map((u) => u.trim())
+            .slice(0, 4)
+        : undefined;
+      const existingGallery = existingItemsById.get(item.id)?.galleryImages;
+
+      return {
+        ...item,
+        galleryImages: isEffectivePro
+          ? cleanGallery && cleanGallery.length > 0
+            ? cleanGallery
+            : undefined
+          : existingGallery,
+      };
+    });
+
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
+      items: sanitizedIncomingItems,
       coverVideo: isEffectivePro
         ? incomingCoverVideo || undefined
         : existingCoverVideo || undefined,
