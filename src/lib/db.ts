@@ -79,7 +79,7 @@ export function createStarterMenu(
     themeColor: '#16a34a',
     themeMode: 'dark',
     address: 'Rua Gastronômica, 142 - Jardins, São Paulo',
-    wifiInfo: 'Cliente_VIP | Senha: bemvindo2026',
+    wifiInfo: '',
     pixKey,
     openingHours: 'Ter a Dom • 11h30 às 23h30',
     isOpen: true,
@@ -389,6 +389,33 @@ const initialData: DatabaseSchema = {
   orders: {},
 };
 
+export function isLegacyDemoUser(u?: ClientUser | null): boolean {
+  if (!u) return false;
+  const email = (u.email || '').trim().toLowerCase();
+  return (
+    u.id === 'user-demo' ||
+    u.id.startsWith('user-demo-') ||
+    [
+      'demo@spotqr.com.br',
+      'demo@spotqr.pro',
+      'cliente@demo.com',
+      'demo@restaurante.com.br',
+    ].includes(email)
+  );
+}
+
+function scrubLegacyDemoUsers(users?: Record<string, ClientUser>): boolean {
+  if (!users) return false;
+  let removed = false;
+  for (const uid of Object.keys(users)) {
+    if (isLegacyDemoUser(users[uid]) || uid === 'user-demo' || uid.startsWith('user-demo-')) {
+      delete users[uid];
+      removed = true;
+    }
+  }
+  return removed;
+}
+
 function ensureDb(): DatabaseSchema {
   try {
     let raw = '';
@@ -478,6 +505,8 @@ function ensureDb(): DatabaseSchema {
 
     if (!parsed.users) {
       parsed.users = {};
+      modified = true;
+    } else if (scrubLegacyDemoUsers(parsed.users)) {
       modified = true;
     }
 
@@ -649,6 +678,7 @@ export async function syncDbFromCloud(): Promise<void> {
         db.users[uid] = cloudUsers[uid];
       }
     }
+    scrubLegacyDemoUsers(db.users);
     changed = true;
   }
 
@@ -759,6 +789,7 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
         merged[uid] = cloudUsers[uid];
       }
     }
+    scrubLegacyDemoUsers(merged);
     db.users = merged;
     saveDb(db);
     await kvRequest(['SET', 'spotqr:users', JSON.stringify(merged)]);
