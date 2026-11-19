@@ -1497,7 +1497,11 @@ export default function DeveloperAdminDashboard() {
 
           {/* SECTION: SECURITY, PASSWORD RECOVERY & ANTI-PIX-HIJACK */}
           {(activeAppSection === 'security' ||
-            activeAppSection === 'overview') && <AdminSecurityPanel />}
+            activeAppSection === 'overview') && (
+            <AdminSecurityPanel
+              onAccountChanged={() => fetchDashboardData(true)}
+            />
+          )}
 
           {/* SECTION: SUBSCRIPTIONS & MONTHLY REVENUE BREAKDOWN */}
           {(activeAppSection === 'subscriptions' ||

@@ -732,6 +732,13 @@ export async function syncDbFromCloud(): Promise<void> {
 
   const cloudUsers = parseSlice<Record<string, ClientUser>>(results[0]);
   if (cloudUsers) {
+    const deletedUsers = globalThis.__spotqrDeletedUserIds;
+    if (deletedUsers && deletedUsers.size > 0) {
+      for (const delId of Array.from(deletedUsers)) {
+        delete cloudUsers[delId];
+        if (db.users) delete db.users[delId];
+      }
+    }
     db.users = { ...cloudUsers, ...(db.users || {}) };
     // Cloud hash always wins over any partial session stub
     for (const uid of Object.keys(cloudUsers)) {
@@ -841,6 +848,13 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
         cloudUsers = {};
       }
     }
+    const deletedUsers = globalThis.__spotqrDeletedUserIds;
+    if (deletedUsers && deletedUsers.size > 0) {
+      for (const delId of Array.from(deletedUsers)) {
+        delete cloudUsers[delId];
+        if (db.users) delete db.users[delId];
+      }
+    }
     const merged: Record<string, ClientUser> = {
       ...cloudUsers,
       ...(db.users || {}),
@@ -854,6 +868,9 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     db.users = merged;
     saveDb(db);
     await kvRequest(['SET', 'spotqr:users', JSON.stringify(merged)]);
+    if (deletedUsers && deletedUsers.size > 0) {
+      deletedUsers.clear();
+    }
     return;
   }
 
@@ -914,6 +931,8 @@ declare global {
   var __spotqrPendingMenuMoves: Array<{ from: string; to: string }> | undefined;
   // eslint-disable-next-line no-var
   var __spotqrDeletedQRSlugs: Set<string> | undefined;
+  // eslint-disable-next-line no-var
+  var __spotqrDeletedUserIds: Set<string> | undefined;
 }
 
 function markDeletedQRSlug(slug: string) {
@@ -922,6 +941,14 @@ function markDeletedQRSlug(slug: string) {
     globalThis.__spotqrDeletedQRSlugs = new Set<string>();
   }
   globalThis.__spotqrDeletedQRSlugs.add(slug);
+}
+
+function markDeletedUserId(userId: string) {
+  if (!userId) return;
+  if (!globalThis.__spotqrDeletedUserIds) {
+    globalThis.__spotqrDeletedUserIds = new Set<string>();
+  }
+  globalThis.__spotqrDeletedUserIds.add(userId);
 }
 
 function queueCloudMenuMove(from: string, to: string) {
@@ -2516,6 +2543,103 @@ export function adminSetUserSuspended(
   db.users![user.id] = user;
   saveDb(db);
   return user;
+}
+
+export function adminDeleteClientUser(userId: string): {
+  deletedUser: ClientUser;
+  deletedSlugs: string[];
+} {
+  const db = ensureDb();
+  const user = db.users?.[userId];
+  if (!user) throw new Error('Cliente não encontrado.');
+
+  const cleanEmail = (user.email || '').trim().toLowerCase();
+  const matchingUserIds = new Set<string>([user.id]);
+
+  if (db.users) {
+    for (const [uid, candidate] of Object.entries(db.users)) {
+      if (
+        uid === user.id ||
+        (cleanEmail && (candidate.email || '').trim().toLowerCase() === cleanEmail)
+      ) {
+        matchingUserIds.add(uid);
+      }
+    }
+  }
+
+  const deletedSlugsSet = new Set<string>();
+
+  for (const [slug, qr] of Object.entries(db.dynamicQRs || {})) {
+    if (slug === 'demo-restaurante' || slug === 'demo-catalogo') continue;
+    const qrOwnerEmail = (qr.ownerEmail || '').trim().toLowerCase();
+    const matchesOwner =
+      (qr.ownerId && matchingUserIds.has(qr.ownerId)) ||
+      (cleanEmail && qrOwnerEmail === cleanEmail);
+    if (matchesOwner) {
+      delete db.dynamicQRs[slug];
+      markDeletedQRSlug(slug);
+      deletedSlugsSet.add(slug);
+    }
+  }
+
+  for (const [slug, menu] of Object.entries(db.menus || {})) {
+    if (slug === 'demo-restaurante' || slug === 'demo-catalogo') continue;
+    const menuOwnerEmail = (menu.ownerEmail || '').trim().toLowerCase();
+    const matchesOwner =
+      deletedSlugsSet.has(slug) ||
+      (menu.ownerId && matchingUserIds.has(menu.ownerId)) ||
+      (cleanEmail && menuOwnerEmail === cleanEmail);
+    if (matchesOwner) {
+      delete db.menus[slug];
+      deletedSlugsSet.add(slug);
+    }
+  }
+
+  if (db.slugRedirects && deletedSlugsSet.size > 0) {
+    for (const [fromSlug, toSlug] of Object.entries(db.slugRedirects)) {
+      if (deletedSlugsSet.has(fromSlug) || deletedSlugsSet.has(toSlug)) {
+        delete db.slugRedirects[fromSlug];
+      }
+    }
+  }
+
+  if (db.orders) {
+    for (const [orderId, order] of Object.entries(db.orders)) {
+      const orderOwnerEmail = (order.storeOwnerEmail || '').trim().toLowerCase();
+      if (
+        deletedSlugsSet.has(order.slug) ||
+        (order.storeOwnerId && matchingUserIds.has(order.storeOwnerId)) ||
+        (cleanEmail && orderOwnerEmail === cleanEmail)
+      ) {
+        delete db.orders[orderId];
+      }
+    }
+  }
+
+  if (db.passwordResets) {
+    for (const [reqId, resetReq] of Object.entries(db.passwordResets)) {
+      const reqEmail = (resetReq.email || '').trim().toLowerCase();
+      if (
+        matchingUserIds.has(resetReq.userId) ||
+        (cleanEmail && reqEmail === cleanEmail)
+      ) {
+        delete db.passwordResets[reqId];
+      }
+    }
+  }
+
+  if (db.users) {
+    for (const uid of Array.from(matchingUserIds)) {
+      delete db.users[uid];
+      markDeletedUserId(uid);
+    }
+  }
+
+  saveDb(db);
+  return {
+    deletedUser: user,
+    deletedSlugs: Array.from(deletedSlugsSet),
+  };
 }
 
 export function getAdminSecurityOverview(): {

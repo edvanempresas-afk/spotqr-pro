@@ -13,6 +13,7 @@ import {
   Ban,
   MessageCircle,
   AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { PasswordResetRequest } from '@/lib/types';
 
@@ -30,13 +31,20 @@ interface SecurityUserRow {
   stores: Array<{ slug: string; storeCode: string; title: string; pixKey: string }>;
 }
 
-export default function AdminSecurityPanel() {
+interface AdminSecurityPanelProps {
+  onAccountChanged?: () => void;
+}
+
+export default function AdminSecurityPanel({
+  onAccountChanged,
+}: AdminSecurityPanelProps) {
   const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>(
     []
   );
   const [usersSecurity, setUsersSecurity] = useState<SecurityUserRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [issuedTokens, setIssuedTokens] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -129,6 +137,34 @@ export default function AdminSecurityPanel() {
         }),
       });
       await loadOverview();
+      onAccountChanged?.();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    setBusyId(userId);
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/admin/security', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_user',
+          userId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Erro ao deletar conta do cliente.');
+        return;
+      }
+      setConfirmDeleteId(null);
+      await loadOverview();
+      onAccountChanged?.();
+    } catch {
+      setErrorMsg('Erro de conexão ao deletar conta do cliente.');
     } finally {
       setBusyId(null);
     }
@@ -505,6 +541,41 @@ export default function AdminSecurityPanel() {
                     {u.isSuspended ? 'Reativar Conta' : 'Suspender Conta'}
                   </span>
                 </button>
+
+                {confirmDeleteId === u.id ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={busyId === u.id}
+                      onClick={() => handleDeleteUser(u.id)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-extrabold flex items-center gap-1.5 transition disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>
+                        {busyId === u.id ? 'Deletando...' : 'Confirmar Exclusão'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === u.id}
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-bold transition disabled:opacity-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busyId === u.id}
+                    onClick={() => setConfirmDeleteId(u.id)}
+                    className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-600 hover:text-white border border-rose-500/40 text-rose-300 text-[11px] font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                    title="Deletar conta permanentemente (apaga usuário e lojas vinculadas)"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Deletar Conta</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}

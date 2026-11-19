@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 import {
+  adminDeleteClientUser,
   adminSetUserPixLock,
   adminSetUserSuspended,
   approvePasswordResetByAdmin,
+  deleteCloudMenu,
   getAdminSecurityOverview,
   persistSliceToCloud,
   rejectPasswordResetByAdmin,
@@ -81,6 +83,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         isSuspended: Boolean(user.isSuspended),
+      });
+    }
+
+    if (action === 'delete_user') {
+      const userId = String(body.userId || '');
+      const { deletedUser, deletedSlugs } = adminDeleteClientUser(userId);
+      await Promise.all([
+        persistSliceToCloud('users'),
+        persistSliceToCloud('qrs'),
+        persistSliceToCloud('resets'),
+        persistSliceToCloud('redirects'),
+        persistSliceToCloud('orders'),
+        ...deletedSlugs.map((slug) => deleteCloudMenu(slug)),
+      ]);
+      return NextResponse.json({
+        success: true,
+        deletedUserId: deletedUser.id,
+        deletedSlugs,
       });
     }
 

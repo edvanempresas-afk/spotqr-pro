@@ -4,7 +4,6 @@ import {
   getClientUserById,
   getClientUserByEmail,
   verifyUserPassword,
-  restoreClientUserFromSession,
 } from './db';
 import { ClientUser } from './types';
 
@@ -103,14 +102,6 @@ export function getAuthenticatedClientUser(
     return byId;
   }
 
-  if (verified.profile) {
-    const restored = restoreClientUserFromSession(verified.profile);
-    if (restored.isSuspended) return null;
-    if ((restored.sessionVersion ?? 1) !== (verified.profile.sessionVersion ?? 1)) {
-      return null;
-    }
-    return restored;
-  }
   return null;
 }
 
