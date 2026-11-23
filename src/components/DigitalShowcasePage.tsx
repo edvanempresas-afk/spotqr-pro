@@ -106,6 +106,8 @@ export default function DigitalShowcasePage({
   const [customerName, setCustomerName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [needsChange, setNeedsChange] = useState<boolean>(false);
+  const [changeForAmount, setChangeForAmount] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -330,6 +332,18 @@ export default function DigitalShowcasePage({
     acceptedPaymentOptions.find((opt) => opt.whatsappLabel === paymentMethod) ||
     null;
   const isPixSelected = selectedPaymentOption?.id === 'pix';
+  const isCashSelected = selectedPaymentOption?.id === 'cash';
+  const isDeliveryOrPickup =
+    enabledModes.length > 0 &&
+    (orderMode === 'delivery' || orderMode === 'pickup');
+  const showCashChangeOption = isDeliveryOrPickup && isCashSelected;
+
+  useEffect(() => {
+    if (!showCashChangeOption) {
+      setNeedsChange(false);
+      setChangeForAmount('');
+    }
+  }, [showCashChangeOption]);
 
   useEffect(() => {
     if (acceptedPaymentOptions.length === 0) {
@@ -460,6 +474,18 @@ export default function DigitalShowcasePage({
       ? Number(menu?.deliveryFee || 0)
       : 0;
   const totalPrice = subtotalPrice + deliveryFee;
+  const parseBrlAmount = (raw: string): number => {
+    const cleaned = raw.replace(/[^\d.,]/g, '').trim();
+    if (!cleaned) return 0;
+    const normalized = cleaned.includes(',')
+      ? cleaned.replace(/\./g, '').replace(',', '.')
+      : cleaned;
+    const num = Number(normalized);
+    return Number.isFinite(num) && num > 0 ? num : 0;
+  };
+  const parsedChangeFor = parseBrlAmount(changeForAmount);
+  const changeReturnAmount =
+    parsedChangeFor >= totalPrice ? parsedChangeFor - totalPrice : 0;
   const canPayPixAtCheckout =
     acceptsPix && hasPixKey && isPixSelected && totalItems > 0 && totalPrice > 0;
 
@@ -535,7 +561,10 @@ export default function DigitalShowcasePage({
   const formatProductionDaysLabel = (days: number): string =>
     `Pronto em ${days} ${days === 1 ? 'dia' : 'dias'}`;
 
-  const buildWhatsAppOrderUrl = (pixTxId?: string): string => {
+  const buildWhatsAppOrderUrl = (
+    orderCode?: string,
+    includePixSummary: boolean = false
+  ): string => {
     if (!menu?.whatsappNumber) return '';
 
     const itemsSummary = Object.values(cart)
@@ -578,8 +607,8 @@ export default function DigitalShowcasePage({
       `*${isCatalog ? 'Loja / Marca' : 'Estabelecimento'}:* ${menu.title}\n` +
       `────────────────────\n`;
 
-    if (pixTxId) {
-      message += `*Código do Pedido:* #${pixTxId}\n`;
+    if (orderCode) {
+      message += `*Código do Pedido:* #${orderCode}\n`;
     }
 
     if (!activeMode) {
@@ -601,6 +630,18 @@ export default function DigitalShowcasePage({
       message += `*Forma de Pagamento:* ${resolvedPaymentText}\n`;
     }
 
+    if (showCashChangeOption) {
+      if (needsChange && parsedChangeFor >= totalPrice) {
+        message += `*Troco:* Sim, troco para *R$ ${parsedChangeFor.toFixed(
+          2
+        )}* (levar *R$ ${changeReturnAmount.toFixed(2)}* de troco)\n`;
+      } else if (needsChange) {
+        message += `*Troco:* Sim, preciso de troco\n`;
+      } else {
+        message += `*Troco:* Não precisa de troco (valor exato)\n`;
+      }
+    }
+
     if (customerName) {
       message += `*Cliente:* ${customerName}\n`;
     }
@@ -612,7 +653,7 @@ export default function DigitalShowcasePage({
     }
     message += `\n*TOTAL: R$ ${totalPrice.toFixed(2)}*\n`;
 
-    if (pixTxId) {
+    if (includePixSummary && isPixSelected) {
       message += `\n*Pagamento via PIX:* Gerado no valor exato de *R$ ${totalPrice.toFixed(2)}* (vou enviar o comprovante abaixo).\n`;
     }
 
@@ -635,6 +676,25 @@ export default function DigitalShowcasePage({
     const itemsList = Object.values(cart);
     if (itemsList.length === 0) return;
 
+    if (showCashChangeOption && needsChange) {
+      if (parsedChangeFor <= 0) {
+        setCheckoutError(
+          'Informe para qual valor você precisa de troco (ex: R$ 50 ou R$ 100).'
+        );
+        return;
+      }
+      if (parsedChangeFor < totalPrice) {
+        setCheckoutError(
+          `O valor para troco (R$ ${parsedChangeFor.toFixed(
+            2
+          )}) precisa ser maior ou igual ao total do pedido (R$ ${totalPrice.toFixed(
+            2
+          )}).`
+        );
+        return;
+      }
+    }
+
     setCheckoutSubmitting(true);
     let orderId = `PED${Date.now().toString().slice(-6)}`;
 
@@ -644,6 +704,13 @@ export default function DigitalShowcasePage({
         acceptedPaymentOptions.length > 0
           ? paymentMethod || acceptedPaymentOptions[0].whatsappLabel
           : 'A combinar pelo WhatsApp';
+      const orderPaymentLabel = showCashChangeOption
+        ? needsChange && parsedChangeFor >= totalPrice
+          ? `${resolvedPaymentText} (Troco p/ R$ ${parsedChangeFor.toFixed(
+              2
+            )} • levar R$ ${changeReturnAmount.toFixed(2)})`
+          : `${resolvedPaymentText} (Sem troco)`
+        : resolvedPaymentText;
 
       const res = await fetch('/api/cardapio/orders', {
         method: 'POST',
@@ -660,7 +727,7 @@ export default function DigitalShowcasePage({
             activeOrderMode === 'delivery'
               ? deliveryAddress.trim()
               : undefined,
-          paymentMethod: resolvedPaymentText,
+          paymentMethod: orderPaymentLabel,
           items: itemsList.map((c) => ({
             id: c.item.id,
             quantity: c.quantity,
@@ -698,7 +765,7 @@ export default function DigitalShowcasePage({
     }
 
     if (canPayPixAtCheckout) {
-      const whatsappUrl = buildWhatsAppOrderUrl(orderId);
+      const whatsappUrl = buildWhatsAppOrderUrl(orderId, true);
       setCopiedPix(false);
       setIsCartOpen(false);
       setClosedPixOrder({
@@ -710,13 +777,17 @@ export default function DigitalShowcasePage({
         whatsappUrl,
       });
       setCart({});
+      setNeedsChange(false);
+      setChangeForAmount('');
       return;
     }
 
-    const url = buildWhatsAppOrderUrl(orderId);
+    const url = buildWhatsAppOrderUrl(orderId, false);
     if (url) {
       window.open(url, '_blank');
       setCart({});
+      setNeedsChange(false);
+      setChangeForAmount('');
       setIsCartOpen(false);
     }
   };
@@ -2425,6 +2496,151 @@ export default function DigitalShowcasePage({
 
                 {/* Accepted Payment Methods (strictly configured by advertiser) */}
                 {renderPaymentSelector()}
+
+                {/* Change (Troco) selector for Delivery & Pickup when paying in Cash */}
+                {showCashChangeOption && (
+                  <div
+                    className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                      isLight
+                        ? 'bg-emerald-50/70 border-emerald-200'
+                        : 'bg-emerald-950/20 border-emerald-500/30'
+                    }`}
+                  >
+                    <label
+                      className={`text-xs font-bold block ${
+                        isLight ? 'text-emerald-900' : 'text-emerald-200'
+                      }`}
+                    >
+                      💵 Pagamento em dinheiro: vai precisar de troco?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNeedsChange(false);
+                          setChangeForAmount('');
+                          setCheckoutError(null);
+                        }}
+                        style={
+                          !needsChange
+                            ? {
+                                backgroundColor: theme.accentHex,
+                                color: theme.accentTextOnSolid,
+                                borderColor: theme.accentHex,
+                              }
+                            : undefined
+                        }
+                        className={`py-2 px-2.5 rounded-xl border text-[11px] font-bold transition ${
+                          !needsChange
+                            ? 'shadow-sm'
+                            : isLight
+                            ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        Não (valor exato)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNeedsChange(true);
+                          setCheckoutError(null);
+                        }}
+                        style={
+                          needsChange
+                            ? {
+                                backgroundColor: theme.accentHex,
+                                color: theme.accentTextOnSolid,
+                                borderColor: theme.accentHex,
+                              }
+                            : undefined
+                        }
+                        className={`py-2 px-2.5 rounded-xl border text-[11px] font-bold transition ${
+                          needsChange
+                            ? 'shadow-sm'
+                            : isLight
+                            ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                        }`}
+                      >
+                        Sim, preciso de troco
+                      </button>
+                    </div>
+
+                    {needsChange && (
+                      <div className="space-y-2 pt-1">
+                        <div>
+                          <label
+                            className={`text-[11px] font-semibold block mb-1 ${labelTextClass}`}
+                          >
+                            Troco para quanto? (R$)
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder={`Ex: ${Math.ceil((totalPrice + 10) / 10) * 10},00`}
+                            value={changeForAmount}
+                            onChange={(e) => {
+                              setChangeForAmount(e.target.value);
+                              setCheckoutError(null);
+                            }}
+                            className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none ${inputFieldClass}`}
+                          />
+                        </div>
+
+                        {(() => {
+                          const quickBills = [20, 50, 100, 200].filter(
+                            (v) => v > totalPrice
+                          );
+                          if (quickBills.length === 0) return null;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`text-[10px] font-semibold ${mutedTextClass}`}
+                              >
+                                Atalhos:
+                              </span>
+                              {quickBills.map((bill) => (
+                                <button
+                                  key={bill}
+                                  type="button"
+                                  onClick={() => {
+                                    setChangeForAmount(`${bill},00`);
+                                    setCheckoutError(null);
+                                  }}
+                                  className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                                    parsedChangeFor === bill
+                                      ? 'bg-emerald-500/25 border-emerald-400 text-emerald-300'
+                                      : isLight
+                                      ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100'
+                                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-500'
+                                  }`}
+                                >
+                                  R$ {bill}
+                                </button>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
+                        {parsedChangeFor > 0 && parsedChangeFor >= totalPrice && (
+                          <p
+                            className={`text-[11px] font-bold ${
+                              isLight ? 'text-emerald-700' : 'text-emerald-300'
+                            }`}
+                          >
+                            ✓ Troco calculado: R$ {changeReturnAmount.toFixed(2)} (para nota de R$ {parsedChangeFor.toFixed(2)})
+                          </p>
+                        )}
+                        {parsedChangeFor > 0 && parsedChangeFor < totalPrice && (
+                          <p className="text-[11px] font-semibold text-amber-400">
+                            ⚠️ Informe um valor igual ou maior que o total do pedido (R$ {totalPrice.toFixed(2)}).
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label

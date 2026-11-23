@@ -732,21 +732,23 @@ export async function syncDbFromCloud(): Promise<void> {
 
   const cloudUsers = parseSlice<Record<string, ClientUser>>(results[0]);
   if (cloudUsers) {
+    const nextUsers: Record<string, ClientUser> = { ...cloudUsers };
     const deletedUsers = globalThis.__spotqrDeletedUserIds;
     if (deletedUsers && deletedUsers.size > 0) {
       for (const delId of Array.from(deletedUsers)) {
-        delete cloudUsers[delId];
-        if (db.users) delete db.users[delId];
+        delete nextUsers[delId];
       }
     }
-    db.users = { ...cloudUsers, ...(db.users || {}) };
-    // Cloud hash always wins over any partial session stub
-    for (const uid of Object.keys(cloudUsers)) {
-      if (cloudUsers[uid]?.passwordHash) {
-        db.users[uid] = cloudUsers[uid];
+    const deletedEmails = globalThis.__spotqrDeletedUserEmails;
+    if (deletedEmails && deletedEmails.size > 0) {
+      for (const [uid, candidate] of Object.entries(nextUsers)) {
+        if (deletedEmails.has((candidate.email || '').trim().toLowerCase())) {
+          delete nextUsers[uid];
+        }
       }
     }
-    scrubLegacyDemoUsers(db.users);
+    scrubLegacyDemoUsers(nextUsers);
+    db.users = nextUsers;
     changed = true;
   }
 
@@ -811,7 +813,7 @@ export async function syncDbFromCloud(): Promise<void> {
 
   const cloudOrders = parseSlice<Record<string, StoreOrder>>(results[9]);
   if (cloudOrders) {
-    db.orders = { ...(db.orders || {}), ...cloudOrders };
+    db.orders = { ...cloudOrders };
     changed = true;
   }
 
@@ -855,6 +857,21 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
         if (db.users) delete db.users[delId];
       }
     }
+    const deletedEmails = globalThis.__spotqrDeletedUserEmails;
+    if (deletedEmails && deletedEmails.size > 0) {
+      for (const [uid, candidate] of Object.entries(cloudUsers)) {
+        if (deletedEmails.has((candidate.email || '').trim().toLowerCase())) {
+          delete cloudUsers[uid];
+        }
+      }
+      if (db.users) {
+        for (const [uid, candidate] of Object.entries(db.users)) {
+          if (deletedEmails.has((candidate.email || '').trim().toLowerCase())) {
+            delete db.users[uid];
+          }
+        }
+      }
+    }
     const merged: Record<string, ClientUser> = {
       ...cloudUsers,
       ...(db.users || {}),
@@ -870,6 +887,9 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     await kvRequest(['SET', 'spotqr:users', JSON.stringify(merged)]);
     if (deletedUsers && deletedUsers.size > 0) {
       deletedUsers.clear();
+    }
+    if (deletedEmails && deletedEmails.size > 0) {
+      deletedEmails.clear();
     }
     return;
   }
@@ -933,6 +953,8 @@ declare global {
   var __spotqrDeletedQRSlugs: Set<string> | undefined;
   // eslint-disable-next-line no-var
   var __spotqrDeletedUserIds: Set<string> | undefined;
+  // eslint-disable-next-line no-var
+  var __spotqrDeletedUserEmails: Set<string> | undefined;
 }
 
 function markDeletedQRSlug(slug: string) {
@@ -949,6 +971,15 @@ function markDeletedUserId(userId: string) {
     globalThis.__spotqrDeletedUserIds = new Set<string>();
   }
   globalThis.__spotqrDeletedUserIds.add(userId);
+}
+
+function markDeletedUserEmail(email: string) {
+  const clean = (email || '').trim().toLowerCase();
+  if (!clean) return;
+  if (!globalThis.__spotqrDeletedUserEmails) {
+    globalThis.__spotqrDeletedUserEmails = new Set<string>();
+  }
+  globalThis.__spotqrDeletedUserEmails.add(clean);
 }
 
 function queueCloudMenuMove(from: string, to: string) {
@@ -1814,6 +1845,8 @@ export function createClientUser(input: {
   };
 
   db.users[id] = user;
+  globalThis.__spotqrDeletedUserIds?.delete(id);
+  globalThis.__spotqrDeletedUserEmails?.delete(cleanEmail);
   saveDb(db);
 
   createDeveloperNotification({
@@ -2633,6 +2666,9 @@ export function adminDeleteClientUser(userId: string): {
       delete db.users[uid];
       markDeletedUserId(uid);
     }
+  }
+  if (cleanEmail) {
+    markDeletedUserEmail(cleanEmail);
   }
 
   saveDb(db);
