@@ -2629,7 +2629,7 @@ export default function DigitalShowcasePage({
                               isLight ? 'text-emerald-700' : 'text-emerald-300'
                             }`}
                           >
-                            ✓ Troco calculado: R$ {changeReturnAmount.toFixed(2)} (para nota de R$ {parsedChangeFor.toFixed(2)})
+                            ✓ Troco calculado: R$ {changeReturnAmount.toFixed(2)} (troco para o valor de R$ {parsedChangeFor.toFixed(2)})
                           </p>
                         )}
                         {parsedChangeFor > 0 && parsedChangeFor < totalPrice && (
