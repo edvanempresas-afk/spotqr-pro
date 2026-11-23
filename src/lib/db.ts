@@ -441,7 +441,7 @@ const initialData: DatabaseSchema = {
     mpPublicKey: 'APP_USR-8b245dbb-b6c0-4335-b46a-ae016ea5071d',
     mpAccessToken:
       'APP_USR-4000171423020297-110821-0d5a69a11b676b64931811de85b054a0-244576316',
-    proPriceReais: 10.9,
+    proPriceReais: 25.9,
     ntfyTopic: 'spotqr-edvan-alertas-1982',
   },
   developerLeads: {},
@@ -1645,15 +1645,16 @@ export function getSubscriptionAnalytics() {
     return dtStr === todayDateStr;
   });
 
+  const fallbackProPrice = Number(db.developerSettings?.proPriceReais) || 25.9;
   const monthlyApprovedCount = monthlyApproved.length;
   const monthlyRevenue = monthlyApproved.reduce(
-    (acc, p) => acc + (Number(p.amount) || 10.9),
+    (acc, p) => acc + (Number(p.amount) || fallbackProPrice),
     0
   );
 
   const todayApprovedCount = todayApproved.length;
   const todayRevenue = todayApproved.reduce(
-    (acc, p) => acc + (Number(p.amount) || 10.9),
+    (acc, p) => acc + (Number(p.amount) || fallbackProPrice),
     0
   );
 
@@ -1661,7 +1662,7 @@ export function getSubscriptionAnalytics() {
     isProStillValid(q)
   ).length;
   const totalAllTimeRevenue = approvedPayments.reduce(
-    (acc, p) => acc + (Number(p.amount) || 10.9),
+    (acc, p) => acc + (Number(p.amount) || fallbackProPrice),
     0
   );
 

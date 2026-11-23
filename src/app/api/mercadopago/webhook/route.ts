@@ -3,6 +3,7 @@ import { checkPaymentStatus } from '@/lib/mercadopago';
 import {
   recordPayment,
   getPayment,
+  getDeveloperSettings,
   syncDbFromCloud,
   persistSliceToCloud,
 } from '@/lib/db';
@@ -25,7 +26,11 @@ export async function POST(request: Request) {
           const existing = getPayment(String(paymentId));
           const slug =
             result.externalReference || existing?.slug || 'unknown';
-          recordPayment(String(paymentId), slug, 'approved', 10.9);
+          const paidAmount =
+            Number(existing?.amount) ||
+            Number(getDeveloperSettings()?.proPriceReais) ||
+            25.9;
+          recordPayment(String(paymentId), slug, 'approved', paidAmount);
           await Promise.all([
             persistSliceToCloud('payments'),
             persistSliceToCloud('qrs'),

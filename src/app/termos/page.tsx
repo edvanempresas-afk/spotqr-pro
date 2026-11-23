@@ -60,20 +60,24 @@ export default function TermosPage() {
             </h2>
             <p>
               O SpotQR Pro disponibiliza gerador de QR Codes estáticos e
-              dinâmicos, criação e edição de cardápios digitais para mesas e
-              delivery, e intermediação de propostas de desenvolvimento de
-              software sob medida.
+              dinâmicos, criação e edição de catálogos digitais e cardápios para
+              mesas, retirada e delivery, além de intermediação de propostas de
+              desenvolvimento de software sob medida.
             </p>
             <ul className="list-disc pl-5 space-y-1 text-slate-300">
               <li>
                 <strong>Versão Gratuita:</strong> Permite gerar QR Codes
-                estáticos sem logotipo central e cardápios com exibição de
-                anúncios patrocinados.
+                estáticos sem logotipo central e catálogos/cardápios com
+                exibição de anúncios patrocinados.
               </li>
               <li>
-                <strong>Plano PRO (<ProPriceLabel />):</strong> Desbloqueia logomarca no
-                centro do QR Code, link dinâmico com redirecionamento editável a
-                qualquer momento e remoção de 100% dos anúncios.
+                <strong>Plano PRO (valor vigente: <ProPriceLabel />/mês):</strong>{' '}
+                Desbloqueia logomarca no centro do QR Code, link dinâmico e
+                amigável editável a qualquer momento, banner em vídeo animado no
+                topo, galeria com múltiplas fotos/ângulos por produto, métricas
+                em tempo real e remoção de 100% dos anúncios. O valor exibido
+                reflete automaticamente o preço vigente configurado na
+                plataforma.
               </li>
             </ul>
           </section>

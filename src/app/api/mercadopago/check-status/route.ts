@@ -4,6 +4,7 @@ import {
   getPayment,
   recordPayment,
   getDynamicQRBySlug,
+  getDeveloperSettings,
   expireDueQRsIfAny,
   syncDbFromCloud,
   persistSliceToCloud,
@@ -47,7 +48,12 @@ export async function GET(request: Request) {
     if (remote.status === 'approved') {
       const targetSlug = slug || remote.externalReference;
       if (targetSlug) {
-        recordPayment(paymentId, targetSlug, 'approved', 10.9);
+        const existingPayment = getPayment(paymentId);
+        const paidAmount =
+          Number(existingPayment?.amount) ||
+          Number(getDeveloperSettings()?.proPriceReais) ||
+          25.9;
+        recordPayment(paymentId, targetSlug, 'approved', paidAmount);
         await Promise.all([
           persistSliceToCloud('payments'),
           persistSliceToCloud('qrs'),

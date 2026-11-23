@@ -1333,7 +1333,7 @@ export default function DeveloperAdminDashboard() {
                         type="number"
                         step="0.01"
                         min="1"
-                        value={settings.proPriceReais ?? 10.9}
+                        value={settings.proPriceReais ?? 25.9}
                         onChange={(e) => {
                           const parsed = parseFloat(
                             e.target.value.replace(',', '.')
@@ -1343,7 +1343,7 @@ export default function DeveloperAdminDashboard() {
                             proPriceReais:
                               Number.isFinite(parsed) && parsed > 0
                                 ? parsed
-                                : 10.9,
+                                : 25.9,
                           });
                         }}
                         className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-white"
@@ -1603,7 +1603,9 @@ export default function DeveloperAdminDashboard() {
                               }`}
                             >
                               R${' '}
-                              {Number(payment.amount || 10.9)
+                              {Number(
+                                payment.amount || settings.proPriceReais || 25.9
+                              )
                                 .toFixed(2)
                                 .replace('.', ',')}
                             </span>

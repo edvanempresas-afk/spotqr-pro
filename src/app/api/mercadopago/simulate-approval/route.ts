@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Dados insuficientes' }, { status: 400 });
     }
 
-    const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 10.9;
+    const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 25.9;
 
     // Mark as approved in DB
     recordPayment(paymentId, slug, 'approved', livePrice);

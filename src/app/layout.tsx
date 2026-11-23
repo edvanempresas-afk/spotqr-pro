@@ -81,7 +81,7 @@ const jsonLd = {
   operatingSystem: 'All',
   offers: {
     '@type': 'Offer',
-    price: '10.90',
+    price: '25.90',
     priceCurrency: 'BRL',
     description:
       'Assinatura SpotQR PRO com Catálogo Digital, Cardápio, Logomarca no Centro e QR Dinâmico',

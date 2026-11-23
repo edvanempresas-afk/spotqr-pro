@@ -65,13 +65,15 @@ export default function PrivacidadePage() {
             </p>
             <ul className="list-disc pl-5 space-y-1 text-slate-300">
               <li>
-                <strong>Criação de Conta e Cardápio:</strong> Nome, e-mail,
-                nome do estabelecimento comercial e WhatsApp de contato.
+                <strong>Criação de Conta, Catálogo e Cardápio:</strong> Nome,
+                e-mail, nome do estabelecimento comercial, WhatsApp de contato e
+                itens/pedidos registrados na loja para controle de estoque.
               </li>
               <li>
-                <strong>Configuração de QR Code:</strong> Links de destino,
-                chaves PIX informadas para geração de pagamentos e dados de rede
-                Wi-Fi inseridos pelo próprio usuário.
+                <strong>Configuração de QR Code e Proteção PIX:</strong> Links
+                de destino, chaves PIX informadas para geração de pagamentos
+                (protegidas por confirmação de senha e quarentena anti-golpe) e
+                dados de rede Wi-Fi inseridos pelo próprio usuário.
               </li>
               <li>
                 <strong>Pagamentos:</strong> Todas as transações financeiras do

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   await syncDbFromCloud();
   const { priceReais, publicKey } = getActiveMercadoPagoConfig();
-  const proPriceReais = Number.isFinite(priceReais) && priceReais > 0 ? priceReais : 10.9;
+  const proPriceReais = Number.isFinite(priceReais) && priceReais > 0 ? priceReais : 25.9;
 
   return NextResponse.json(
     { proPriceReais, mpPublicKey: publicKey },

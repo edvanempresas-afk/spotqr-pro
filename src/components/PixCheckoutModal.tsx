@@ -110,7 +110,7 @@ export default function PixCheckoutModal({
 
   const minutes = Math.floor(countdown / 60);
   const seconds = countdown % 60;
-  const priceFormatted = (paymentData.amount || 10.9)
+  const priceFormatted = (paymentData.amount || 25.9)
     .toFixed(2)
     .replace('.', ',');
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export const DEFAULT_PRO_PRICE = 10.9;
+export const DEFAULT_PRO_PRICE = 25.9;
 
 const PRO_PRICE_EVENT = 'spotqr:pro-price-updated';
 

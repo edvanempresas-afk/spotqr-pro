@@ -20,7 +20,7 @@ export function getActiveMercadoPagoConfig() {
   ).trim();
   const pixKey = (settings.mpPixKey || 'pagamentos@spotqr.pro').trim();
   const subscriptionUrl = (settings.mpSubscriptionUrl || '').trim();
-  const priceReais = Number(settings.proPriceReais) || 10.9;
+  const priceReais = Number(settings.proPriceReais) || 25.9;
   const isLive =
     accessToken.startsWith('APP_USR-') || accessToken.startsWith('TEST-');
 
@@ -468,7 +468,7 @@ export async function chargeMercadoPagoCard(input: {
       };
 
   const payload: Record<string, unknown> = {
-    transaction_amount: Number(input.amount) || 10.9,
+    transaction_amount: Number(input.amount) || 25.9,
     token: input.cardToken,
     description:
       input.description || `SpotQR PRO Mensalidade (${input.slug})`,

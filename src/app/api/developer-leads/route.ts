@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       platformStats: {
         totalQRs: qrs.length,
         paidQRs,
-        qrRevenue: paidQRs * 10.9,
+        qrRevenue: paidQRs * (Number(settings.proPriceReais) || 25.9),
         totalScans,
       },
     });
@@ -169,7 +169,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (body.action === 'test_notification') {
-      const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 10.9;
+      const livePrice = Number(getDeveloperSettings()?.proPriceReais) || 25.9;
       const livePriceFormatted = livePrice.toFixed(2).replace('.', ',');
       const testNotif = createDeveloperNotification({
         type: 'subscription_paid',

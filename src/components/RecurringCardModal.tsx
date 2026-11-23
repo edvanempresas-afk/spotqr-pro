@@ -134,7 +134,7 @@ export default function RecurringCardModal({
 
   if (!isOpen) return null;
 
-  const priceFormatted = (Number(proPriceReais) || 10.9)
+  const priceFormatted = (Number(proPriceReais) || 25.9)
     .toFixed(2)
     .replace('.', ',');
 
