@@ -45,6 +45,12 @@ export default function AdminSecurityPanel({
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(null);
+  const [busySlug, setBusySlug] = useState<string | null>(null);
+  const [catalogToast, setCatalogToast] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
   const [issuedTokens, setIssuedTokens] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -170,6 +176,38 @@ export default function AdminSecurityPanel({
     }
   };
 
+  const handleDeleteCatalog = async (slug: string) => {
+    setBusySlug(slug);
+    setErrorMsg('');
+    setCatalogToast(null);
+    try {
+      const res = await fetch('/api/admin/security', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_catalog',
+          slug,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.error || 'Erro ao excluir catálogo.');
+        return;
+      }
+      setConfirmDeleteSlug(null);
+      setCatalogToast({
+        type: 'success',
+        text: `🗑️ Catálogo "/${slug}" foi excluído com sucesso! A conta da cliente continua ativa.`,
+      });
+      await loadOverview();
+      onAccountChanged?.();
+    } catch {
+      setErrorMsg('Erro de conexão ao excluir catálogo.');
+    } finally {
+      setBusySlug(null);
+    }
+  };
+
   const buildOfficialWhatsAppUrl = (
     req: PasswordResetRequest,
     plainCode?: string
@@ -248,6 +286,25 @@ export default function AdminSecurityPanel({
       {errorMsg && (
         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs">
           {errorMsg}
+        </div>
+      )}
+
+      {catalogToast && (
+        <div
+          className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between ${
+            catalogToast.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+          }`}
+        >
+          <span>{catalogToast.text}</span>
+          <button
+            type="button"
+            onClick={() => setCatalogToast(null)}
+            className="text-xs hover:underline text-slate-400"
+          >
+            Fechar
+          </button>
         </div>
       )}
 
@@ -486,16 +543,60 @@ export default function AdminSecurityPanel({
                   )}
                 </div>
                 {u.stores.length > 0 && (
-                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
+                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-400 pt-1">
                     {u.stores.map((s) => (
                       <span
                         key={s.slug}
-                        className="px-2 py-0.5 rounded-md bg-slate-950 border border-slate-800"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800"
                       >
-                        <strong className="text-slate-200">{s.storeCode}</strong> /{s.slug} • PIX:{' '}
+                        <strong className="text-slate-200">{s.storeCode}</strong>
+                        <a
+                          href={`/cardapio/${s.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-400 hover:underline font-mono"
+                        >
+                          /{s.slug}
+                        </a>
+                        {s.title && s.title !== s.slug && (
+                          <span className="text-slate-300 max-w-[120px] truncate">({s.title})</span>
+                        )}
+                        <span className="text-slate-700">•</span>
+                        <span>PIX:</span>
                         <span className="text-emerald-300 font-mono">
                           {s.pixKey || 'sem PIX'}
                         </span>
+
+                        {confirmDeleteSlug === s.slug ? (
+                          <span className="inline-flex items-center gap-1 pl-1.5 ml-1 border-l border-slate-700 animate-fade-in">
+                            <span className="text-[10px] text-rose-400 font-bold">Excluir?</span>
+                            <button
+                              type="button"
+                              disabled={busySlug === s.slug}
+                              onClick={() => handleDeleteCatalog(s.slug)}
+                              className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold transition"
+                            >
+                              Sim
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busySlug === s.slug}
+                              onClick={() => setConfirmDeleteSlug(null)}
+                              className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition"
+                            >
+                              Não
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteSlug(s.slug)}
+                            className="p-0.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition ml-1"
+                            title={`Excluir este catálogo específico (/${s.slug})`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>

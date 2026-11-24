@@ -2818,6 +2818,61 @@ export function adminDeleteClientUser(userId: string): {
   };
 }
 
+export function adminDeleteStore(slug: string): {
+  deletedSlug: string;
+  deletedTitle: string;
+} {
+  const cleanSlug = (slug || '').trim().toLowerCase();
+  if (!cleanSlug) throw new Error('Slug não informado.');
+  if (cleanSlug === 'demo-restaurante' || cleanSlug === 'demo-catalogo') {
+    throw new Error(
+      'Não é permitido excluir os catálogos oficiais de demonstração.'
+    );
+  }
+
+  const db = ensureDb();
+  const existingMenu = db.menus?.[cleanSlug];
+  const existingQR = db.dynamicQRs?.[cleanSlug];
+
+  if (!existingMenu && !existingQR) {
+    throw new Error(`Catálogo com slug "/${cleanSlug}" não foi encontrado.`);
+  }
+
+  const title = existingMenu?.title || existingQR?.title || cleanSlug;
+
+  if (db.menus && db.menus[cleanSlug]) {
+    delete db.menus[cleanSlug];
+  }
+
+  if (db.dynamicQRs && db.dynamicQRs[cleanSlug]) {
+    delete db.dynamicQRs[cleanSlug];
+    markDeletedQRSlug(cleanSlug);
+  }
+
+  if (db.slugRedirects) {
+    for (const [fromSlug, toSlug] of Object.entries(db.slugRedirects)) {
+      if (fromSlug === cleanSlug || toSlug === cleanSlug) {
+        delete db.slugRedirects[fromSlug];
+      }
+    }
+  }
+
+  if (db.orders) {
+    for (const [orderId, order] of Object.entries(db.orders)) {
+      if (order.slug === cleanSlug) {
+        delete db.orders[orderId];
+      }
+    }
+  }
+
+  saveDb(db);
+
+  return {
+    deletedSlug: cleanSlug,
+    deletedTitle: title,
+  };
+}
+
 export function getAdminSecurityOverview(): {
   resetRequests: PasswordResetRequest[];
   usersSecurity: Array<{

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 import {
   adminDeleteClientUser,
+  adminDeleteStore,
   adminSetUserPixLock,
   adminSetUserSuspended,
   approvePasswordResetByAdmin,
@@ -101,6 +102,22 @@ export async function POST(req: NextRequest) {
         success: true,
         deletedUserId: deletedUser.id,
         deletedSlugs,
+      });
+    }
+
+    if (action === 'delete_catalog' || action === 'delete_store') {
+      const slug = String(body.slug || '');
+      const { deletedSlug, deletedTitle } = adminDeleteStore(slug);
+      await Promise.all([
+        persistSliceToCloud('qrs'),
+        persistSliceToCloud('redirects'),
+        persistSliceToCloud('orders'),
+        deleteCloudMenu(deletedSlug),
+      ]);
+      return NextResponse.json({
+        success: true,
+        deletedSlug,
+        deletedTitle,
       });
     }
 

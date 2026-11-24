@@ -15,6 +15,8 @@ import {
   ShoppingBag,
   QrCode,
   RotateCcw,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import { AdminStoreSummary } from '@/lib/types';
 import { isProStillValid, formatRemainingProTime } from '@/lib/pro-status';
@@ -44,6 +46,8 @@ export default function AdminStoresProPanel({
   );
   const [drafts, setDrafts] = useState<Record<string, StoreGrantDraft>>({});
   const [busySlug, setBusySlug] = useState<string | null>(null);
+  const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(null);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -168,6 +172,42 @@ export default function AdminStoresProPanel({
       setToast({ type: 'error', text: 'Erro de conexão ao revogar PRO.' });
     } finally {
       setBusySlug(null);
+    }
+  };
+
+  const handleDeleteStore = async (store: AdminStoreSummary) => {
+    setDeletingSlug(store.slug);
+    setToast(null);
+    try {
+      const res = await fetch('/api/admin/pro-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_store',
+          slug: store.slug,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setToast({
+          type: 'error',
+          text: data?.error || 'Erro ao excluir catálogo.',
+        });
+        return;
+      }
+      if (Array.isArray(data.stores)) {
+        onStoresUpdated(data.stores);
+      }
+      setConfirmDeleteSlug(null);
+      setToast({
+        type: 'success',
+        text: `🗑️ Catálogo "${store.title}" (/${store.slug}) foi excluído com sucesso! A conta da cliente continua ativa.`,
+      });
+      onRefresh?.();
+    } catch {
+      setToast({ type: 'error', text: 'Erro de conexão ao excluir catálogo.' });
+    } finally {
+      setDeletingSlug(null);
     }
   };
 
@@ -387,6 +427,42 @@ export default function AdminStoresProPanel({
                         <span>Abrir Página</span>
                         <ArrowUpRight className="w-3 h-3" />
                       </Link>
+
+                      <span className="text-slate-700">•</span>
+
+                      {confirmDeleteSlug === store.slug ? (
+                        <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-lg bg-rose-500/15 border border-rose-500/40 animate-fade-in">
+                          <span className="text-[11px] font-bold text-rose-300">
+                            Excluir este catálogo?
+                          </span>
+                          <button
+                            type="button"
+                            disabled={deletingSlug === store.slug}
+                            onClick={() => handleDeleteStore(store)}
+                            className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition"
+                          >
+                            {deletingSlug === store.slug ? 'Excluindo...' : 'Sim, Excluir'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={deletingSlug === store.slug}
+                            onClick={() => setConfirmDeleteSlug(null)}
+                            className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteSlug(store.slug)}
+                          className="inline-flex items-center gap-1 text-slate-400 hover:text-rose-400 font-bold transition"
+                          title={`Excluir apenas o catálogo /${store.slug} (mantém a conta do cliente ativa)`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          <span>Excluir Catálogo</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 

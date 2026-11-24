@@ -7,6 +7,8 @@ import {
   revokeProFromQR,
   syncDbFromCloud,
   persistSliceToCloud,
+  adminDeleteStore,
+  deleteCloudMenu,
 } from '@/lib/db';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
 
@@ -60,6 +62,22 @@ export async function POST(req: NextRequest) {
         { error: 'Slug da loja é obrigatório.' },
         { status: 400 }
       );
+    }
+
+    if (action === 'delete_store' || action === 'delete_catalog') {
+      const { deletedSlug, deletedTitle } = adminDeleteStore(slug);
+      await Promise.all([
+        persistSliceToCloud('qrs'),
+        persistSliceToCloud('redirects'),
+        persistSliceToCloud('orders'),
+        deleteCloudMenu(deletedSlug),
+      ]);
+      return NextResponse.json({
+        success: true,
+        deletedSlug,
+        deletedTitle,
+        stores: getAdminStoresList(),
+      });
     }
 
     if (action === 'revoke_pro') {
