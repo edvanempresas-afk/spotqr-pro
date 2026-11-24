@@ -196,6 +196,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      const refCookie = req.cookies.get('spotqr_ref')?.value || '';
+      const referredBy = (body.referredBy || body.refCode || refCookie || '').trim().toLowerCase();
+
       try {
         const created = createClientUser({
           name: String(name),
@@ -203,6 +206,7 @@ export async function POST(req: NextRequest) {
           email: String(email),
           whatsapp: String(whatsapp || ''),
           passwordPlain: String(password),
+          referredBy,
         }) as ReturnType<typeof createClientUser> & { plainBackupCode?: string };
 
         await Promise.all([

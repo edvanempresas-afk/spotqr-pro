@@ -142,10 +142,16 @@ export default function PixCheckoutModal({
           <div className="space-y-5 relative z-10">
             {/* Header */}
             <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold">
-                <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
-                <span>Checkout Oficial Mercado Livre & Mercado Pago</span>
-              </div>
+              {paymentData.amount === 25.5 ? (
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-extrabold animate-pulse">
+                  <span>🎁 Convite VIP: 15% de Desconto Aplicado (De R$ 29,90 por R$ 25,50)</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold">
+                  <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Checkout Oficial Mercado Livre & Mercado Pago</span>
+                </div>
+              )}
               <h3 className="text-xl sm:text-2xl font-extrabold text-white">
                 Assinatura SpotQR PRO — R$ {priceFormatted}
               </h3>

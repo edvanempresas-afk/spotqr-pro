@@ -223,6 +223,8 @@ export interface DynamicQRRecord {
   ownerEmail?: string;
 }
 
+export type PixKeyType = 'cpf' | 'cnpj' | 'phone' | 'email' | 'random';
+
 export interface ClientUser {
   id: string;
   name: string;
@@ -240,6 +242,46 @@ export interface ClientUser {
   proCreditExpiresAt?: string | null;
   proCreditVoucherCode?: string;
   proCreditDays?: number;
+  referralCode?: string;
+  referredBy?: string;
+  pixKey?: string;
+  pixType?: PixKeyType;
+  pixUpdatedAt?: string;
+}
+
+export interface ReferralConversion {
+  id: string;
+  affiliateId: string;
+  affiliateCode: string;
+  affiliateName: string;
+  affiliateWhatsapp?: string;
+  referredUserId: string;
+  referredUserEmail: string;
+  referredUserName: string;
+  referredSlug?: string;
+  paymentId: string;
+  amountPaid: number;
+  commissionAmount: number;
+  createdAt: string;
+  status: 'pending' | 'paid';
+  payoutId?: string;
+  paidAt?: string;
+}
+
+export interface AffiliatePayout {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  affiliateWhatsapp: string;
+  pixKey: string;
+  pixType: PixKeyType;
+  conversionIds: string[];
+  totalConversions: number;
+  totalAmount: number;
+  receiptUrl?: string;
+  receiptName?: string;
+  paidAt: string;
+  adminNotes?: string;
 }
 
 export interface PasswordResetRequest {
@@ -367,7 +409,9 @@ export type DeveloperNotificationType =
   | 'new_lead'
   | 'new_client'
   | 'voucher_redeemed'
-  | 'security_alert';
+  | 'security_alert'
+  | 'affiliate_commission'
+  | 'affiliate_payout';
 
 export interface DeveloperNotification {
   id: string;
@@ -391,6 +435,8 @@ export interface PaymentRecord {
   amount: number;
   createdAt: string;
   approvedAt?: string;
+  affiliateCode?: string;
+  affiliateCommission?: number;
 }
 
 

@@ -38,10 +38,15 @@ export async function createPixPayment(
   slug: string,
   userEmail: string = 'cliente@spotqr.pro',
   userName: string = 'Cliente SpotQR',
-  originUrl: string = 'http://localhost:3000'
+  originUrl: string = 'http://localhost:3000',
+  customAmount?: number
 ): Promise<PixPaymentResponse> {
-  const { accessToken, pixKey, subscriptionUrl, priceReais, isLive } =
+  const { accessToken, pixKey, subscriptionUrl, priceReais: defaultPrice, isLive } =
     getActiveMercadoPagoConfig();
+  const priceReais =
+    Number.isFinite(customAmount) && Number(customAmount) > 0
+      ? Number(customAmount)
+      : defaultPrice;
 
   // If Mercado Pago Access Token is configured, call official Mercado Pago / Mercado Livre APIs
   if (isLive) {

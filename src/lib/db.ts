@@ -17,6 +17,9 @@ import {
   StoreOrder,
   StoreOrderItem,
   StoreOrderStatus,
+  PixKeyType,
+  ReferralConversion,
+  AffiliatePayout,
 } from './types';
 import { getItemStockInfo } from './stock';
 import { DEMO_PAYMENTS } from './payments';
@@ -45,6 +48,8 @@ interface DatabaseSchema {
   vouchers?: Record<string, ProVoucher>;
   passwordResets?: Record<string, PasswordResetRequest>;
   orders?: Record<string, StoreOrder>;
+  referralConversions?: Record<string, ReferralConversion>;
+  affiliatePayouts?: Record<string, AffiliatePayout>;
 }
 
 export function hashClientPassword(password: string): string {
@@ -448,6 +453,8 @@ const initialData: DatabaseSchema = {
   developerNotifications: {},
   users: {},
   orders: {},
+  referralConversions: {},
+  affiliatePayouts: {},
 };
 
 export function isLegacyDemoUser(u?: ClientUser | null): boolean {
@@ -591,6 +598,16 @@ function ensureDb(): DatabaseSchema {
       modified = true;
     }
 
+    if (!parsed.referralConversions) {
+      parsed.referralConversions = {};
+      modified = true;
+    }
+
+    if (!parsed.affiliatePayouts) {
+      parsed.affiliatePayouts = {};
+      modified = true;
+    }
+
     if (modified) {
       saveDb(parsed);
     }
@@ -635,7 +652,9 @@ export type CloudSliceKey =
   | 'settings'
   | 'vouchers'
   | 'resets'
-  | 'orders';
+  | 'orders'
+  | 'conversions'
+  | 'payouts';
 
 const CLOUD_KEYS: CloudSliceKey[] = [
   'users',
@@ -648,6 +667,8 @@ const CLOUD_KEYS: CloudSliceKey[] = [
   'redirects',
   'resets',
   'orders',
+  'conversions',
+  'payouts',
 ];
 
 function getCloudKVConfig(): { url: string; token: string } | null {
@@ -817,6 +838,22 @@ export async function syncDbFromCloud(): Promise<void> {
     changed = true;
   }
 
+  const cloudConversions = parseSlice<Record<string, ReferralConversion>>(
+    results[10]
+  );
+  if (cloudConversions) {
+    db.referralConversions = { ...cloudConversions, ...(db.referralConversions || {}) };
+    changed = true;
+  }
+
+  const cloudPayouts = parseSlice<Record<string, AffiliatePayout>>(
+    results[11]
+  );
+  if (cloudPayouts) {
+    db.affiliatePayouts = { ...cloudPayouts, ...(db.affiliatePayouts || {}) };
+    changed = true;
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -932,6 +969,8 @@ export async function persistSliceToCloud(slice: CloudSliceKey): Promise<void> {
     vouchers: db.vouchers || {},
     resets: db.passwordResets || {},
     orders: db.orders || {},
+    conversions: db.referralConversions || {},
+    payouts: db.affiliatePayouts || {},
   };
   await kvRequest(['SET', `spotqr:${slice}`, JSON.stringify(map[slice])]);
 }
@@ -1565,6 +1604,104 @@ export function recordPayment(
       };
     }
   }
+
+  // Check for affiliate referral commission (One-time CPA bounty on 1st paid PRO)
+  if (status === 'approved' && !wasAlreadyApproved) {
+    try {
+      const payerEmail = (resolvedClientEmail || '').trim().toLowerCase();
+      const allUsers = Object.values(db.users || {});
+      const payingUser = allUsers.find(
+        (u) =>
+          (qr?.ownerId && u.id === qr.ownerId) ||
+          (payerEmail && u.email.toLowerCase() === payerEmail)
+      );
+
+      const refCode = (
+        payingUser?.referredBy ||
+        prevPayment?.affiliateCode ||
+        ''
+      ).trim().toLowerCase();
+
+      if (refCode) {
+        const affiliate = allUsers.find(
+          (u) => (u.referralCode || '').trim().toLowerCase() === refCode
+        );
+
+        if (affiliate && affiliate.pixKey) {
+          // Check anti-fraud (not self-referral)
+          const isSelfRefer =
+            payingUser &&
+            (affiliate.id === payingUser.id ||
+              affiliate.email.toLowerCase() === payingUser.email.toLowerCase() ||
+              (affiliate.whatsapp &&
+                payingUser.whatsapp &&
+                phonesMatch(affiliate.whatsapp, payingUser.whatsapp)) ||
+              (affiliate.pixKey &&
+                payingUser.email.toLowerCase() ===
+                  affiliate.pixKey.toLowerCase()));
+
+          // Check if it's the customer's first approved PRO payment
+          const priorApproved = Object.values(db.payments || {}).filter(
+            (p) =>
+              p.id !== paymentId &&
+              p.status === 'approved' &&
+              ((payingUser &&
+                p.clientEmail &&
+                p.clientEmail.toLowerCase() ===
+                  payingUser.email.toLowerCase()) ||
+                p.slug === slug)
+          );
+
+          const isFirstProPayment = priorApproved.length === 0;
+
+          const alreadyConverted = Object.values(
+            db.referralConversions || {}
+          ).some((c) => c.paymentId === paymentId);
+
+          if (!isSelfRefer && isFirstProPayment && !alreadyConverted) {
+            if (!db.referralConversions) db.referralConversions = {};
+            const convId = `conv_${Date.now()}_${Math.random()
+              .toString(36)
+              .slice(2, 6)}`;
+            const conversion: ReferralConversion = {
+              id: convId,
+              affiliateId: affiliate.id,
+              affiliateCode: affiliate.referralCode || refCode,
+              affiliateName: affiliate.name,
+              affiliateWhatsapp: affiliate.whatsapp,
+              referredUserId: payingUser?.id || `user_${slug}`,
+              referredUserEmail: resolvedClientEmail,
+              referredUserName: resolvedClientName,
+              referredSlug: slug,
+              paymentId,
+              amountPaid: amount,
+              commissionAmount: 10.0,
+              createdAt: now,
+              status: 'pending',
+            };
+            db.referralConversions[convId] = conversion;
+            db.payments[paymentId].affiliateCode = affiliate.referralCode || refCode;
+            db.payments[paymentId].affiliateCommission = 10.0;
+
+            createDeveloperNotification({
+              type: 'affiliate_commission',
+              title: `🎁 Nova Indicação PRO Paga! (+ R$ 10,00 no PIX)`,
+              message: `${affiliate.name} indicou ${resolvedClientName} (/${slug}), que assinou o PRO por R$ ${amount
+                .toFixed(2)
+                .replace('.', ',')}. Comissão de R$ 10,00 pendente no painel de afiliados.`,
+              amount: 10.0,
+              clientName: affiliate.name,
+              contact: affiliate.whatsapp || affiliate.email,
+              slug,
+            });
+          }
+        }
+      }
+    } catch (refErr) {
+      console.warn('Error processing referral commission:', refErr);
+    }
+  }
+
   saveDb(db);
 
   // Trigger mobile notifications
@@ -1811,6 +1948,7 @@ export function createClientUser(input: {
   email: string;
   whatsapp: string;
   passwordPlain: string;
+  referredBy?: string;
 }): ClientUser {
   const db = ensureDb();
   if (!db.users) db.users = {};
@@ -1842,6 +1980,7 @@ export function createClientUser(input: {
     sessionVersion: (stub?.sessionVersion ?? 0) + 1,
     recoveryCodeHash: initialRecovery.hash,
     recoveryCodeHint: initialRecovery.hint,
+    referredBy: (input.referredBy || stub?.referredBy || '').trim().toLowerCase() || undefined,
     createdAt: stub?.createdAt || new Date().toISOString(),
   };
 
@@ -3141,6 +3280,278 @@ export async function getUserOrdersOverview(
   }
 
   return result;
+}
+
+export function normalizeReferralCode(raw: string): string {
+  return (raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+}
+
+export function getOrCreateUserReferralCode(user: ClientUser): string {
+  if (user.referralCode && user.referralCode.trim()) {
+    return user.referralCode.trim().toLowerCase();
+  }
+  const db = ensureDb();
+  if (!db.users) db.users = {};
+
+  const base =
+    normalizeReferralCode(user.businessName) ||
+    normalizeReferralCode(user.name) ||
+    'parceiro';
+
+  let candidate = base;
+  let counter = 1;
+  const existingCodes = new Set(
+    Object.values(db.users)
+      .map((u) => (u.referralCode || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  while (existingCodes.has(candidate)) {
+    candidate = `${base}-${counter}`;
+    counter++;
+  }
+
+  user.referralCode = candidate;
+  db.users[user.id] = user;
+  saveDb(db);
+  return candidate;
+}
+
+export function updateUserPix(
+  userId: string,
+  pixKey: string,
+  pixType: PixKeyType
+): ClientUser {
+  const db = ensureDb();
+  if (!db.users) db.users = {};
+  const user = db.users[userId];
+  if (!user) {
+    throw new Error('Usuário não encontrado.');
+  }
+
+  const cleanPix = (pixKey || '').trim();
+  if (!cleanPix) {
+    throw new Error('A chave PIX é obrigatória para participar do programa.');
+  }
+
+  user.pixKey = cleanPix;
+  user.pixType = pixType;
+  user.pixUpdatedAt = new Date().toISOString();
+  if (!user.referralCode) {
+    getOrCreateUserReferralCode(user);
+  }
+
+  db.users[userId] = user;
+  saveDb(db);
+  return user;
+}
+
+export function findUserByReferralCode(code: string): ClientUser | null {
+  if (!code) return null;
+  const db = ensureDb();
+  const clean = code.trim().toLowerCase();
+  const direct = Object.values(db.users || {}).find(
+    (u) => (u.referralCode || '').trim().toLowerCase() === clean
+  );
+  if (direct) return direct;
+
+  // By store slug owned by user
+  const matchingQR = Object.values(db.dynamicQRs || {}).find(
+    (q) => q.slug.toLowerCase() === clean
+  );
+  if (matchingQR?.ownerId && db.users && db.users[matchingQR.ownerId]) {
+    return db.users[matchingQR.ownerId];
+  }
+  return null;
+}
+
+export interface PendingAffiliatePayoutGroup {
+  affiliateId: string;
+  affiliateName: string;
+  affiliateEmail: string;
+  affiliateWhatsapp: string;
+  pixKey: string;
+  pixType: PixKeyType;
+  conversions: ReferralConversion[];
+  totalAmount: number;
+  count: number;
+}
+
+export function getPendingAffiliatePayouts(): PendingAffiliatePayoutGroup[] {
+  const db = ensureDb();
+  const allConversions = Object.values(db.referralConversions || {});
+  const pendingConversions = allConversions.filter(
+    (c) => c.status === 'pending'
+  );
+
+  const groups: Record<string, PendingAffiliatePayoutGroup> = {};
+
+  for (const c of pendingConversions) {
+    const affiliate = (db.users && db.users[c.affiliateId]) || null;
+    const affId = c.affiliateId;
+    if (!groups[affId]) {
+      groups[affId] = {
+        affiliateId: affId,
+        affiliateName: affiliate?.name || c.affiliateName || 'Afiliado',
+        affiliateEmail: affiliate?.email || '',
+        affiliateWhatsapp: affiliate?.whatsapp || c.affiliateWhatsapp || '',
+        pixKey: affiliate?.pixKey || '',
+        pixType: affiliate?.pixType || 'email',
+        conversions: [],
+        totalAmount: 0,
+        count: 0,
+      };
+    }
+    groups[affId].conversions.push(c);
+    groups[affId].totalAmount += c.commissionAmount || 10.0;
+    groups[affId].count += 1;
+  }
+
+  // ONLY return affiliates with actual pending conversions (> 0)
+  return Object.values(groups).filter((g) => g.count > 0 && g.totalAmount > 0);
+}
+
+export function recordAffiliatePayout(
+  affiliateId: string,
+  receiptUrl: string,
+  receiptName?: string,
+  adminNotes?: string
+): AffiliatePayout {
+  const db = ensureDb();
+  if (!db.referralConversions) db.referralConversions = {};
+  if (!db.affiliatePayouts) db.affiliatePayouts = {};
+
+  const affiliate = (db.users && db.users[affiliateId]) || null;
+  if (!affiliate) {
+    throw new Error('Afiliado não encontrado.');
+  }
+
+  const pendingForAffiliate = Object.values(db.referralConversions).filter(
+    (c) => c.affiliateId === affiliateId && c.status === 'pending'
+  );
+
+  if (pendingForAffiliate.length === 0) {
+    throw new Error('Não há comissões pendentes para este afiliado.');
+  }
+
+  const now = new Date().toISOString();
+  const payoutId = `payout_${Date.now()}_${Math.random()
+    .toString(36)
+    .slice(2, 6)}`;
+  const totalAmount = pendingForAffiliate.reduce(
+    (sum, c) => sum + (c.commissionAmount || 10.0),
+    0
+  );
+
+  const payout: AffiliatePayout = {
+    id: payoutId,
+    affiliateId,
+    affiliateName: affiliate.name,
+    affiliateWhatsapp: affiliate.whatsapp,
+    pixKey: affiliate.pixKey || '',
+    pixType: affiliate.pixType || 'email',
+    conversionIds: pendingForAffiliate.map((c) => c.id),
+    totalConversions: pendingForAffiliate.length,
+    totalAmount,
+    receiptUrl,
+    receiptName: receiptName || 'comprovante_pix.png',
+    paidAt: now,
+    adminNotes,
+  };
+
+  // Mark all pending conversions as paid
+  for (const c of pendingForAffiliate) {
+    c.status = 'paid';
+    c.payoutId = payoutId;
+    c.paidAt = now;
+  }
+
+  db.affiliatePayouts[payoutId] = payout;
+  saveDb(db);
+
+  createDeveloperNotification({
+    type: 'affiliate_payout',
+    title: `💸 PIX de Comissão Enviado! (R$ ${totalAmount
+      .toFixed(2)
+      .replace('.', ',')})`,
+    message: `Comprovante anexado para ${affiliate.name}. ${payout.totalConversions} indicações quitadas no valor de R$ ${totalAmount.toFixed(2)}.`,
+    amount: totalAmount,
+    clientName: affiliate.name,
+    contact: affiliate.whatsapp,
+  });
+
+  return payout;
+}
+
+export function getAllAffiliatePayouts(): AffiliatePayout[] {
+  const db = ensureDb();
+  return Object.values(db.affiliatePayouts || {}).sort(
+    (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+  );
+}
+
+export function getAffiliateDashboardData(userId: string) {
+  const db = ensureDb();
+  const user = (db.users && db.users[userId]) || null;
+  if (!user) return null;
+
+  const code = getOrCreateUserReferralCode(user);
+  const cleanCode = code.trim().toLowerCase();
+
+  // Users referred by this code
+  const referredUsers = Object.values(db.users || {}).filter(
+    (u) => (u.referredBy || '').trim().toLowerCase() === cleanCode
+  );
+
+  // Conversions for this affiliate
+  const conversions = Object.values(db.referralConversions || {}).filter(
+    (c) =>
+      c.affiliateId === userId ||
+      (c.affiliateCode && c.affiliateCode.trim().toLowerCase() === cleanCode)
+  );
+
+  const pendingBalance = conversions
+    .filter((c) => c.status === 'pending')
+    .reduce((sum, c) => sum + (c.commissionAmount || 10.0), 0);
+
+  const paidBalance = conversions
+    .filter((c) => c.status === 'paid')
+    .reduce((sum, c) => sum + (c.commissionAmount || 10.0), 0);
+
+  // Payouts received by this affiliate
+  const payouts = Object.values(db.affiliatePayouts || {})
+    .filter((p) => p.affiliateId === userId)
+    .sort(
+      (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime()
+    );
+
+  return {
+    referralCode: code,
+    hasPixConfigured: Boolean(user.pixKey && user.pixKey.trim()),
+    pixKey: user.pixKey || '',
+    pixType: user.pixType || 'email',
+    stats: {
+      referredTotal: referredUsers.length,
+      referredPaid: conversions.length,
+      pendingBalance,
+      paidBalance,
+    },
+    conversions: conversions.map((c) => ({
+      id: c.id,
+      customerName: c.referredUserName,
+      date: c.createdAt,
+      status: c.status,
+      commission: c.commissionAmount || 10.0,
+      paidAt: c.paidAt,
+    })),
+    payouts,
+  };
 }
 
 

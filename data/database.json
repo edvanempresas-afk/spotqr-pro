@@ -286,5 +286,7 @@
   "vouchers": {},
   "slugRedirects": {},
   "passwordResets": {},
-  "orders": {}
+  "orders": {},
+  "referralConversions": {},
+  "affiliatePayouts": {}
 }

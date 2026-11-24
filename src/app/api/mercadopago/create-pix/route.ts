@@ -6,6 +6,7 @@ import {
   getDynamicQRBySlug,
   syncDbFromCloud,
   persistSliceToCloud,
+  findUserByReferralCode,
 } from '@/lib/db';
 import { DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
@@ -34,12 +35,32 @@ export async function POST(request: NextRequest) {
       clientUser?.name || name || title || 'Cliente SpotQR Pro';
     const originUrl = request.nextUrl?.origin || 'http://localhost:3000';
 
+    // Check if customer qualifies for Affiliate VIP discount (R$ 25,50)
+    const refCookie = request.cookies.get('spotqr_ref')?.value || '';
+    const effectiveRef = (
+      clientUser?.referredBy ||
+      body.refCode ||
+      refCookie ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+
+    let customAmount: number | undefined = undefined;
+    if (effectiveRef) {
+      const affiliate = findUserByReferralCode(effectiveRef);
+      if (affiliate && affiliate.id !== clientUser?.id) {
+        customAmount = 25.5;
+      }
+    }
+
     // 1. Create Pix Payment & Checkout Pro Preference via Mercado Pago / Mercado Livre
     const pixData = await createPixPayment(
       cleanSlug,
       payerEmail,
       payerName,
-      originUrl
+      originUrl,
+      customAmount
     );
 
     const existing = getDynamicQRBySlug(cleanSlug);

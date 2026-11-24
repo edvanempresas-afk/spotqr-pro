@@ -1875,17 +1875,17 @@ export default function DigitalShowcasePage({
             >
               <p>
                 {isCatalog
-                  ? 'Catálogo Digital criado gratuitamente com SpotQR.'
-                  : 'Cardápio Digital criado gratuitamente com SpotQR.'}
+                  ? 'Catálogo Digital criado com SpotQR.'
+                  : 'Cardápio Digital criado com SpotQR.'}
               </p>
               <Link
-                href="/"
+                href={`/?ref=${menu.slug}`}
                 style={{ color: theme.readableAccentText }}
-                className="font-semibold underline underline-offset-2"
+                className="font-bold underline underline-offset-2"
               >
                 {isCatalog
-                  ? 'Crie o catálogo da sua loja sem comissões'
-                  : 'Crie o cardápio do seu restaurante sem comissões'}
+                  ? '🎁 Crie o catálogo da sua loja com 15% de Desconto VIP'
+                  : '🎁 Crie o cardápio do seu restaurante com 15% de Desconto VIP'}
               </Link>
             </div>
           )}

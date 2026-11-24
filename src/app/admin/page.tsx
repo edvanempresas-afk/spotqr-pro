@@ -16,6 +16,7 @@ import {
 import AdminStoresProPanel from '@/components/AdminStoresProPanel';
 import AdminVouchersPanel from '@/components/AdminVouchersPanel';
 import AdminSecurityPanel from '@/components/AdminSecurityPanel';
+import AdminAffiliatesPanel from '@/components/AdminAffiliatesPanel';
 import {
   Inbox,
   MessageCircle,
@@ -59,6 +60,8 @@ import {
   Volume2,
   Store,
   Ticket,
+  Coins,
+  Gift,
 } from 'lucide-react';
 import Link from 'next/link';
 import { broadcastProPriceUpdate } from '@/lib/pro-price';
@@ -119,6 +122,7 @@ export default function DeveloperAdminDashboard() {
     | 'stores'
     | 'vouchers'
     | 'security'
+    | 'affiliates'
     | 'subscriptions'
     | 'proposals'
     | 'notifications'
@@ -971,7 +975,7 @@ export default function DeveloperAdminDashboard() {
           </div>
 
           {/* APP NAVIGATION TABS (Desktop Pills + Mobile Bottom Bar) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 p-1.5 bg-[#101726] border border-slate-800 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
@@ -1022,6 +1026,19 @@ export default function DeveloperAdminDashboard() {
             >
               <ShieldCheck className="w-4 h-4 shrink-0" />
               <span>🔐 Segurança &amp; PIX</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('affiliates')}
+              className={`flex items-center justify-center gap-1.5 py-3 px-2.5 rounded-xl text-xs font-extrabold transition whitespace-nowrap ${
+                activeAppSection === 'affiliates'
+                  ? 'bg-amber-500 text-slate-950 shadow-glow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Coins className="w-4 h-4 shrink-0" />
+              <span>🎁 Afiliados PIX</span>
             </button>
 
             <button
@@ -1501,6 +1518,25 @@ export default function DeveloperAdminDashboard() {
             <AdminSecurityPanel
               onAccountChanged={() => fetchDashboardData(true)}
             />
+          )}
+
+          {/* SECTION: AFFILIATES & PIX COMMISSIONS */}
+          {(activeAppSection === 'affiliates' ||
+            activeAppSection === 'overview') && (
+            <div className="bg-[#101726] border border-slate-800 rounded-3xl p-5 sm:p-6 mb-8 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800 mb-6">
+                <div>
+                  <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                    <Coins className="w-5 h-5 text-amber-400" />
+                    <span>Controle de Comissões de Afiliados (PIX)</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Transfira o PIX aos indicadores e anexe o comprovante bancário para arquivamento.
+                  </p>
+                </div>
+              </div>
+              <AdminAffiliatesPanel />
+            </div>
           )}
 
           {/* SECTION: SUBSCRIPTIONS & MONTHLY REVENUE BREAKDOWN */}
@@ -2151,7 +2187,7 @@ export default function DeveloperAdminDashboard() {
           )}
 
           {/* FIXED BOTTOM NAVIGATION BAR FOR SMARTPHONES (Native Mobile App Feel) */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-1 py-2 grid grid-cols-7 gap-0.5">
+          <div className="fixed bottom-0 left-0 right-0 z-40 sm:hidden bg-[#0b0f17]/95 backdrop-blur-lg border-t border-slate-800 px-1 py-2 grid grid-cols-8 gap-0.5">
             <button
               type="button"
               onClick={() => setActiveAppSection('overview')}
@@ -2202,6 +2238,19 @@ export default function DeveloperAdminDashboard() {
             >
               <ShieldCheck className="w-4 h-4 mb-0.5" />
               <span>Segurança</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAppSection('affiliates')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl text-[9px] font-bold ${
+                activeAppSection === 'affiliates'
+                  ? 'text-amber-400 bg-amber-500/10'
+                  : 'text-slate-400'
+              }`}
+            >
+              <Coins className="w-4 h-4 mb-0.5" />
+              <span>Afiliados</span>
             </button>
 
             <button

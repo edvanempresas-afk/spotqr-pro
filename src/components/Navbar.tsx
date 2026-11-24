@@ -15,6 +15,8 @@ import {
   LogOut,
   Menu,
   X,
+  Gift,
+  Coins,
 } from 'lucide-react';
 import { useProPrice } from '@/lib/pro-price';
 
@@ -29,6 +31,26 @@ export default function Navbar({
   const [authUser, setAuthUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeRefCode, setActiveRefCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refParam = urlParams.get('ref');
+      if (refParam) {
+        const cleanRef = refParam.trim().toLowerCase();
+        window.localStorage.setItem('spotqr_ref', cleanRef);
+        document.cookie = `spotqr_ref=${cleanRef}; max-age=2592000; path=/; samesite=lax`;
+        setActiveRefCode(cleanRef);
+      } else {
+        const saved = window.localStorage.getItem('spotqr_ref');
+        if (saved) {
+          setActiveRefCode(saved);
+        }
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     fetch('/api/auth')
@@ -61,6 +83,16 @@ export default function Navbar({
           : 'glass-panel border-slate-800/80'
       }`}
     >
+      {/* VIP Referral Offer Ribbon */}
+      {activeRefCode && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white text-[11px] sm:text-xs font-bold py-2 px-3 text-center flex items-center justify-center gap-2 shadow-md animate-fade-in">
+          <Gift className="w-4 h-4 shrink-0 animate-bounce" />
+          <span>
+            🎁 <strong>Convite VIP Aplicado!</strong> Você ganhou <strong>15% de Desconto Exclusivo</strong> no Plano PRO: De R$ 29,90 por apenas <strong>R$ 25,50</strong>!
+          </span>
+        </div>
+      )}
+
       <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-8 h-20 flex items-center justify-between gap-3">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
@@ -163,6 +195,17 @@ export default function Navbar({
               }`}
             />
             <span>Contratar Desenvolvedor</span>
+          </Link>
+          <Link
+            href="/dashboard"
+            className={`transition-colors flex items-center gap-1.5 border px-2.5 2xl:px-3 py-1.5 rounded-full whitespace-nowrap ${
+              isLight
+                ? 'text-amber-800 hover:text-amber-900 bg-amber-50 border-amber-300'
+                : 'hover:text-amber-200 text-amber-300 bg-amber-500/15 border-amber-500/40'
+            }`}
+          >
+            <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>🎁 Indique &amp; Ganhe R$ 10</span>
           </Link>
         </nav>
 
@@ -322,6 +365,18 @@ export default function Navbar({
             >
               <Code2 className="w-4 h-4 text-emerald-500 shrink-0" />
               <span>Contratar Desenvolvedor</span>
+            </Link>
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`px-3 py-2.5 rounded-xl border transition flex items-center gap-2 ${
+                isLight
+                  ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold'
+                  : 'bg-amber-500/15 border-amber-500/40 text-amber-300 font-bold'
+              }`}
+            >
+              <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>🎁 Indique &amp; Ganhe R$ 10 no PIX</span>
             </Link>
             <Link
               href={isAdmin ? '/admin' : '/dashboard'}

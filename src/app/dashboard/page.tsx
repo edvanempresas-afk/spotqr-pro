@@ -14,6 +14,7 @@ import RecurringCardModal from '@/components/RecurringCardModal';
 import FriendlySlugPanel from '@/components/FriendlySlugPanel';
 import ClientSecurityModal from '@/components/ClientSecurityModal';
 import { StoreOrdersModal } from '@/components/StoreOrdersModal';
+import ClientAffiliateModal from '@/components/ClientAffiliateModal';
 import {
   QrCode,
   Sparkles,
@@ -42,6 +43,8 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  Gift,
+  Coins,
 } from 'lucide-react';
 import { DynamicQRRecord, QRConfig } from '@/lib/types';
 import {
@@ -115,6 +118,7 @@ export default function DashboardPage() {
   const [ordersOverview, setOrdersOverview] = useState<
     Record<string, { total: number; pending: number }>
   >({});
+  const [isAffiliateModalOpen, setIsAffiliateModalOpen] = useState(false);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [clientTheme, setClientTheme] = useState<'dark' | 'light'>('dark');
   const expiredSyncTriggeredRef = useRef<Set<string>>(new Set());
@@ -735,6 +739,15 @@ export default function DashboardPage() {
 
                 <button
                   type="button"
+                  onClick={() => setIsAffiliateModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider shadow-glow transition"
+                >
+                  <Gift className="w-4 h-4" />
+                  <span>Indique &amp; Ganhe R$ 10</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setIsSecurityModalOpen(true)}
                   className={`flex items-center gap-1.5 px-3.5 py-2.5 border rounded-xl text-xs font-bold transition ${
                     isLight
@@ -758,6 +771,49 @@ export default function DashboardPage() {
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Sair</span>
                 </button>
+              </div>
+            </div>
+
+            {/* AGGRESSIVE IN-APP MARKETING: INDIQUE & GANHE BANNER */}
+            <div
+              className={`p-5 sm:p-6 rounded-3xl border-2 mb-8 relative overflow-hidden transition-all shadow-xl ${
+                isLight
+                  ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-amber-50 border-emerald-300'
+                  : 'bg-gradient-to-r from-emerald-950/60 via-[#101c2e] to-amber-950/50 border-emerald-500/40'
+              }`}
+            >
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 relative z-10">
+                <div className="space-y-1.5 max-w-2xl">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-wider">
+                    <Gift className="w-3.5 h-3.5" />
+                    <span>Zere sua Mensalidade + Renda Extra no PIX</span>
+                  </div>
+                  <h2
+                    className={`text-xl sm:text-2xl font-black tracking-tight ${
+                      isLight ? 'text-slate-900' : 'text-white'
+                    }`}
+                  >
+                    💸 Ganhe R$ 10,00 no PIX por Cada Comércio Indicado!
+                  </h2>
+                  <p
+                    className={`text-xs sm:text-sm leading-relaxed ${
+                      isLight ? 'text-slate-700' : 'text-slate-300'
+                    }`}
+                  >
+                    Dê <strong>15% de Desconto VIP</strong> (Plano PRO por apenas <strong>R$ 25,50</strong>) para outros lojistas, restaurantes e amigos. Quando eles assinarem, nós transferimos <strong>R$ 10,00 direto na sua chave PIX</strong> com comprovante bancário!
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsAffiliateModalOpen(true)}
+                    className="w-full sm:w-auto py-3.5 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-glow transition flex items-center justify-center gap-2"
+                  >
+                    <Coins className="w-4 h-4" />
+                    <span>Pegar Meu Link &amp; Chave PIX</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1799,6 +1855,12 @@ export default function DashboardPage() {
           }}
         />
       )}
+
+      <ClientAffiliateModal
+        isOpen={isAffiliateModalOpen}
+        onClose={() => setIsAffiliateModalOpen(false)}
+        currentUser={currentUser}
+      />
     </div>
   );
 }
