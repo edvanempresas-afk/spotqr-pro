@@ -75,6 +75,13 @@ export type ShowcasePaymentMethod =
   | 'cash'
   | 'payment_link';
 
+export interface MenuExtra {
+  id: string;
+  name: string;
+  price: number;
+  isAvailable?: boolean;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -88,6 +95,8 @@ export interface MenuItem {
   isAvailable: boolean;
   stockMode?: ProductStockMode;
   stockQuantity?: number;
+  allowExtras?: boolean; // Permite adicionais/extras (Bacon, Queijo, etc.)
+  allowedExtraIds?: string[]; // IDs dos adicionais permitidos para este item
 }
 
 export interface MenuCategory {
@@ -113,6 +122,7 @@ export interface RestaurantMenu {
   logoImage?: string;
   categories: MenuCategory[];
   items: MenuItem[];
+  extras?: MenuExtra[]; // Cadastro geral de adicionais / complementos da loja
   address?: string;
   wifiInfo?: string;
   pixKey?: string;
@@ -122,6 +132,7 @@ export interface RestaurantMenu {
   allowDelivery?: boolean;
   allowPickup?: boolean;
   allowOnSite?: boolean;
+  allowCallWaiter?: boolean; // Se o cliente pode chamar o garçom pelo WhatsApp (só exibe se leu o QR da mesa)
   acceptedPayments?: ShowcasePaymentMethod[];
   productImagePosition?: 'left' | 'right';
   ownerId?: string;
@@ -131,6 +142,12 @@ export interface RestaurantMenu {
 
 export type StoreOrderStatus = 'pending' | 'confirmed' | 'cancelled';
 
+export interface SelectedExtraItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface StoreOrderItem {
   id: string;
   name: string;
@@ -138,6 +155,7 @@ export interface StoreOrderItem {
   quantity: number;
   stockMode?: ProductStockMode;
   stockDeducted: number;
+  selectedExtras?: SelectedExtraItem[];
 }
 
 export interface StoreOrder {

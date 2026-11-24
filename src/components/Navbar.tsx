@@ -93,7 +93,7 @@ export default function Navbar({
         </div>
       )}
 
-      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 h-20 flex items-center justify-between gap-2 sm:gap-4">
+      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 lg:px-6 h-20 flex items-center justify-between gap-1.5 sm:gap-3">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-glow group-hover:scale-105 transition-transform shrink-0">
@@ -130,7 +130,7 @@ export default function Navbar({
 
         {/* Navigation Links - Balanced responsive spacing for 1280px+ */}
         <nav
-          className={`hidden xl:flex items-center gap-2 xl:gap-3 2xl:gap-4 text-[11px] 2xl:text-xs font-semibold ${
+          className={`hidden xl:flex items-center gap-1.5 xl:gap-2.5 2xl:gap-4 text-[11px] 2xl:text-xs font-semibold ${
             isLight ? 'text-slate-600' : 'text-slate-300'
           }`}
         >
@@ -140,7 +140,8 @@ export default function Navbar({
               isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'
             }`}
           >
-            Gerador Grátis
+            <span className="hidden 2xl:inline">Gerador Grátis</span>
+            <span className="2xl:hidden">Gerador</span>
           </Link>
           <Link
             href="/catalogo/demo-catalogo"
@@ -153,7 +154,8 @@ export default function Navbar({
                 isLight ? 'text-emerald-600' : 'text-emerald-400'
               }`}
             />
-            <span>Catálogo Demo</span>
+            <span className="hidden 2xl:inline">Catálogo Demo</span>
+            <span className="2xl:hidden">Catálogo</span>
           </Link>
           <Link
             href="/cardapio/demo-restaurante"
@@ -166,7 +168,8 @@ export default function Navbar({
                 isLight ? 'text-amber-600' : 'text-amber-400'
               }`}
             />
-            <span>Cardápio Demo</span>
+            <span className="hidden 2xl:inline">Cardápio Demo</span>
+            <span className="2xl:hidden">Cardápio</span>
           </Link>
           <Link
             href="/#precos"
@@ -179,7 +182,8 @@ export default function Navbar({
                 isLight ? 'text-amber-600' : 'text-amber-400'
               }`}
             />
-            <span>Vantagens PRO ({proPriceLabel})</span>
+            <span className="hidden 2xl:inline">Vantagens PRO ({proPriceLabel})</span>
+            <span className="2xl:hidden">Vantagens PRO</span>
           </Link>
           <Link
             href="/#desenvolvedor"
@@ -212,12 +216,12 @@ export default function Navbar({
         </nav>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {authUser ? (
             <>
               <Link
                 href={isAdmin ? '/admin' : '/dashboard'}
-                className={`flex items-center gap-1.5 px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
                   isLight
                     ? 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 shadow-sm'
                     : 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30'
@@ -228,7 +232,7 @@ export default function Navbar({
                     isLight ? 'text-emerald-600' : 'text-emerald-400'
                   }`}
                 />
-                <span className="max-w-[120px] 2xl:max-w-[160px] truncate">
+                <span className="max-w-[100px] xl:max-w-[120px] 2xl:max-w-[160px] truncate">
                   {authUser.businessName || authUser.name}
                 </span>
               </Link>

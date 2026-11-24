@@ -35,6 +35,8 @@ import {
   Loader2,
   Package,
   Star,
+  PlusCircle,
+  Bell,
 } from 'lucide-react';
 import { StoreOrdersModal } from './StoreOrdersModal';
 import AutoPlayLoopVideo from './AutoPlayLoopVideo';
@@ -42,6 +44,7 @@ import {
   RestaurantMenu,
   MenuItem,
   MenuCategory,
+  MenuExtra,
   ProductStockMode,
   ShowcasePaymentMethod,
   QRConfig,
@@ -190,7 +193,7 @@ export default function MenuEditorModal({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'info' | 'categories' | 'items' | 'branding'
+    'info' | 'categories' | 'items' | 'branding' | 'extras'
   >('items');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [creatingCategoryForItemId, setCreatingCategoryForItemId] = useState<
@@ -221,6 +224,7 @@ export default function MenuEditorModal({
   const allowDelivery = menu?.allowDelivery ?? defaultFulfill;
   const allowPickup = menu?.allowPickup ?? defaultFulfill;
   const allowOnSite = menu?.allowOnSite ?? defaultFulfill;
+  const allowCallWaiter = menu?.allowCallWaiter ?? true;
   const acceptedPayments = getAcceptedPaymentsList(menu);
 
   const toggleAcceptedPayment = (method: ShowcasePaymentMethod) => {
@@ -342,6 +346,7 @@ export default function MenuEditorModal({
     allowDelivery: source.allowDelivery ?? !( (source.mode || mode) === 'catalog' ),
     allowPickup: source.allowPickup ?? !( (source.mode || mode) === 'catalog' ),
     allowOnSite: source.allowOnSite ?? !( (source.mode || mode) === 'catalog' ),
+    allowCallWaiter: source.allowCallWaiter ?? true,
     acceptedPayments: getAcceptedPaymentsList(source),
     themeMode: source.themeMode === 'light' ? 'light' : 'dark',
     themeColor: normalizeHexColor(
@@ -595,6 +600,57 @@ export default function MenuEditorModal({
     setMenu({
       ...menu,
       items: menu.items.filter((it) => it.id !== itemId),
+    });
+  };
+
+  const handleAddExtra = () => {
+    if (!menu) return;
+    const newExtra: MenuExtra = {
+      id: `extra-${Date.now()}`,
+      name: '',
+      price: 0,
+      isAvailable: true,
+    };
+    setMenu({
+      ...menu,
+      extras: [...(menu.extras || []), newExtra],
+    });
+  };
+
+  const handleUpdateExtra = (extraId: string, patch: Partial<MenuExtra>) => {
+    if (!menu) return;
+    setMenu({
+      ...menu,
+      extras: (menu.extras || []).map((ex) =>
+        ex.id === extraId ? { ...ex, ...patch } : ex
+      ),
+    });
+  };
+
+  const handleDeleteExtra = (extraId: string) => {
+    if (!menu) return;
+    setMenu({
+      ...menu,
+      extras: (menu.extras || []).filter((ex) => ex.id !== extraId),
+      items: menu.items.map((it) => ({
+        ...it,
+        allowedExtraIds: (it.allowedExtraIds || []).filter((id) => id !== extraId),
+      })),
+    });
+  };
+
+  const handleAddDefaultExtras = () => {
+    if (!menu) return;
+    const defaults: MenuExtra[] = [
+      { id: `extra-${Date.now()}-1`, name: 'Bacon Crocante Extra', price: 4.5, isAvailable: true },
+      { id: `extra-${Date.now()}-2`, name: 'Queijo Cheddar Fatiado', price: 3.5, isAvailable: true },
+      { id: `extra-${Date.now()}-3`, name: 'Ovo Frito na Manteiga', price: 2.5, isAvailable: true },
+      { id: `extra-${Date.now()}-4`, name: 'Molho Especial da Casa', price: 2.0, isAvailable: true },
+      { id: `extra-${Date.now()}-5`, name: 'Hambúrguer 100g Extra', price: 8.0, isAvailable: true },
+    ];
+    setMenu({
+      ...menu,
+      extras: [...(menu.extras || []), ...defaults],
     });
   };
 
@@ -878,6 +934,10 @@ export default function MenuEditorModal({
               label: isCatalog
                 ? `🛍️ Produtos (${menu?.items.length || 0})`
                 : `🍔 Pratos & Produtos (${menu?.items.length || 0})`,
+            },
+            {
+              id: 'extras',
+              label: `🍟 Adicionais & Extras (${menu?.extras?.length || 0})`,
             },
             {
               id: 'branding',
@@ -1325,12 +1385,21 @@ export default function MenuEditorModal({
                               <input
                                 type="number"
                                 step="0.10"
-                                value={item.price}
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, {
-                                    price: parseFloat(e.target.value) || 0,
-                                  })
-                                }
+                                min="0"
+                                value={item.price === 0 ? '' : item.price}
+                                placeholder="0,00"
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '') {
+                                    handleUpdateItem(item.id, { price: 0 });
+                                  } else {
+                                    const parsed = parseFloat(val);
+                                    handleUpdateItem(item.id, {
+                                      price: isNaN(parsed) ? 0 : parsed,
+                                    });
+                                  }
+                                }}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-400 font-bold"
                               />
                             </div>
@@ -1844,6 +1913,99 @@ export default function MenuEditorModal({
                                 </div>
                               );
                             })()}
+
+                            {/* Extras / Adicionais Section for this Item */}
+                            <div className="sm:col-span-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(item.allowExtras)}
+                                    onChange={(e) => {
+                                      const allow = e.target.checked;
+                                      if (allow) {
+                                        const allExtraIds = (menu.extras || []).map((ex) => ex.id);
+                                        handleUpdateItem(item.id, {
+                                          allowExtras: true,
+                                          allowedExtraIds:
+                                            item.allowedExtraIds && item.allowedExtraIds.length > 0
+                                              ? item.allowedExtraIds
+                                              : allExtraIds,
+                                        });
+                                      } else {
+                                        handleUpdateItem(item.id, { allowExtras: false });
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 focus:ring-offset-slate-900"
+                                  />
+                                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                    🍟 Permitir Itens Adicionais / Extras neste produto?
+                                  </span>
+                                </label>
+                                {item.allowExtras && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                    {(item.allowedExtraIds || []).length} selecionado(s)
+                                  </span>
+                                )}
+                              </div>
+
+                              {item.allowExtras && (
+                                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                                  {(!menu.extras || menu.extras.length === 0) ? (
+                                    <div className="text-xs text-amber-300/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                      <span>Nenhum adicional cadastrado ainda na loja.</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveTab('extras')}
+                                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] whitespace-nowrap self-start sm:self-auto"
+                                      >
+                                        Cadastrar Adicionais Agora
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="text-[11px] text-slate-400">
+                                        Selecione quais adicionais podem ser incluídos pelo cliente neste item (já vêm todos marcados por padrão):
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        {menu.extras.map((extra) => {
+                                          const isChecked = (item.allowedExtraIds || []).includes(extra.id);
+                                          return (
+                                            <label
+                                              key={extra.id}
+                                              className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${
+                                                isChecked
+                                                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                                                  : 'bg-slate-900 border-slate-800 text-slate-400 opacity-60'
+                                              }`}
+                                            >
+                                              <div className="flex items-center gap-2 truncate">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={(e) => {
+                                                    const current = item.allowedExtraIds || [];
+                                                    const next = e.target.checked
+                                                      ? [...current, extra.id]
+                                                      : current.filter((id) => id !== extra.id);
+                                                    handleUpdateItem(item.id, { allowedExtraIds: next });
+                                                  }}
+                                                  className="w-3.5 h-3.5 rounded text-emerald-500"
+                                                />
+                                                <span className="font-semibold truncate">{extra.name || 'Sem nome'}</span>
+                                              </div>
+                                              <span className="font-mono text-emerald-400 text-[11px] shrink-0 ml-1">
+                                                +R$ {Number(extra.price || 0).toFixed(2).replace('.', ',')}
+                                              </span>
+                                            </label>
+                                          );
+                                        })}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Availability & Delete Actions */}
@@ -1878,6 +2040,163 @@ export default function MenuEditorModal({
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* TAB: EXTRAS / ADICIONAIS GERAIS DA LOJA */}
+              {activeTab === 'extras' && (
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#121929] border border-slate-800">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span>🍟 Cadastro Geral de Adicionais &amp; Extras</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          {(menu.extras || []).length} cadastrado(s)
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        Cadastre aqui os adicionais que sua loja oferece (ex: Bacon extra, Queijo cheddar, Ovo adicional, Borda recheada, Embalagem para presente, etc.). Depois, basta marcar no card de cada produto se ele aceita adicionais.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {(!menu.extras || menu.extras.length === 0) && (
+                        <button
+                          type="button"
+                          onClick={handleAddDefaultExtras}
+                          className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition flex items-center gap-1.5"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Adicionar Sugestões Prontas</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleAddExtra}
+                        className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-black transition flex items-center gap-1.5 shadow-glow"
+                      >
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Novo Adicional</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {(!menu.extras || menu.extras.length === 0) ? (
+                    <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-xl">
+                        🍟
+                      </div>
+                      <h4 className="text-sm font-bold text-white">Nenhum adicional cadastrado ainda</h4>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        Crie adicionais para permitir que seus clientes personalizem lanches e produtos somando o valor extra na compra.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleAddDefaultExtras}
+                          className="px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition"
+                        >
+                          ⚡ Carregar Sugestões Prontas (Lanches)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleAddExtra}
+                          className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition"
+                        >
+                          + Criar Adicional do Zero
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {menu.extras.map((extra, idx) => (
+                        <div
+                          key={extra.id}
+                          className="p-3.5 rounded-2xl bg-[#121929] border border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 hover:border-slate-700 transition"
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-[11px] font-mono text-slate-500 w-5">
+                              #{idx + 1}
+                            </span>
+                            <div className="flex-1">
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                Nome do Adicional:
+                              </label>
+                              <input
+                                type="text"
+                                value={extra.name}
+                                placeholder="Ex: Bacon Crocante Extra, Queijo Cheddar..."
+                                onChange={(e) =>
+                                  handleUpdateExtra(extra.id, { name: e.target.value })
+                                }
+                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="w-32">
+                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                Valor Adicional (R$):
+                              </label>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs font-bold">
+                                  R$
+                                </span>
+                                <input
+                                  type="number"
+                                  step="0.10"
+                                  min="0"
+                                  value={extra.price === 0 ? '' : extra.price}
+                                  placeholder="0,00"
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                      handleUpdateExtra(extra.id, { price: 0 });
+                                    } else {
+                                      const parsed = parseFloat(val);
+                                      handleUpdateExtra(extra.id, {
+                                        price: isNaN(parsed) ? 0 : parsed,
+                                      });
+                                    }
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-emerald-400 font-bold"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="pt-4 flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateExtra(extra.id, {
+                                    isAvailable: extra.isAvailable === false ? true : false,
+                                  })
+                                }
+                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                                  extra.isAvailable !== false
+                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                    : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                                }`}
+                              >
+                                {extra.isAvailable !== false ? 'Ativo' : 'Pausado'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteExtra(extra.id)}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
+                                title="Excluir adicional"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2907,14 +3226,18 @@ export default function MenuEditorModal({
                     <input
                       type="number"
                       step="0.50"
+                      min="0"
                       disabled={!allowDelivery}
-                      value={menu.deliveryFee || 0}
-                      onChange={(e) =>
+                      value={menu.deliveryFee === 0 ? '' : menu.deliveryFee || ''}
+                      placeholder="0,00"
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setMenu({
                           ...menu,
-                          deliveryFee: parseFloat(e.target.value) || 0,
-                        })
-                      }
+                          deliveryFee: val === '' ? 0 : parseFloat(val) || 0,
+                        });
+                      }}
                       className={`w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white ${
                         !allowDelivery ? 'opacity-40 cursor-not-allowed' : ''
                       }`}
@@ -2949,6 +3272,62 @@ export default function MenuEditorModal({
                       }`}
                     >
                       {menu.isOpen !== false ? '🟢 Aberto' : '🔴 Fechado'}
+                    </button>
+                  </div>
+
+                  {/* Botão Chamar Garçom na Mesa (Switch Estilo iPhone / iOS) */}
+                  <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="text-xs font-bold text-white block truncate">
+                          {isCatalog
+                            ? 'Botão "Falar com Vendedor"'
+                            : 'Botão "Chamar Garçom na Mesa"'}
+                        </span>
+                        <span
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
+                            allowCallWaiter
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                          }`}
+                        >
+                          {allowCallWaiter ? 'Ativado' : 'Desativado'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 block mt-1 leading-relaxed">
+                        {isCatalog
+                          ? 'Exibe o botão de contato direto no WhatsApp para tirar dúvidas sobre produtos.'
+                          : 'Quando ativado, o botão SÓ aparece quando o cliente lê o QR Code da mesa (?mesa=X), para o garçom saber exatamente a mesa de onde veio o chamado.'}
+                      </span>
+                    </div>
+
+                    {/* Botão liga e desliga estilo iPhone (iOS Switch) */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={allowCallWaiter}
+                      onClick={() =>
+                        setMenu({
+                          ...menu,
+                          allowCallWaiter: !allowCallWaiter,
+                        })
+                      }
+                      title={
+                        allowCallWaiter
+                          ? 'Clique para desativar a chamada de garçom'
+                          : 'Clique para ativar a chamada de garçom'
+                      }
+                      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner ${
+                        allowCallWaiter ? 'bg-emerald-500' : 'bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          allowCallWaiter ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
                     </button>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   Printer,
@@ -10,7 +10,7 @@ import {
   Hash,
 } from 'lucide-react';
 import { QRConfig } from '@/lib/types';
-import { getDefaultFrameTexts } from '@/lib/qr-canvas';
+import { getDefaultFrameTexts, renderStyledQR } from '@/lib/qr-canvas';
 import { useProPrice } from '@/lib/pro-price';
 
 interface TableTentModalProps {
@@ -33,15 +33,83 @@ export default function TableTentModal({
   const { proPriceLabel } = useProPrice();
   const [showTableNumbers, setShowTableNumbers] = useState(true);
   const [startTableNum, setStartTableNum] = useState(1);
+  const [table1QrUrl, setTable1QrUrl] = useState<string>(qrDataUrl);
+  const [table2QrUrl, setTable2QrUrl] = useState<string>(qrDataUrl);
+
+  const t1 = String(startTableNum).padStart(2, '0');
+  const t2 = String(startTableNum + 1).padStart(2, '0');
+
+  const getTableTargetUrl = useCallback((baseValue: string, tableNum: string) => {
+    if (!baseValue) return baseValue;
+    try {
+      const url = new URL(baseValue);
+      url.searchParams.set('mesa', tableNum);
+      return url.toString();
+    } catch {
+      return baseValue.includes('?')
+        ? `${baseValue}&mesa=${tableNum}`
+        : `${baseValue}?mesa=${tableNum}`;
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const baseTarget = config.url || '';
+    if (!showTableNumbers || !baseTarget || typeof document === 'undefined') {
+      setTable1QrUrl(qrDataUrl);
+      setTable2QrUrl(qrDataUrl);
+      return;
+    }
+
+    const url1 = getTableTargetUrl(baseTarget, t1);
+    const url2 = getTableTargetUrl(baseTarget, t2);
+
+    const c1 = document.createElement('canvas');
+    c1.width = 800;
+    c1.height = 800;
+    const c2 = document.createElement('canvas');
+    c2.width = 800;
+    c2.height = 800;
+
+    Promise.all([
+      renderStyledQR({
+        config,
+        targetContent: url1,
+        canvas: c1,
+        width: 800,
+        height: 800,
+        isPro,
+      }),
+      renderStyledQR({
+        config,
+        targetContent: url2,
+        canvas: c2,
+        width: 800,
+        height: 800,
+        isPro,
+      }),
+    ])
+      .then(() => {
+        if (!active) return;
+        setTable1QrUrl(c1.toDataURL('image/png'));
+        setTable2QrUrl(c2.toDataURL('image/png'));
+      })
+      .catch(() => {
+        if (!active) return;
+        setTable1QrUrl(qrDataUrl);
+        setTable2QrUrl(qrDataUrl);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [config, isPro, qrDataUrl, showTableNumbers, t1, t2, getTableTargetUrl]);
 
   if (!isOpen) return null;
 
   const handlePrint = () => {
     window.print();
   };
-
-  const t1 = String(startTableNum).padStart(2, '0');
-  const t2 = String(startTableNum + 1).padStart(2, '0');
 
   const frameDefaults = getDefaultFrameTexts(config.type);
   const topLabel1 = config.frameTopText || config.frameText || frameDefaults.topText;
@@ -210,10 +278,10 @@ export default function TableTentModal({
 
                 {/* High-res QR Code */}
                 <div className="bg-white p-3 rounded-2xl shadow-md border border-slate-100 mb-4">
-                  {qrDataUrl && (
+                  {(table1QrUrl || qrDataUrl) && (
                     <img
-                      src={qrDataUrl}
-                      alt="QR Code de Mesa"
+                      src={table1QrUrl || qrDataUrl}
+                      alt={`QR Code de Mesa ${t1}`}
                       className="w-44 h-44 object-contain"
                     />
                   )}
@@ -267,10 +335,10 @@ export default function TableTentModal({
                 </p>
 
                 <div className="bg-white p-3 rounded-2xl shadow-md border border-slate-100 mb-4">
-                  {qrDataUrl && (
+                  {(table2QrUrl || qrDataUrl) && (
                     <img
-                      src={qrDataUrl}
-                      alt="QR Code de Mesa"
+                      src={table2QrUrl || qrDataUrl}
+                      alt={`QR Code de Mesa ${t2}`}
                       className="w-44 h-44 object-contain"
                     />
                   )}

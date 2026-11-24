@@ -16,6 +16,7 @@ import {
   MenuItem,
   StoreOrder,
   StoreOrderItem,
+  SelectedExtraItem,
   StoreOrderStatus,
   PixKeyType,
   ReferralConversion,
@@ -101,6 +102,13 @@ export function createStarterMenu(
       { id: 'cat-3', name: '🥤 Bebidas & Drinks' },
       { id: 'cat-4', name: '🍰 Sobremesas' },
     ],
+    extras: [
+      { id: 'extra-1', name: 'Bacon Crocante Extra', price: 4.5, isAvailable: true },
+      { id: 'extra-2', name: 'Queijo Cheddar Fatiado', price: 3.5, isAvailable: true },
+      { id: 'extra-3', name: 'Ovo Frito na Manteiga', price: 2.5, isAvailable: true },
+      { id: 'extra-4', name: 'Maionese Especial da Casa', price: 2.0, isAvailable: true },
+      { id: 'extra-5', name: 'Hambúrguer 100g Extra', price: 8.0, isAvailable: true },
+    ],
     items: [
       {
         id: 'item-1',
@@ -113,6 +121,8 @@ export function createStarterMenu(
           'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
         badge: 'Mais Vendido',
         isAvailable: true,
+        allowExtras: true,
+        allowedExtraIds: ['extra-1', 'extra-2', 'extra-3', 'extra-4', 'extra-5'],
       },
       {
         id: 'item-2',
@@ -2958,7 +2968,7 @@ export interface CreateOrderParams {
   tableNumber?: string;
   deliveryAddress?: string;
   paymentMethod?: string;
-  items: { id: string; quantity: number }[];
+  items: { id: string; quantity: number; selectedExtras?: SelectedExtraItem[] }[];
   deliveryFee?: number;
   notes?: string;
 }
@@ -3054,15 +3064,31 @@ export async function createStoreOrder(
     }
 
     const itemPrice = typeof target.price === 'number' ? target.price : 0;
-    subtotal += itemPrice * reqQty;
+    let extraPriceSum = 0;
+    const selectedExtras: SelectedExtraItem[] = [];
+    if (Array.isArray(reqItem.selectedExtras)) {
+      for (const ex of reqItem.selectedExtras) {
+        if (ex && ex.name && typeof ex.price === 'number') {
+          extraPriceSum += ex.price;
+          selectedExtras.push({
+            id: ex.id || ex.name,
+            name: ex.name,
+            price: ex.price,
+          });
+        }
+      }
+    }
+    const unitWithExtras = itemPrice + extraPriceSum;
+    subtotal += unitWithExtras * reqQty;
 
     orderItems.push({
       id: target.id,
       name: target.name,
-      price: itemPrice,
+      price: unitWithExtras,
       quantity: reqQty,
       stockMode: target.stockMode || 'unlimited',
       stockDeducted,
+      selectedExtras: selectedExtras.length > 0 ? selectedExtras : undefined,
     });
   }
 

@@ -30,7 +30,7 @@ import {
   ArrowUp,
   Layers,
 } from 'lucide-react';
-import { RestaurantMenu, MenuItem } from '@/lib/types';
+import { RestaurantMenu, MenuItem, MenuExtra, SelectedExtraItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
 import { isProStillValid } from '@/lib/pro-status';
 import {
@@ -64,8 +64,11 @@ function extractItemPhotos(
 }
 
 interface CartItem {
+  cartKey: string;
   item: MenuItem;
   quantity: number;
+  selectedExtras?: MenuExtra[];
+  unitPrice: number;
 }
 
 interface ClosedPixOrder {
@@ -97,6 +100,11 @@ export default function DigitalShowcasePage({
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [customizingItem, setCustomizingItem] = useState<{
+    item: MenuItem;
+    selectedExtraIds: Set<string>;
+    quantity: number;
+  } | null>(null);
 
   // Order details
   const [orderMode, setOrderMode] = useState<OrderMode>(
@@ -204,9 +212,16 @@ export default function DigitalShowcasePage({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const mesaParam = urlParams.get('mesa');
-      if (mesaParam) {
-        setTableNumber(`Mesa ${mesaParam}`);
+      const mesaParam =
+        urlParams.get('mesa') ||
+        urlParams.get('table') ||
+        urlParams.get('m');
+      if (mesaParam && mesaParam.trim()) {
+        const cleanMesa = mesaParam.trim();
+        const formatted = cleanMesa.toLowerCase().startsWith('mesa')
+          ? cleanMesa
+          : `Mesa ${cleanMesa}`;
+        setTableNumber(formatted);
         setOrderMode('table');
       }
     }
@@ -424,10 +439,31 @@ export default function DigitalShowcasePage({
       ? 'bg-black/10 hover:bg-black/20'
       : 'bg-white/15 hover:bg-white/25';
 
+  const getItemAllowedExtras = (targetItem: MenuItem): MenuExtra[] => {
+    if (!targetItem.allowExtras || !menu?.extras || menu.extras.length === 0) {
+      return [];
+    }
+    const allowedSet = new Set(targetItem.allowedExtraIds || []);
+    return menu.extras.filter(
+      (ex) => allowedSet.has(ex.id) && ex.isAvailable !== false
+    );
+  };
+
   const addToCart = (item: MenuItem) => {
     const stock = getItemStockInfo(item);
     if (!stock.canOrder || stock.maxQuantity <= 0) return;
     setClosedPixOrder(null);
+
+    const availableExtras = getItemAllowedExtras(item);
+    if (availableExtras.length > 0) {
+      setCustomizingItem({
+        item,
+        selectedExtraIds: new Set<string>(),
+        quantity: 1,
+      });
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev[item.id];
       const currentQty = existing ? existing.quantity : 0;
@@ -437,26 +473,80 @@ export default function DigitalShowcasePage({
       return {
         ...prev,
         [item.id]: {
+          cartKey: item.id,
           item,
           quantity: currentQty + 1,
+          unitPrice: item.price,
         },
       };
     });
   };
 
-  const removeFromCart = (itemId: string) => {
+  const handleConfirmCustomizedItem = () => {
+    if (!customizingItem) return;
+    const { item, selectedExtraIds, quantity } = customizingItem;
+    const stock = getItemStockInfo(item);
+    if (!stock.canOrder || stock.maxQuantity <= 0) {
+      setCustomizingItem(null);
+      return;
+    }
+
+    const allExtras = menu?.extras || [];
+    const chosenExtras = allExtras.filter((ex) => selectedExtraIds.has(ex.id));
+    const sortedExtraIds = chosenExtras.map((e) => e.id).sort();
+    const cartKey =
+      sortedExtraIds.length > 0
+        ? `${item.id}:${sortedExtraIds.join('-')}`
+        : item.id;
+
+    const extraCost = chosenExtras.reduce(
+      (sum, ex) => sum + (Number(ex.price) || 0),
+      0
+    );
+    const unitPrice = item.price + extraCost;
+
+    setCart((prev) => {
+      const currentTotalItemQty = Object.values(prev)
+        .filter((c) => c.item.id === item.id)
+        .reduce((sum, c) => sum + c.quantity, 0);
+
+      const allowedToAdd = Math.min(
+        quantity,
+        Math.max(0, stock.maxQuantity - currentTotalItemQty)
+      );
+      if (allowedToAdd <= 0) return prev;
+
+      const existing = prev[cartKey];
+      const newQty = existing ? existing.quantity + allowedToAdd : allowedToAdd;
+
+      return {
+        ...prev,
+        [cartKey]: {
+          cartKey,
+          item,
+          quantity: newQty,
+          selectedExtras: chosenExtras,
+          unitPrice,
+        },
+      };
+    });
+
+    setCustomizingItem(null);
+  };
+
+  const removeFromCart = (cartKey: string) => {
     setClosedPixOrder(null);
     setCart((prev) => {
-      const existing = prev[itemId];
+      const existing = prev[cartKey];
       if (!existing) return prev;
       if (existing.quantity <= 1) {
         const next = { ...prev };
-        delete next[itemId];
+        delete next[cartKey];
         return next;
       }
       return {
         ...prev,
-        [itemId]: {
+        [cartKey]: {
           ...existing,
           quantity: existing.quantity - 1,
         },
@@ -464,9 +554,33 @@ export default function DigitalShowcasePage({
     });
   };
 
+  const incrementCartItem = (cartKey: string) => {
+    setClosedPixOrder(null);
+    setCart((prev) => {
+      const existing = prev[cartKey];
+      if (!existing) return prev;
+      const stock = getItemStockInfo(existing.item);
+      const totalItemQty = Object.values(prev)
+        .filter((c) => c.item.id === existing.item.id)
+        .reduce((sum, c) => sum + c.quantity, 0);
+      if (totalItemQty >= stock.maxQuantity) return prev;
+
+      return {
+        ...prev,
+        [cartKey]: {
+          ...existing,
+          quantity: existing.quantity + 1,
+        },
+      };
+    });
+  };
+
   const totalItems = Object.values(cart).reduce((acc, c) => acc + c.quantity, 0);
   const subtotalPrice = Object.values(cart).reduce(
-    (acc, c) => acc + c.quantity * c.item.price,
+    (acc, c) =>
+      acc +
+      c.quantity *
+        (typeof c.unitPrice === 'number' ? c.unitPrice : c.item.price),
     0
   );
   const deliveryFee =
@@ -540,9 +654,11 @@ export default function DigitalShowcasePage({
     const cleanNumber = menu.whatsappNumber.replace(/\D/g, '');
     const msg = isCatalog
       ? `Olá! Estou vendo o catálogo digital de *${menu.title}* e gostaria de tirar uma dúvida / fazer um pedido.`
-      : `🔔 *CHAMADO DE ATENDIMENTO*\n\nOlá! Estou em *${
-          tableNumber || 'Minha Mesa'
-        }* no *${menu.title}* e gostaria de chamar o garçom / atendimento.`;
+      : `🔔 *CHAMADO DE GARÇOM*\n\n` +
+        `*Mesa:* ${tableNumber || 'Mesa não identificada'}\n` +
+        `*Restaurante:* ${menu.title}\n` +
+        `────────────────────\n` +
+        `Olá! Estou na *${tableNumber || 'minha mesa'}* no *${menu.title}* e gostaria de chamar o garçom / atendimento, por favor.`;
     window.open(
       `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`,
       '_blank'
@@ -574,9 +690,17 @@ export default function DigitalShowcasePage({
           prodDays > 0
             ? ` (Sob encomenda • ${formatProductionDaysLabel(prodDays).toLowerCase()})`
             : '';
-        return `• ${c.quantity}x ${c.item.name}${prodDaysInfo} — R$ ${(
-          c.quantity * c.item.price
-        ).toFixed(2)}`;
+        const lineTotal = (
+          c.quantity * (c.unitPrice ?? c.item.price)
+        ).toFixed(2);
+        let line = `• ${c.quantity}x ${c.item.name}${prodDaysInfo} — R$ ${lineTotal}`;
+        if (c.selectedExtras && c.selectedExtras.length > 0) {
+          const extrasStr = c.selectedExtras
+            .map((ex) => `+ ${ex.name} (+R$ ${Number(ex.price).toFixed(2)})`)
+            .join(', ');
+          line += `\n   ↳ *Adicionais:* ${extrasStr}`;
+        }
+        return line;
       })
       .join('\n');
 
@@ -731,6 +855,11 @@ export default function DigitalShowcasePage({
           items: itemsList.map((c) => ({
             id: c.item.id,
             quantity: c.quantity,
+            selectedExtras: c.selectedExtras?.map((ex) => ({
+              id: ex.id,
+              name: ex.name,
+              price: ex.price,
+            })),
           })),
           deliveryFee: deliveryFee > 0 ? deliveryFee : 0,
           notes: notes.trim() || undefined,
@@ -863,9 +992,17 @@ export default function DigitalShowcasePage({
     : 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80';
 
   const renderCartActionControl = (targetItem: MenuItem) => {
-    const itemInCart = cart[targetItem.id]?.quantity || 0;
+    const matchingEntries = Object.values(cart).filter(
+      (c) => c.item.id === targetItem.id
+    );
+    const totalItemInCart = matchingEntries.reduce(
+      (sum, c) => sum + c.quantity,
+      0
+    );
     const itemStock = getItemStockInfo(targetItem);
-    const itemReachedMax = itemInCart >= itemStock.maxQuantity;
+    const itemReachedMax = totalItemInCart >= itemStock.maxQuantity;
+    const availableExtras = getItemAllowedExtras(targetItem);
+    const hasExtras = availableExtras.length > 0;
 
     if (!itemStock.canOrder) {
       return (
@@ -881,7 +1018,7 @@ export default function DigitalShowcasePage({
       );
     }
 
-    if (itemInCart > 0) {
+    if (totalItemInCart > 0) {
       return (
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div
@@ -895,14 +1032,20 @@ export default function DigitalShowcasePage({
             <ShoppingCart className="w-3.5 h-3.5 stroke-[2.3] ml-1 shrink-0 opacity-85" />
             <button
               type="button"
-              onClick={() => removeFromCart(targetItem.id)}
+              onClick={() => {
+                if (matchingEntries.length === 1) {
+                  removeFromCart(matchingEntries[0].cartKey || targetItem.id);
+                } else {
+                  setIsCartOpen(true);
+                }
+              }}
               aria-label={`Remover 1 ${targetItem.name} do carrinho`}
               className={`p-1 rounded-lg transition ${subtleOnSolidClass}`}
             >
               <Minus className="w-3.5 h-3.5 stroke-[2.6]" />
             </button>
             <span className="text-xs font-extrabold px-1 min-w-[1.25rem] text-center">
-              {itemInCart}
+              {totalItemInCart}
             </span>
             <button
               type="button"
@@ -914,6 +1057,8 @@ export default function DigitalShowcasePage({
                   ? itemStock.isUnique
                     ? 'Peça única — máximo 1 unidade'
                     : `Estoque máximo disponível: ${itemStock.maxQuantity}`
+                  : hasExtras
+                  ? 'Adicionar mais com adicionais'
                   : 'Adicionar mais uma unidade'
               }
               className={`p-1 rounded-lg transition ${
@@ -923,7 +1068,7 @@ export default function DigitalShowcasePage({
               <Plus className="w-3.5 h-3.5 stroke-[2.6]" />
             </button>
           </div>
-          {itemReachedMax && (
+          {itemReachedMax ? (
             <span
               className={`text-[9px] font-bold ${
                 isLight ? 'text-amber-700' : 'text-amber-300'
@@ -933,7 +1078,15 @@ export default function DigitalShowcasePage({
                 ? 'Peça única (máx. 1)'
                 : `Máx. ${itemStock.maxQuantity} disp.`}
             </span>
-          )}
+          ) : hasExtras ? (
+            <span
+              className={`text-[9px] font-bold ${
+                isLight ? 'text-emerald-700' : 'text-emerald-300'
+              }`}
+            >
+              + Adicionais disponíveis
+            </span>
+          ) : null}
         </div>
       );
     }
@@ -948,10 +1101,15 @@ export default function DigitalShowcasePage({
           color: theme.accentTextOnSolid,
           borderColor: theme.accentBorder,
         }}
-        className="group/add shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold hover:brightness-105 active:scale-[0.97] shadow-md border transition-all whitespace-nowrap"
+        className="group/add shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold hover:brightness-105 active:scale-[0.97] shadow-md border transition-all whitespace-nowrap"
       >
         <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
         <span>Adicionar</span>
+        {hasExtras && (
+          <span className="text-[10px] font-medium opacity-90">
+            (Opções)
+          </span>
+        )}
         <span
           className={`inline-flex items-center justify-center w-4 h-4 rounded-md ${
             theme.accentTextOnSolid === '#0f172a' ? 'bg-black/15' : 'bg-white/20'
@@ -1332,41 +1490,55 @@ export default function DigitalShowcasePage({
               </div>
             </div>
 
-            {/* Quick Assistance Bar (Waiter/Seller) — PIX only opens after closing cart order */}
-            <div
-              className={`mt-5 pt-4 border-t grid grid-cols-1 gap-3 ${
-                isLight ? 'border-slate-200' : 'border-slate-800/80'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={handlePrimaryAssist}
-                className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
-                  isLight
-                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200'
-                    : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 border-slate-700'
-                }`}
-              >
-                {isCatalog ? (
-                  <>
-                    <MessageCircle
-                      className="w-4 h-4"
-                      style={{ color: theme.readableAccentText }}
-                    />
-                    <span>Falar com Vendedor</span>
-                  </>
-                ) : (
-                  <>
-                    <Bell
-                      className={`w-4 h-4 ${
-                        isLight ? 'text-amber-600' : 'text-amber-400'
-                      }`}
-                    />
-                    <span>Chamar Garçom</span>
-                  </>
-                )}
-              </button>
-            </div>
+            {/* Quick Assistance Bar (Waiter/Seller) — Só exibe se o cliente leu o QR da mesa (?mesa=X) e o lojista ativou a opção */}
+            {(() => {
+              const allowCallWaiter = menu?.allowCallWaiter !== false;
+              const hasTableScanned = Boolean(tableNumber && tableNumber.trim());
+              const canShowCallWaiter =
+                !isCatalog &&
+                allowCallWaiter &&
+                hasTableScanned &&
+                Boolean(menu?.whatsappNumber);
+              const canShowSellerChat =
+                isCatalog &&
+                allowCallWaiter &&
+                Boolean(menu?.whatsappNumber);
+
+              if (!canShowCallWaiter && !canShowSellerChat) return null;
+
+              return (
+                <div
+                  className={`mt-5 pt-4 border-t grid grid-cols-1 gap-3 ${
+                    isLight ? 'border-slate-200' : 'border-slate-800/80'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={handlePrimaryAssist}
+                    className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                      isLight
+                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 shadow-sm'
+                        : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/40 shadow-sm'
+                    }`}
+                  >
+                    {isCatalog ? (
+                      <>
+                        <MessageCircle
+                          className="w-4 h-4"
+                          style={{ color: theme.readableAccentText }}
+                        />
+                        <span>Falar com Vendedor</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bell className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
+                        <span>Chamar Garçom • {tableNumber}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Search Input */}
@@ -2203,6 +2375,250 @@ export default function DigitalShowcasePage({
         </div>
       )}
 
+      {/* Item Customization & Extras Modal */}
+      {customizingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div
+            className={`relative w-full max-w-md border rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col ${modalBoxClass}`}
+          >
+            {/* Header */}
+            <div
+              className={`shrink-0 flex items-center justify-between pb-3 border-b ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🍟</span>
+                <div>
+                  <h3 className={`text-sm font-extrabold ${headingTextClass}`}>
+                    Adicionais & Complementos
+                  </h3>
+                  <p className={`text-[11px] ${mutedTextClass}`}>
+                    Personalize seu pedido do seu jeito
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomizingItem(null)}
+                className={`p-1.5 rounded-xl transition ${
+                  isLight
+                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Item Info Banner */}
+            <div
+              className={`shrink-0 p-3 rounded-2xl my-3 border ${
+                isLight
+                  ? 'bg-slate-50 border-slate-200'
+                  : 'bg-slate-900/60 border-slate-800'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className={`text-xs font-bold truncate ${headingTextClass}`}>
+                    {customizingItem.item.name}
+                  </h4>
+                  {customizingItem.item.description && (
+                    <p className={`text-[11px] line-clamp-2 mt-0.5 ${mutedTextClass}`}>
+                      {customizingItem.item.description}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className="text-xs font-black shrink-0"
+                  style={{ color: theme.readableAccentText }}
+                >
+                  R$ {customizingItem.item.price.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Extras Selection List */}
+            <div className="flex-1 min-h-0 overflow-y-auto py-1 space-y-2 pr-1">
+              <span
+                className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${
+                  isLight ? 'text-slate-500' : 'text-slate-400'
+                }`}
+              >
+                Escolha os adicionais desejados:
+              </span>
+
+              {getItemAllowedExtras(customizingItem.item).map((extra) => {
+                const isSelected = customizingItem.selectedExtraIds.has(extra.id);
+                return (
+                  <button
+                    key={extra.id}
+                    type="button"
+                    onClick={() => {
+                      setCustomizingItem((prev) => {
+                        if (!prev) return null;
+                        const nextSet = new Set(prev.selectedExtraIds);
+                        if (nextSet.has(extra.id)) {
+                          nextSet.delete(extra.id);
+                        } else {
+                          nextSet.add(extra.id);
+                        }
+                        return { ...prev, selectedExtraIds: nextSet };
+                      });
+                    }}
+                    className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all ${
+                      isSelected
+                        ? isLight
+                          ? 'bg-emerald-50/90 border-emerald-400 text-slate-900 shadow-sm'
+                          : 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
+                        : isLight
+                        ? 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
+                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 text-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
+                          isSelected
+                            ? 'bg-emerald-500 border-emerald-600 text-white'
+                            : isLight
+                            ? 'border-slate-300 bg-white'
+                            : 'border-slate-600 bg-slate-800'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                      <span className="text-xs font-bold">
+                        {extra.name}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`text-xs font-black shrink-0 ${
+                        isSelected
+                          ? isLight
+                            ? 'text-emerald-700'
+                            : 'text-emerald-400'
+                          : mutedTextClass
+                      }`}
+                    >
+                      + R$ {Number(extra.price).toFixed(2)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quantity Stepper & Add Button */}
+            <div
+              className={`shrink-0 pt-4 mt-2 border-t space-y-3 ${
+                isLight ? 'border-slate-200' : 'border-slate-800'
+              }`}
+            >
+              {/* Stepper */}
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${labelTextClass}`}>
+                  Quantidade deste item:
+                </span>
+                <div
+                  className={`flex items-center gap-2 rounded-xl p-1 border ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-200'
+                      : 'bg-slate-900 border-slate-800'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCustomizingItem((prev) =>
+                        prev
+                          ? { ...prev, quantity: Math.max(1, prev.quantity - 1) }
+                          : null
+                      )
+                    }
+                    disabled={customizingItem.quantity <= 1}
+                    className={`p-1.5 rounded-lg transition ${
+                      customizingItem.quantity <= 1
+                        ? 'opacity-30 cursor-not-allowed'
+                        : isLight
+                        ? 'hover:bg-white text-slate-700'
+                        : 'hover:bg-slate-800 text-white'
+                    }`}
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span
+                    className={`text-xs font-black px-2 ${headingTextClass}`}
+                  >
+                    {customizingItem.quantity}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const stock = getItemStockInfo(customizingItem.item);
+                      const currentTotalInCart = Object.values(cart)
+                        .filter((c) => c.item.id === customizingItem.item.id)
+                        .reduce((sum, c) => sum + c.quantity, 0);
+                      const maxPossible = Math.max(
+                        0,
+                        stock.maxQuantity - currentTotalInCart
+                      );
+                      setCustomizingItem((prev) => {
+                        if (!prev) return null;
+                        if (prev.quantity >= maxPossible) return prev;
+                        return { ...prev, quantity: prev.quantity + 1 };
+                      });
+                    }}
+                    className={`p-1.5 rounded-lg transition ${
+                      isLight
+                        ? 'hover:bg-white text-slate-700'
+                        : 'hover:bg-slate-800 text-white'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Total Calculation & Confirm Button */}
+              {(() => {
+                const allExtras = menu?.extras || [];
+                const chosenExtras = allExtras.filter((ex) =>
+                  customizingItem.selectedExtraIds.has(ex.id)
+                );
+                const extrasCost = chosenExtras.reduce(
+                  (sum, ex) => sum + (Number(ex.price) || 0),
+                  0
+                );
+                const unitTotal = customizingItem.item.price + extrasCost;
+                const grandTotal = unitTotal * customizingItem.quantity;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={handleConfirmCustomizedItem}
+                    style={{
+                      backgroundColor: theme.accentHex,
+                      color: theme.accentTextOnSolid,
+                    }}
+                    className="w-full py-3 px-4 rounded-2xl text-xs font-black shadow-lg transition hover:brightness-105 active:scale-[0.98] flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <ShoppingCart className="w-4 h-4 stroke-[2.4]" />
+                      <span>Adicionar ao Pedido</span>
+                    </span>
+                    <span className="font-extrabold text-sm">
+                      R$ {grandTotal.toFixed(2)}
+                    </span>
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cart & WhatsApp Checkout Drawer/Modal */}
       {isCartOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4">
@@ -2301,26 +2717,50 @@ export default function DigitalShowcasePage({
             <div className="flex-1 min-h-0 overflow-y-auto py-2 space-y-3">
               {Object.values(cart).map((c) => {
                 const stock = getItemStockInfo(c.item);
-                const reachedMax = c.quantity >= stock.maxQuantity;
+                const totalItemQty = Object.values(cart)
+                  .filter((itemC) => itemC.item.id === c.item.id)
+                  .reduce((sum, itemC) => sum + itemC.quantity, 0);
+                const reachedMax = totalItemQty >= stock.maxQuantity;
+                const effectiveUnitPrice = c.unitPrice ?? c.item.price;
+
                 return (
                   <div
-                    key={c.item.id}
+                    key={c.cartKey || c.item.id}
                     className={`flex items-center justify-between p-3 rounded-xl border ${
                       isLight
                         ? 'bg-slate-50 border-slate-200'
                         : 'bg-slate-900/60 border-slate-800'
                     }`}
                   >
-                    <div>
+                    <div className="flex-1 min-w-0 pr-3">
                       <h4 className={`text-xs font-bold ${headingTextClass}`}>
                         {c.item.name}
                       </h4>
-                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+
+                      {/* Selected Extras chips */}
+                      {c.selectedExtras && c.selectedExtras.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {c.selectedExtras.map((extra) => (
+                            <span
+                              key={extra.id}
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                isLight
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                              }`}
+                            >
+                              + {extra.name} (+R$ {Number(extra.price).toFixed(2)})
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         <span
                           className="text-[11px] font-semibold"
                           style={{ color: theme.readableAccentText }}
                         >
-                          R$ {(c.item.price * c.quantity).toFixed(2)}
+                          R$ {(effectiveUnitPrice * c.quantity).toFixed(2)}
                         </span>
                         {(stock.isUnique || stock.isLimited) && (
                           <span
@@ -2334,26 +2774,27 @@ export default function DigitalShowcasePage({
                           </span>
                         )}
                         {getItemProductionDays(c.item) > 0 && (
-                            <span
-                              className={`text-[10px] font-semibold ${
-                                isLight ? 'text-orange-700' : 'text-orange-300'
-                              }`}
-                            >
-                              • {formatProductionDaysLabel(getItemProductionDays(c.item))}
-                            </span>
-                          )}
+                          <span
+                            className={`text-[10px] font-semibold ${
+                              isLight ? 'text-orange-700' : 'text-orange-300'
+                            }`}
+                          >
+                            • {formatProductionDaysLabel(getItemProductionDays(c.item))}
+                          </span>
+                        )}
                       </div>
                     </div>
 
                     <div
-                      className={`flex items-center gap-2 rounded-lg px-2 py-1 ${
+                      className={`flex items-center gap-2 rounded-lg px-2 py-1 shrink-0 ${
                         isLight
                           ? 'bg-white border border-slate-200'
                           : 'bg-slate-800'
                       }`}
                     >
                       <button
-                        onClick={() => removeFromCart(c.item.id)}
+                        type="button"
+                        onClick={() => removeFromCart(c.cartKey || c.item.id)}
                         className={`p-0.5 transition ${
                           isLight
                             ? 'text-slate-500 hover:text-slate-900'
@@ -2368,7 +2809,8 @@ export default function DigitalShowcasePage({
                         {c.quantity}
                       </span>
                       <button
-                        onClick={() => addToCart(c.item)}
+                        type="button"
+                        onClick={() => incrementCartItem(c.cartKey || c.item.id)}
                         disabled={reachedMax}
                         title={
                           reachedMax

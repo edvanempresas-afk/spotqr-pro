@@ -536,22 +536,36 @@ export function StoreOrdersModal({
                         {order.items.map((it, idx) => (
                           <div
                             key={`${it.id}-${idx}`}
-                            className="flex flex-wrap items-center justify-between text-xs py-1 px-2.5 rounded-xl bg-slate-900/40 border border-slate-800/40"
+                            className="flex flex-wrap items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-slate-900/40 border border-slate-800/40 gap-2"
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-emerald-400">
-                                {it.quantity}x
-                              </span>
-                              <span className="font-medium">{it.name}</span>
-                              {it.stockMode === 'unique' && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 border border-purple-500/35 text-purple-300">
-                                  💎 Peça Única {isPending ? '(Reservada)' : isCancelled ? '(Devolvida)' : '(Baixada)'}
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-emerald-400">
+                                  {it.quantity}x
                                 </span>
-                              )}
-                              {it.stockMode === 'limited' && (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/35 text-amber-300">
-                                  📦 {it.stockDeducted} unid. {isPending ? 'reservadas' : isCancelled ? 'devolvidas' : 'baixadas'}
-                                </span>
+                                <span className="font-medium">{it.name}</span>
+                                {it.stockMode === 'unique' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 border border-purple-500/35 text-purple-300">
+                                    💎 Peça Única {isPending ? '(Reservada)' : isCancelled ? '(Devolvida)' : '(Baixada)'}
+                                  </span>
+                                )}
+                                {it.stockMode === 'limited' && (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/35 text-amber-300">
+                                    📦 {it.stockDeducted} unid. {isPending ? 'reservadas' : isCancelled ? 'devolvidas' : 'baixadas'}
+                                  </span>
+                                )}
+                              </div>
+                              {it.selectedExtras && it.selectedExtras.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pl-5">
+                                  {it.selectedExtras.map((ex) => (
+                                    <span
+                                      key={ex.id}
+                                      className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+                                    >
+                                      + {ex.name} (+R$ {Number(ex.price).toFixed(2)})
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </div>
                             <span className="font-bold">
