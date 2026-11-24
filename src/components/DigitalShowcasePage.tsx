@@ -766,8 +766,10 @@ export default function DigitalShowcasePage({
         if (c.selectedFlavors && c.selectedFlavors.length > 0) {
           const totalFl = c.selectedFlavors.length;
           const flavorsStr = c.selectedFlavors
-            .map((fl) => (totalFl > 1 ? `1/${totalFl} ${fl.name}` : fl.name))
-            .join(', ');
+            .map((fl, fIdx) =>
+              totalFl > 1 ? `${fIdx + 1}º ${fl.name}` : fl.name
+            )
+            .join(' + ');
           line += `\n   ↳ *Sabores (${totalFl}):* ${flavorsStr}`;
         }
         if (c.selectedExtras && c.selectedExtras.length > 0) {
@@ -2681,8 +2683,8 @@ export default function DigitalShowcasePage({
                               }`}
                             >
                               {c.selectedFlavors && c.selectedFlavors.length > 1
-                                ? `1/${c.selectedFlavors.length} `
-                                : '🍕 '}
+                                ? `${fIdx + 1}º Sabor: `
+                                : 'Sabor: '}
                               {fl.name}
                             </span>
                           ))}

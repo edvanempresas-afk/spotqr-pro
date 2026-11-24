@@ -277,7 +277,7 @@ export default function ShowcaseCustomizeModal({
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="text-xl shrink-0">
-              {hasFlavorsEnabled ? '🍕' : '🍟'}
+              {hasFlavorsEnabled ? '🍽️' : '🍟'}
             </span>
             <div className="min-w-0">
               <h3
@@ -287,7 +287,9 @@ export default function ShowcaseCustomizeModal({
               </h3>
               <p className={`text-[11px] truncate ${mutedTextClass}`}>
                 {hasFlavorsEnabled
-                  ? 'Escolha tamanho, sabores e complementos'
+                  ? sizes.length > 0
+                    ? 'Escolha tamanho, sabores e complementos'
+                    : 'Escolha os sabores e complementos desejados'
                   : 'Personalize com adicionais do seu jeito'}
               </p>
             </div>
@@ -409,11 +411,7 @@ export default function ShowcaseCustomizeModal({
                             : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
                         }`}
                       >
-                        {n === 1
-                          ? '1 Sabor'
-                          : n === 2
-                          ? '2 Sabores (½)'
-                          : `${n} Sabores`}
+                        {n === 1 ? '1 Sabor' : `${n} Sabores`}
                       </button>
                     );
                   })}
@@ -426,7 +424,7 @@ export default function ShowcaseCustomizeModal({
                       : 'bg-slate-900/60 border-slate-800 text-slate-300'
                   }`}
                 >
-                  Este tamanho permite <strong>1 sabor inteiro</strong>.
+                  Este tamanho permite <strong>1 sabor</strong>.
                 </div>
               )}
             </div>
@@ -447,21 +445,21 @@ export default function ShowcaseCustomizeModal({
                 </span>
               </div>
 
-              {/* Interactive Fraction Slots Cards */}
+              {/* Interactive Flavor Slots Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {flavorSlots.map((slotFlavor, idx) => {
                   const isEditingThis = activeSlotIdx === idx;
-                  const fractionStr =
-                    flavorCount === 1 ? 'Inteiro' : `1/${flavorCount}`;
+                  const slotLabel =
+                    flavorCount === 1
+                      ? 'Sabor Selecionado'
+                      : `Sabor ${idx + 1} de ${flavorCount}`;
                   return (
                     <button
                       key={`slot-${idx}`}
                       type="button"
                       onClick={() => {
                         setActiveSlotIdx(idx);
-                        setFlavorToast(
-                          `Selecionando o ${idx + 1}º sabor (${fractionStr}):`
-                        );
+                        setFlavorToast(`Selecionando o ${idx + 1}º sabor:`);
                       }}
                       className={`p-2.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-2 ${
                         isEditingThis
@@ -499,7 +497,7 @@ export default function ShowcaseCustomizeModal({
                                 : mutedTextClass
                             }`}
                           >
-                            {fractionStr} • Sabor {idx + 1} de {flavorCount}
+                            {slotLabel}
                             {isEditingThis && ' (Escolhendo agora)'}
                           </span>
                           <span
@@ -537,9 +535,7 @@ export default function ShowcaseCustomizeModal({
               >
                 <span>
                   {flavorToast ||
-                    `👉 Selecione abaixo o ${activeSlotIdx + 1}º sabor (${
-                      flavorCount === 1 ? 'Inteiro' : `1/${flavorCount}`
-                    }):`}
+                    `👉 Selecione abaixo o ${activeSlotIdx + 1}º sabor:`}
                 </span>
               </div>
 

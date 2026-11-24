@@ -566,8 +566,8 @@ export function StoreOrdersModal({
                                       className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300"
                                     >
                                       {it.selectedFlavors && it.selectedFlavors.length > 1
-                                        ? `1/${it.selectedFlavors.length} `
-                                        : '🍕 '}
+                                        ? `${fIdx + 1}º `
+                                        : '• '}
                                       {fl.name}
                                     </span>
                                   ))}
