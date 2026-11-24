@@ -5,19 +5,19 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://www.spotqr.com.br'),
   applicationName: 'SpotQR Pro',
   title:
-    'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
+    'SpotQR Pro | Catálogos, Cardápios & Programa Indique e Ganhe Renda Extra',
   description:
-    'Crie Catálogos Digitais para lojas, roupas, artesanato e produtos com pedidos no WhatsApp e PIX sem taxas, além de Cardápios Digitais e QR Codes dinâmicos com logomarca no centro.',
+    'Crie Catálogos Digitais, Cardápios e QR Codes com Logo. Ganhe dinheiro nas horas vagas com o Indique & Ganhe: comissão fácil de R$ 10,00 no PIX por indicação, com saque rápido e desconto VIP para o seu indicado.',
   manifest: '/manifest.json',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
+    title: 'SpotQR Pro | Catálogos, Cardápios & Indique e Ganhe Renda Extra',
     description:
-      'Crie Catálogos Digitais online de produtos sem taxas ou comissões, Cardápios Digitais e QR Codes dinâmicos com sua logomarca no centro.',
+      'Crie Catálogos Digitais online e QR Codes dinâmicos com logo. Conheça também o Programa Indique & Ganhe: comissão fácil de R$ 10,00 no PIX nas horas vagas!',
     url: 'https://www.spotqr.com.br',
-    siteName: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes',
+    siteName: 'SpotQR Pro — Catálogos Digitais, Cardápios & Renda Extra',
     locale: 'pt_BR',
     type: 'website',
     images: [
@@ -31,9 +31,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'SpotQR Pro | Catálogo Digital, QR Code com Logo & Cardápio',
+    title: 'SpotQR Pro | Catálogos, Cardápios & Indique e Ganhe Renda Extra',
     description:
-      'Crie Catálogos Digitais online com carrinho, PIX e WhatsApp sem comissões, Cardápios Digitais e QR Codes profissionais com logo no centro.',
+      'Crie Catálogos Digitais online sem comissões e ganhe dinheiro nas horas vagas com o Programa Indique & Ganhe (comissão fácil de R$ 10 via PIX).',
     images: ['/og-spotqr.png'],
   },
   appleWebApp: {
@@ -42,6 +42,22 @@ export const metadata: Metadata = {
     title: 'SpotQR App',
   },
   keywords: [
+    'comissao facil',
+    'comissão facil',
+    'indique e ganhe',
+    'indique e ganhe dinheiro',
+    'ganhar dinheiro nas horas vagas',
+    'renda extra no pix',
+    'como ganhar dinheiro na internet',
+    'programa de afiliados pix',
+    'afiliados que pagam no pix',
+    'ganhar dinheiro indicando amigos',
+    'renda extra facil online',
+    'trabalhar nas horas vagas',
+    'ganhar 10 reais no pix',
+    'renda extra sem investimento',
+    'indique e ganhe 2026',
+    'afiliado mercado pago pix',
     'catalogo digital',
     'catalogo digital gratis',
     'catalogo online para loja',
@@ -72,23 +88,44 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes',
-  url: 'https://www.spotqr.com.br',
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'All',
-  offers: {
-    '@type': 'Offer',
-    price: '25.90',
-    priceCurrency: 'BRL',
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'SpotQR Pro — Catálogos Digitais, Cardápios & QR Codes',
+    url: 'https://www.spotqr.com.br',
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'All',
+    offers: {
+      '@type': 'Offer',
+      price: '25.90',
+      priceCurrency: 'BRL',
+      description:
+        'Assinatura SpotQR PRO com Catálogo Digital, Cardápio, Logomarca no Centro e QR Dinâmico',
+    },
     description:
-      'Assinatura SpotQR PRO com Catálogo Digital, Cardápio, Logomarca no Centro e QR Dinâmico',
+      'Plataforma completa para criar Catálogos Digitais de produtos com pedidos via WhatsApp e PIX sem taxas, Cardápios Digitais e QR Codes dinâmicos com logomarca no centro.',
   },
-  description:
-    'Plataforma completa para criar Catálogos Digitais de produtos com pedidos via WhatsApp e PIX sem taxas, Cardápios Digitais e QR Codes dinâmicos com logomarca no centro.',
-};
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FinancialProduct',
+    name: 'Programa Indique & Ganhe SpotQR Pro — Renda Extra no PIX',
+    description:
+      'Programa de afiliados com comissão fácil de R$ 10,00 via PIX por indicação. Ganhe dinheiro nas horas vagas indicando novos assinantes para a plataforma.',
+    url: 'https://www.spotqr.com.br/regras-indique-e-ganhe',
+    provider: {
+      '@type': 'Organization',
+      name: 'SpotQR Pro',
+      url: 'https://www.spotqr.com.br',
+    },
+    offers: {
+      '@type': 'Offer',
+      price: '10.00',
+      priceCurrency: 'BRL',
+      description: 'Bônus de comissão em dinheiro pago via PIX por assinante PRO indicado',
+    },
+  },
+];
 
 export default function RootLayout({
   children,

@@ -198,7 +198,7 @@ export default function Navbar({
             <span className="2xl:hidden">Dev Sob Medida</span>
           </Link>
           <Link
-            href="/dashboard"
+            href={authUser ? '/dashboard' : '/#indique-e-ganhe'}
             className={`transition-colors flex items-center gap-1 border px-2.5 py-1 rounded-full whitespace-nowrap ${
               isLight
                 ? 'text-amber-800 hover:text-amber-900 bg-amber-50 border-amber-300'
@@ -353,7 +353,7 @@ export default function Navbar({
               <span>Contratar Desenvolvedor</span>
             </Link>
             <Link
-              href="/dashboard"
+              href={authUser ? '/dashboard' : '/#indique-e-ganhe'}
               onClick={() => setMobileMenuOpen(false)}
               className={`px-3 py-2.5 rounded-xl border transition flex items-center gap-2 ${
                 isLight

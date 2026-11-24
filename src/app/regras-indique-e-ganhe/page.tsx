@@ -16,9 +16,21 @@ import {
 } from 'lucide-react';
 
 export const metadata = {
-  title: 'Regulamento Oficial | Indique & Ganhe R$ 10 | SpotQR Pro',
+  title:
+    'Indique & Ganhe R$ 10 no PIX | Comissão Fácil & Renda Extra nas Horas Vagas | SpotQR Pro',
   description:
-    'Regras oficiais do programa de afiliados e indicação SpotQR Pro: ganhe R$ 10 via PIX por amigo que assinar o PRO com 15% de desconto.',
+    'Quer ganhar dinheiro nas horas vagas com comissão fácil? Participe do programa Indique & Ganhe SpotQR Pro: receba R$ 10,00 no PIX por comércio indicado e ofereça 15% de desconto VIP no Plano PRO.',
+  keywords: [
+    'comissao facil',
+    'comissão facil',
+    'indique e ganhe',
+    'ganhar dinheiro nas horas vagas',
+    'renda extra no pix',
+    'programa de afiliados pix',
+    'trabalhar nas horas vagas',
+    'ganhar 10 reais indicando',
+    'renda extra facil',
+  ],
 };
 
 export default function RegrasIndiqueEGanhePage() {

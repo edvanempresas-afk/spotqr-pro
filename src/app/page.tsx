@@ -27,6 +27,9 @@ import {
   Lock,
   Check,
   X,
+  Gift,
+  Coins,
+  Clock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { FEATURES_MATRIX } from '@/lib/permissions';
@@ -581,6 +584,126 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* REFERRAL / AFFILIATE & EXTRA INCOME SEO SECTION */}
+        <section id="indique-e-ganhe" className="py-20 bg-gradient-to-b from-[#0c121e] to-[#080d17] border-y border-slate-800/80 relative overflow-hidden">
+          {/* Background Ambient Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-emerald-500/10 blur-[120px] pointer-events-none rounded-full" />
+
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            {/* Header */}
+            <div className="text-center max-w-3xl mx-auto space-y-4 mb-14">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-black uppercase tracking-wider shadow-sm">
+                <Gift className="w-4 h-4 text-amber-400" />
+                <span>Renda Extra no PIX • Comissão Fácil</span>
+              </div>
+
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+                Ganhe Dinheiro nas Horas Vagas com o{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-emerald-400 to-teal-300">
+                  Indique &amp; Ganhe
+                </span>
+              </h2>
+
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+                Procurando uma <strong>comissão fácil</strong> para fazer uma <strong>renda extra no PIX</strong>? Recomende o SpotQR Pro para lojas de roupas, pizzarias, hamburguerias, restaurantes e comércios da sua região. Você recebe <strong>R$ 10,00 via PIX</strong> por cada novo assinante PRO e o comerciante ganha <strong>15% de desconto VIP</strong>!
+              </p>
+            </div>
+
+            {/* 3 Pillars Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#111827]/90 border border-slate-800 shadow-xl space-y-3 relative hover:border-amber-500/40 transition">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <Coins className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Comissão Fácil de R$ 10,00</h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Sem metas complicadas e sem burocracia. O valor da comissão é pago diretamente na sua chave PIX em até 48h úteis após a confirmação do pagamento pelo nosso robô!
+                </p>
+                <div className="pt-2 text-xs font-semibold text-amber-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Comprovante bancário no painel
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#111827]/90 border border-slate-800 shadow-xl space-y-3 relative hover:border-emerald-500/40 transition">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Super Fácil de Indicar (15% OFF)</h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Quem entra pelo seu link exclusivo não paga o valor integral: ganha 15% de desconto VIP, saindo de R$ 29,90 por apenas R$ 25,50. Todo lojista quer economizar!
+                </p>
+                <div className="pt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Alta taxa de conversão
+                </div>
+              </div>
+
+              <div className="p-6 sm:p-7 rounded-3xl bg-[#111827]/90 border border-slate-800 shadow-xl space-y-3 relative hover:border-teal-500/40 transition">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white">Trabalhe nas Horas Vagas</h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Você não precisa de computador nem de experiência prévia. Compartilhe seu link exclusivo no WhatsApp, redes sociais ou apresente a plataforma aos comércios locais do seu bairro.
+                </p>
+                <div className="pt-2 text-xs font-semibold text-teal-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> 100% pelo celular
+                </div>
+              </div>
+            </div>
+
+            {/* Simulador de Ganhos */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#131c2e] via-[#101726] to-[#131c2e] border border-slate-800 shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 text-center lg:text-left">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                  Simulação de Renda Extra
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white">
+                  Quanto você pode ganhar indicando comércios?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400">
+                  Veja o potencial de ganhos dedicando apenas alguns minutos por dia nas suas horas vagas:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 w-full lg:w-auto text-center shrink-0">
+                <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+                  <div className="text-[11px] font-bold text-slate-400">5 Comércios</div>
+                  <div className="text-lg sm:text-xl font-black text-white mt-0.5">R$ 50</div>
+                  <div className="text-[10px] text-emerald-400 font-semibold">no PIX</div>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30">
+                  <div className="text-[11px] font-bold text-emerald-300">10 Comércios</div>
+                  <div className="text-lg sm:text-xl font-black text-emerald-400 mt-0.5">R$ 100</div>
+                  <div className="text-[10px] text-emerald-300 font-semibold">no PIX</div>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30">
+                  <div className="text-[11px] font-bold text-amber-300">30 Comércios</div>
+                  <div className="text-lg sm:text-xl font-black text-amber-400 mt-0.5">R$ 300</div>
+                  <div className="text-[10px] text-amber-300 font-semibold">no PIX</div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTAs */}
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                href="/login"
+                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm uppercase tracking-wider text-center shadow-glow transition flex items-center justify-center gap-2"
+              >
+                <Coins className="w-5 h-5" />
+                <span>Começar Agora (Cadastre-se Grátis)</span>
+              </Link>
+              <Link
+                href="/regras-indique-e-ganhe"
+                className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs sm:text-sm font-bold text-center transition flex items-center justify-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Consultar Regulamento Completo</span>
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* HIRE THE DEVELOPER / CUSTOM PROJECTS & AI SECTION */}
         <DeveloperContactSection />
 
@@ -593,6 +716,14 @@ export default function HomePage() {
 
             <div className="space-y-4">
               {[
+                {
+                  q: 'Como funciona o programa Indique & Ganhe para ganhar dinheiro nas horas vagas?',
+                  a: 'É uma oportunidade de renda extra com comissão fácil: ao se cadastrar gratuitamente no SpotQR Pro e registrar sua chave PIX, você desbloqueia um link exclusivo de indicação. Cada amigo ou comércio que assinar o Plano PRO pelo seu link garante a você R$ 10,00 no PIX e ganha 15% de desconto de boas-vindas (R$ 25,50 no primeiro mês).',
+                },
+                {
+                  q: 'Quando e como recebo a comissão do Indique & Ganhe?',
+                  a: 'A comissão de R$ 10,00 por assinante PRO é transferida diretamente para a sua chave PIX cadastrada em até 48 horas úteis após a confirmação do pagamento pelo nosso robô. O comprovante bancário oficial fica arquivado no seu painel para você conferir a qualquer momento.',
+                },
                 {
                   q: 'Por que o site tem anúncios na versão gratuita?',
                   a: `Os anúncios viabilizam manter a infraestrutura 100% gratuita para quem precisa apenas de um QR Code estático básico. Ao assinar a versão PRO por ${proPriceLabel}, todos os anúncios são completamente removidos do seu painel e do catálogo ou cardápio visualizado pelos seus clientes.`,
