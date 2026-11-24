@@ -93,7 +93,7 @@ export default function Navbar({
         </div>
       )}
 
-      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-8 h-20 flex items-center justify-between gap-3">
+      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 h-20 flex items-center justify-between gap-2 sm:gap-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-glow group-hover:scale-105 transition-transform shrink-0">
@@ -119,7 +119,7 @@ export default function Navbar({
               </span>
             </div>
             <span
-              className={`text-[11px] font-medium whitespace-nowrap hidden sm:inline xl:hidden 2xl:inline ${
+              className={`text-[11px] font-medium whitespace-nowrap hidden 2xl:inline ${
                 isLight ? 'text-slate-500' : 'text-slate-400'
               }`}
             >
@@ -130,7 +130,7 @@ export default function Navbar({
 
         {/* Navigation Links - Balanced responsive spacing for 1280px+ */}
         <nav
-          className={`hidden xl:flex items-center gap-2.5 2xl:gap-5 text-[11px] 2xl:text-xs font-semibold ${
+          className={`hidden xl:flex items-center gap-2 xl:gap-3 2xl:gap-4 text-[11px] 2xl:text-xs font-semibold ${
             isLight ? 'text-slate-600' : 'text-slate-300'
           }`}
         >
@@ -183,7 +183,7 @@ export default function Navbar({
           </Link>
           <Link
             href="/#desenvolvedor"
-            className={`transition-colors flex items-center gap-1 border px-2.5 2xl:px-3 py-1.5 rounded-full whitespace-nowrap ${
+            className={`transition-colors flex items-center gap-1 border px-2 py-1 rounded-full whitespace-nowrap ${
               isLight
                 ? 'text-emerald-700 hover:text-emerald-800 bg-emerald-50 border-emerald-200'
                 : 'hover:text-emerald-300 text-emerald-300 bg-emerald-500/10 border-emerald-500/30'
@@ -194,18 +194,20 @@ export default function Navbar({
                 isLight ? 'text-emerald-600' : 'text-emerald-400'
               }`}
             />
-            <span>Contratar Desenvolvedor</span>
+            <span className="hidden 2xl:inline">Contratar Desenvolvedor</span>
+            <span className="2xl:hidden">Dev Sob Medida</span>
           </Link>
           <Link
             href="/dashboard"
-            className={`transition-colors flex items-center gap-1.5 border px-2.5 2xl:px-3 py-1.5 rounded-full whitespace-nowrap ${
+            className={`transition-colors flex items-center gap-1 border px-2.5 py-1 rounded-full whitespace-nowrap ${
               isLight
                 ? 'text-amber-800 hover:text-amber-900 bg-amber-50 border-amber-300'
                 : 'hover:text-amber-200 text-amber-300 bg-amber-500/15 border-amber-500/40'
             }`}
           >
             <Gift className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>🎁 Indique &amp; Ganhe R$ 10</span>
+            <span className="hidden 2xl:inline">🎁 Indique &amp; Ganhe R$ 10</span>
+            <span className="2xl:hidden">🎁 Indique &amp; Ganhe</span>
           </Link>
         </nav>
 
@@ -215,18 +217,18 @@ export default function Navbar({
             <>
               <Link
                 href={isAdmin ? '/admin' : '/dashboard'}
-                className={`flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
                   isLight
-                    ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border-emerald-200'
+                    ? 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 shadow-sm'
                     : 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30'
                 }`}
               >
-                <UserCheck
+                <LayoutDashboard
                   className={`w-3.5 h-3.5 shrink-0 ${
                     isLight ? 'text-emerald-600' : 'text-emerald-400'
                   }`}
                 />
-                <span className="max-w-[115px] 2xl:max-w-[150px] truncate">
+                <span className="max-w-[120px] 2xl:max-w-[160px] truncate">
                   {authUser.businessName || authUser.name}
                 </span>
               </Link>
@@ -246,10 +248,10 @@ export default function Navbar({
           ) : (
             <Link
               href="/login"
-              className={`flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3 py-2 text-[11px] 2xl:text-xs font-bold rounded-xl border transition whitespace-nowrap ${
                 isLight
-                  ? 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-slate-200'
-                  : 'text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/90 border-slate-700'
+                  ? 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 shadow-sm'
+                  : 'text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30'
               }`}
             >
               <LogIn
@@ -260,22 +262,6 @@ export default function Navbar({
               <span>Entrar / Criar Conta</span>
             </Link>
           )}
-
-          <Link
-            href={isAdmin ? '/admin' : '/dashboard'}
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 2xl:px-3 py-2 text-[11px] 2xl:text-xs font-semibold rounded-xl border transition whitespace-nowrap ${
-              isLight
-                ? 'text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border-slate-200'
-                : 'text-slate-200 hover:text-white bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60'
-            }`}
-          >
-            <LayoutDashboard
-              className={`w-3.5 h-3.5 shrink-0 ${
-                isLight ? 'text-emerald-600' : 'text-emerald-400'
-              }`}
-            />
-            <span>{isAdmin ? 'Meu Painel' : 'Meus Catálogos & QRs'}</span>
-          </Link>
 
           <button
             type="button"
