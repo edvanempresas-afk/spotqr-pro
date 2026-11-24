@@ -477,32 +477,41 @@ export default function ShowcaseCustomizeModal({
                           : 'bg-slate-900/50 border-slate-800'
                       }`}
                     >
-                      <div className="min-w-0">
-                        <span
-                          className={`text-[10px] font-black uppercase tracking-wider block ${
-                            isEditingThis
-                              ? isLight
-                                ? 'text-amber-700'
-                                : 'text-amber-300'
-                              : slotFlavor
-                              ? isLight
-                                ? 'text-emerald-700'
-                                : 'text-emerald-400'
-                              : mutedTextClass
-                          }`}
-                        >
-                          {fractionStr} • Sabor {idx + 1} de {flavorCount}
-                          {isEditingThis && ' (Escolhendo agora)'}
-                        </span>
-                        <span
-                          className={`text-xs font-bold block truncate mt-0.5 ${
-                            slotFlavor ? headingTextClass : mutedTextClass
-                          }`}
-                        >
-                          {slotFlavor
-                            ? slotFlavor.name
-                            : `Toque abaixo para escolher...`}
-                        </span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {slotFlavor?.imageUrl && (
+                          <img
+                            src={slotFlavor.imageUrl}
+                            alt={slotFlavor.name}
+                            className="w-8 h-8 rounded-lg object-cover shrink-0 border border-slate-700/40"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <span
+                            className={`text-[10px] font-black uppercase tracking-wider block ${
+                              isEditingThis
+                                ? isLight
+                                  ? 'text-amber-700'
+                                  : 'text-amber-300'
+                                : slotFlavor
+                                ? isLight
+                                  ? 'text-emerald-700'
+                                  : 'text-emerald-400'
+                                : mutedTextClass
+                            }`}
+                          >
+                            {fractionStr} • Sabor {idx + 1} de {flavorCount}
+                            {isEditingThis && ' (Escolhendo agora)'}
+                          </span>
+                          <span
+                            className={`text-xs font-bold block truncate mt-0.5 ${
+                              slotFlavor ? headingTextClass : mutedTextClass
+                            }`}
+                          >
+                            {slotFlavor
+                              ? slotFlavor.name
+                              : `Toque abaixo para escolher...`}
+                          </span>
+                        </div>
                       </div>
                       {slotFlavor ? (
                         <Check className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -578,24 +587,36 @@ export default function ShowcaseCustomizeModal({
                           : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`text-xs font-bold ${headingTextClass}`}>
-                            {fl.name}
-                          </span>
-                          {chosenCountForThis > 0 && (
-                            <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              ✓ {chosenCountForThis}x selecionado
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {fl.imageUrl && (
+                          <img
+                            src={fl.imageUrl}
+                            alt={fl.name}
+                            loading="lazy"
+                            className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover shrink-0 border ${
+                              isLight ? 'border-slate-200' : 'border-slate-700'
+                            }`}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-xs font-bold ${headingTextClass}`}>
+                              {fl.name}
                             </span>
+                            {chosenCountForThis > 0 && (
+                              <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                ✓ {chosenCountForThis}x selecionado
+                              </span>
+                            )}
+                          </div>
+                          {fl.description && (
+                            <p
+                              className={`text-[11px] line-clamp-2 mt-0.5 ${mutedTextClass}`}
+                            >
+                              {fl.description}
+                            </p>
                           )}
                         </div>
-                        {fl.description && (
-                          <p
-                            className={`text-[11px] line-clamp-2 mt-0.5 ${mutedTextClass}`}
-                          >
-                            {fl.description}
-                          </p>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">

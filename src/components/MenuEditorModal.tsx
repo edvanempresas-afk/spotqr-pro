@@ -211,6 +211,7 @@ export default function MenuEditorModal({
     target:
       | { kind: 'item'; itemId: string }
       | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
+      | { kind: 'flavor'; flavorId: string }
       | { kind: 'brand'; field: 'logoImage' | 'coverImage' };
   } | null>(null);
 
@@ -672,6 +673,7 @@ export default function MenuEditorModal({
     target:
       | { kind: 'item'; itemId: string }
       | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
+      | { kind: 'flavor'; flavorId: string }
       | { kind: 'brand'; field: 'logoImage' | 'coverImage' }
   ) => {
     if (!file.type || !file.type.startsWith('image/')) {
@@ -814,6 +816,18 @@ export default function MenuEditorModal({
           }),
         };
       });
+    } else if (cropSession.target.kind === 'flavor') {
+      const targetFlavorId = cropSession.target.flavorId;
+      setMenu((prev) =>
+        prev
+          ? {
+              ...prev,
+              flavors: (prev.flavors || []).map((fl) =>
+                fl.id === targetFlavorId ? { ...fl, imageUrl: croppedDataUrl } : fl
+              ),
+            }
+          : prev
+      );
     } else {
       const field = cropSession.target.field;
       setMenu((prev) => (prev ? { ...prev, [field]: croppedDataUrl } : prev));
@@ -2251,6 +2265,17 @@ export default function MenuEditorModal({
                           }
                         : prev
                     )
+                  }
+                  onUploadFlavorPhoto={(flavorId, file) =>
+                    openCropForFile(file, 'product', { kind: 'flavor', flavorId })
+                  }
+                  onCropFlavorPhoto={(flavorId, currentUrl) =>
+                    setCropSession({
+                      src: currentUrl,
+                      isObjectUrl: false,
+                      preset: 'product',
+                      target: { kind: 'flavor', flavorId },
+                    })
                   }
                 />
               )}

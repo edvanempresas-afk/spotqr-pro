@@ -7,6 +7,9 @@ import {
   Trash2,
   FolderInput,
   Pizza,
+  Upload,
+  Crop,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { MenuCategory, MenuFlavor, MenuItem } from '@/lib/types';
 
@@ -16,19 +19,68 @@ interface MenuFlavorsTabProps {
   menuItems: MenuItem[];
   onChangeFlavors: (nextFlavors: MenuFlavor[]) => void;
   onCleanupDeletedFlavor: (flavorId: string) => void;
+  onUploadFlavorPhoto: (flavorId: string, file: File) => void;
+  onCropFlavorPhoto: (flavorId: string, currentUrl: string) => void;
 }
 
-const PIZZA_PRESET_FLAVORS: Array<{ name: string; description: string; price: number }> = [
-  { name: 'Mussarela', description: 'Molho de tomate, mussarela especial e orégano', price: 42 },
-  { name: 'Calabresa', description: 'Calabresa fatiada, cebola roxa e mussarela', price: 44 },
-  { name: 'Portuguesa', description: 'Presunto, ovos, cebola, ervilha, azeitona e mussarela', price: 48 },
-  { name: 'Frango com Catupiry', description: 'Frango desfiado temperado coberto com Catupiry original', price: 49 },
-  { name: 'Marguerita', description: 'Mussarela, tomate em rodelas, manjericão fresco e parmesão', price: 45 },
-  { name: 'Quatro Queijos', description: 'Mussarela, provolone, parmesão e gorgonzola/catupiry', price: 52 },
-  { name: 'Camarão Especial', description: 'Camarão refogado no alho e ervas com requeijão cremoso', price: 66 },
+const PIZZA_SAMPLE_PHOTO =
+  'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80';
+
+const PIZZA_PRESET_FLAVORS: Array<{
+  name: string;
+  description: string;
+  price: number;
+  imageUrl?: string;
+}> = [
+  {
+    name: 'Mussarela',
+    description: 'Molho de tomate, mussarela especial e orégano',
+    price: 42,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Calabresa',
+    description: 'Calabresa fatiada, cebola roxa e mussarela',
+    price: 44,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Portuguesa',
+    description: 'Presunto, ovos, cebola, ervilha, azeitona e mussarela',
+    price: 48,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Frango com Catupiry',
+    description: 'Frango desfiado temperado coberto com Catupiry original',
+    price: 49,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Marguerita',
+    description: 'Mussarela, tomate em rodelas, manjericão fresco e parmesão',
+    price: 45,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Quatro Queijos',
+    description: 'Mussarela, provolone, parmesão e gorgonzola/catupiry',
+    price: 52,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
+  {
+    name: 'Camarão Especial',
+    description: 'Camarão refogado no alho e ervas com requeijão cremoso',
+    price: 66,
+    imageUrl: PIZZA_SAMPLE_PHOTO,
+  },
 ];
 
-const PASTEL_PRESET_FLAVORS: Array<{ name: string; description: string; price: number }> = [
+const PASTEL_PRESET_FLAVORS: Array<{
+  name: string;
+  description: string;
+  price: number;
+}> = [
   { name: 'Carne Moída Temperada', description: 'Carne bovina refogada com cheiro-verde', price: 3.5 },
   { name: 'Queijo Mussarela', description: 'Queijo mussarela derretido em tiras', price: 3.5 },
   { name: 'Pizza (Presunto e Queijo)', description: 'Presunto, queijo mussarela, tomate e orégano', price: 4.0 },
@@ -43,6 +95,8 @@ export default function MenuFlavorsTab({
   menuItems,
   onChangeFlavors,
   onCleanupDeletedFlavor,
+  onUploadFlavorPhoto,
+  onCropFlavorPhoto,
 }: MenuFlavorsTabProps) {
   const [importCategoryId, setImportCategoryId] = useState<string>('');
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -53,6 +107,7 @@ export default function MenuFlavorsTab({
       name: '',
       description: '',
       price: 0,
+      imageUrl: '',
       isAvailable: true,
     };
     onChangeFlavors([...flavors, newFlavor]);
@@ -69,7 +124,9 @@ export default function MenuFlavorsTab({
     onCleanupDeletedFlavor(flavorId);
   };
 
-  const handleLoadPreset = (presetList: typeof PIZZA_PRESET_FLAVORS) => {
+  const handleLoadPreset = (
+    presetList: Array<{ name: string; description: string; price: number; imageUrl?: string }>
+  ) => {
     const now = Date.now();
     const existingNames = new Set(flavors.map((f) => f.name.trim().toLowerCase()));
     const additions: MenuFlavor[] = presetList
@@ -79,6 +136,7 @@ export default function MenuFlavorsTab({
         name: p.name,
         description: p.description,
         price: p.price,
+        imageUrl: p.imageUrl || '',
         isAvailable: true,
       }));
     if (additions.length === 0) return;
@@ -105,6 +163,7 @@ export default function MenuFlavorsTab({
         name: it.name.trim(),
         description: it.description?.trim() || '',
         price: typeof it.price === 'number' ? it.price : 0,
+        imageUrl: it.imageUrl || '',
         isAvailable: it.isAvailable !== false,
       }));
 
@@ -113,7 +172,7 @@ export default function MenuFlavorsTab({
     } else {
       onChangeFlavors([...flavors, ...imported]);
       setImportNotice(
-        `✅ ${imported.length} ${imported.length === 1 ? 'sabor importado' : 'sabores importados'} com sucesso!`
+        `✅ ${imported.length} ${imported.length === 1 ? 'sabor importado (com fotos!)' : 'sabores importados (com fotos!)'} com sucesso!`
       );
     }
     setTimeout(() => setImportNotice(null), 4000);
@@ -132,7 +191,7 @@ export default function MenuFlavorsTab({
             </span>
           </h3>
           <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-            Cadastre os sabores uma única vez (ex: Calabresa, Portuguesa, Carne, Queijo...) ou importe de uma categoria pronta. Depois, qualquer tamanho de Pizza ou Pastel poderá puxar essa lista para combinações de 2, 3 ou 4 sabores!
+            Cadastre os sabores uma única vez com foto, ingredientes e preço (ou importe de uma categoria pronta). A foto aparece ao lado de cada sabor na escolha do cliente!
           </p>
         </div>
 
@@ -211,55 +270,141 @@ export default function MenuFlavorsTab({
             Nenhum sabor cadastrado ainda na aba de Sabores
           </h4>
           <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
-            Você pode cadastrar sabores aqui (ou importar uma categoria pronta acima). Lembre que nos produtos você também pode escolher puxar os sabores direto de qualquer categoria do cardápio sem precisar duplicar!
+            Você pode cadastrar sabores aqui com foto (ou importar uma categoria pronta acima). Nos produtos você também pode puxar os sabores direto de qualquer categoria do cardápio — já trazendo as fotos de cada item automaticamente!
           </p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
           {flavors.map((flavor, idx) => (
             <div
               key={flavor.id}
-              className="p-3.5 rounded-2xl bg-[#121929] border border-slate-800/80 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 hover:border-slate-700 transition"
+              className="p-3.5 rounded-2xl bg-[#121929] border border-slate-800/80 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5 hover:border-slate-700 transition"
             >
-              <div className="flex items-start sm:items-center gap-2.5 flex-1">
-                <span className="text-[11px] font-mono text-slate-500 w-5 pt-2 sm:pt-0 shrink-0">
+              {/* Photo Upload + Preview Column */}
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="text-[11px] font-mono text-slate-500 w-5">
                   #{idx + 1}
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 flex-1">
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                      Nome do Sabor:
-                    </label>
-                    <input
-                      type="text"
-                      value={flavor.name}
-                      placeholder="Ex: Calabresa, Frango c/ Catupiry, Carne..."
-                      onChange={(e) =>
-                        handleUpdateFlavor(flavor.id, { name: e.target.value })
-                      }
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
-                    />
+                <div className="flex flex-col items-center gap-1.5">
+                  <div className="w-16 h-16 rounded-xl bg-slate-950 border border-slate-700 overflow-hidden flex items-center justify-center">
+                    {flavor.imageUrl ? (
+                      <img
+                        src={flavor.imageUrl}
+                        alt={flavor.name || 'Sabor'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="w-6 h-6 text-slate-600" />
+                    )}
                   </div>
-                  <div>
-                    <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                      Ingredientes / Descrição (opcional):
+                  <div className="flex items-center gap-1">
+                    <label
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-[10px] font-bold text-emerald-300 cursor-pointer transition"
+                      title="Enviar foto da galeria/computador"
+                    >
+                      <Upload className="w-2.5 h-2.5" />
+                      <span>Foto</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) onUploadFlavorPhoto(flavor.id, file);
+                        }}
+                        className="hidden"
+                      />
                     </label>
-                    <input
-                      type="text"
-                      value={flavor.description || ''}
-                      placeholder="Ex: Mussarela, calabresa fatiada e cebola..."
-                      onChange={(e) =>
-                        handleUpdateFlavor(flavor.id, {
-                          description: e.target.value,
-                        })
-                      }
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600"
-                    />
+                    {flavor.imageUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => onCropFlavorPhoto(flavor.id, flavor.imageUrl!)}
+                        className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition"
+                        title="Enquadrar foto"
+                      >
+                        <Crop className="w-2.5 h-2.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateFlavor(flavor.id, {
+                            imageUrl: PIZZA_SAMPLE_PHOTO,
+                          })
+                        }
+                        className="px-1.5 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] transition"
+                        title="Aplicar foto padrão de pizza"
+                      >
+                        🍕
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0 justify-between md:justify-end">
+              {/* Name, Description & Image URL */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1">
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Nome do Sabor:
+                  </label>
+                  <input
+                    type="text"
+                    value={flavor.name}
+                    placeholder="Ex: Calabresa, Frango c/ Catupiry..."
+                    onChange={(e) =>
+                      handleUpdateFlavor(flavor.id, { name: e.target.value })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Ingredientes (opcional):
+                  </label>
+                  <input
+                    type="text"
+                    value={flavor.description || ''}
+                    placeholder="Ex: Mussarela, calabresa fatiada e cebola..."
+                    onChange={(e) =>
+                      handleUpdateFlavor(flavor.id, {
+                        description: e.target.value,
+                      })
+                    }
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    URL da Foto (opcional):
+                  </label>
+                  {flavor.imageUrl?.startsWith('data:') ? (
+                    <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-2.5 py-1.5 text-[11px] text-emerald-300">
+                      <span className="truncate font-semibold">✅ Foto enviada</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateFlavor(flavor.id, { imageUrl: '' })}
+                        className="text-slate-400 hover:text-rose-400 text-[10px] underline shrink-0"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={flavor.imageUrl || ''}
+                      placeholder="https://... ou clique em Foto"
+                      onChange={(e) =>
+                        handleUpdateFlavor(flavor.id, { imageUrl: e.target.value })
+                      }
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 font-mono placeholder-slate-600"
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Price & Availability Actions */}
+              <div className="flex items-center gap-3 shrink-0 justify-between lg:justify-end">
                 <div className="w-36">
                   <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
                     Valor Sabor / Extra (R$):

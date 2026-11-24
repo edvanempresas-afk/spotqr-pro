@@ -58,6 +58,7 @@ export function resolveItemAvailableFlavors(
         name: candidate.name,
         description: candidate.description,
         price: typeof candidate.price === 'number' ? candidate.price : 0,
+        imageUrl: candidate.imageUrl,
         isAvailable: candidate.isAvailable,
       }));
   }

@@ -397,8 +397,15 @@ export default function ItemMultiFlavorSection({
                                 : current.filter((id) => id !== fl.id);
                               onUpdateItem({ allowedFlavorIds: next });
                             }}
-                            className="w-3.5 h-3.5 rounded text-emerald-500"
+                            className="w-3.5 h-3.5 rounded text-emerald-500 shrink-0"
                           />
+                          {fl.imageUrl && (
+                            <img
+                              src={fl.imageUrl}
+                              alt={fl.name}
+                              className="w-6 h-6 rounded-md object-cover shrink-0 border border-slate-700"
+                            />
+                          )}
                           <span className="font-semibold truncate">
                             {fl.name || 'Sem nome'}
                           </span>
