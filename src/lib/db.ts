@@ -17,11 +17,15 @@ import {
   StoreOrder,
   StoreOrderItem,
   SelectedExtraItem,
+  SelectedFlavorItem,
+  SelectedSizeItem,
+  FlavorPricingRule,
   StoreOrderStatus,
   PixKeyType,
   ReferralConversion,
   AffiliatePayout,
 } from './types';
+import { calculateCustomizedUnitPrice } from './flavors';
 import { getItemStockInfo } from './stock';
 import { DEMO_PAYMENTS } from './payments';
 import { computeStableStoreCode, isProStillValid } from './pro-status';
@@ -2968,7 +2972,14 @@ export interface CreateOrderParams {
   tableNumber?: string;
   deliveryAddress?: string;
   paymentMethod?: string;
-  items: { id: string; quantity: number; selectedExtras?: SelectedExtraItem[] }[];
+  items: {
+    id: string;
+    quantity: number;
+    selectedSize?: SelectedSizeItem;
+    selectedFlavors?: SelectedFlavorItem[];
+    flavorPricingRule?: FlavorPricingRule;
+    selectedExtras?: SelectedExtraItem[];
+  }[];
   deliveryFee?: number;
   notes?: string;
 }
@@ -3094,30 +3105,76 @@ export async function createStoreOrder(
     }
 
     const itemPrice = typeof target.price === 'number' ? target.price : 0;
-    let extraPriceSum = 0;
+
+    let resolvedSize: SelectedSizeItem | undefined;
+    if (reqItem.selectedSize && reqItem.selectedSize.name) {
+      const matchedSize = (target.sizes || []).find(
+        (s) => s.id === reqItem.selectedSize?.id
+      );
+      resolvedSize = matchedSize
+        ? { id: matchedSize.id, name: matchedSize.name, price: matchedSize.price }
+        : {
+            id: reqItem.selectedSize.id || reqItem.selectedSize.name,
+            name: reqItem.selectedSize.name,
+            price: Number(reqItem.selectedSize.price) || 0,
+          };
+    }
+
+    const selectedFlavors: SelectedFlavorItem[] = [];
+    if (Array.isArray(reqItem.selectedFlavors)) {
+      for (const fl of reqItem.selectedFlavors) {
+        if (!fl || !fl.name) continue;
+        const fromMenuFlavors = (menu.flavors || []).find((f) => f.id === fl.id);
+        const fromMenuItems = (menu.items || []).find((it) => it.id === fl.id);
+        const authoritativePrice = fromMenuFlavors
+          ? Number(fromMenuFlavors.price) || 0
+          : fromMenuItems
+          ? Number(fromMenuItems.price) || 0
+          : Number(fl.price) || 0;
+        selectedFlavors.push({
+          id: fl.id || fl.name,
+          name: fl.name,
+          price: authoritativePrice,
+        });
+      }
+    }
+
     const selectedExtras: SelectedExtraItem[] = [];
     if (Array.isArray(reqItem.selectedExtras)) {
       for (const ex of reqItem.selectedExtras) {
         if (ex && ex.name && typeof ex.price === 'number') {
-          extraPriceSum += ex.price;
+          const fromMenuExtra = (menu.extras || []).find((e) => e.id === ex.id);
           selectedExtras.push({
             id: ex.id || ex.name,
             name: ex.name,
-            price: ex.price,
+            price: fromMenuExtra ? Number(fromMenuExtra.price) || 0 : ex.price,
           });
         }
       }
     }
-    const unitWithExtras = itemPrice + extraPriceSum;
-    subtotal += unitWithExtras * reqQty;
+
+    const pricingRule: FlavorPricingRule =
+      target.flavorPricingRule || reqItem.flavorPricingRule || 'highest';
+    const { unitPrice: unitCalculatedPrice } = calculateCustomizedUnitPrice({
+      baseItemPrice: itemPrice,
+      selectedSize: resolvedSize,
+      selectedFlavors,
+      flavorPricingRule: pricingRule,
+      selectedExtras,
+    });
+
+    subtotal += unitCalculatedPrice * reqQty;
 
     orderItems.push({
       id: target.id,
       name: target.name,
-      price: unitWithExtras,
+      price: unitCalculatedPrice,
       quantity: reqQty,
       stockMode: target.stockMode || 'unlimited',
       stockDeducted,
+      selectedSize: resolvedSize,
+      selectedFlavors: selectedFlavors.length > 0 ? selectedFlavors : undefined,
+      flavorPricingRule: selectedFlavors.length > 0 ? pricingRule : undefined,
       selectedExtras: selectedExtras.length > 0 ? selectedExtras : undefined,
     });
   }

@@ -539,11 +539,14 @@ export function StoreOrdersModal({
                             className="flex flex-wrap items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-slate-900/40 border border-slate-800/40 gap-2"
                           >
                             <div className="flex flex-col gap-0.5">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-emerald-400">
                                   {it.quantity}x
                                 </span>
-                                <span className="font-medium">{it.name}</span>
+                                <span className="font-medium">
+                                  {it.name}
+                                  {it.selectedSize ? ` (${it.selectedSize.name})` : ''}
+                                </span>
                                 {it.stockMode === 'unique' && (
                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 border border-purple-500/35 text-purple-300">
                                     💎 Peça Única {isPending ? '(Reservada)' : isCancelled ? '(Devolvida)' : '(Baixada)'}
@@ -555,6 +558,21 @@ export function StoreOrdersModal({
                                   </span>
                                 )}
                               </div>
+                              {it.selectedFlavors && it.selectedFlavors.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pl-5">
+                                  {it.selectedFlavors.map((fl, fIdx) => (
+                                    <span
+                                      key={`${fl.id}-${fIdx}`}
+                                      className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300"
+                                    >
+                                      {it.selectedFlavors && it.selectedFlavors.length > 1
+                                        ? `1/${it.selectedFlavors.length} `
+                                        : '🍕 '}
+                                      {fl.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {it.selectedExtras && it.selectedExtras.length > 0 && (
                                 <div className="flex flex-wrap gap-1 pl-5">
                                   {it.selectedExtras.map((ex) => (

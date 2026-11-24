@@ -66,6 +66,8 @@ import {
 } from '@/lib/theme';
 import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import ImageCropModal from './ImageCropModal';
+import MenuFlavorsTab from './MenuFlavorsTab';
+import ItemMultiFlavorSection from './ItemMultiFlavorSection';
 
 interface MenuEditorModalProps {
   isOpen: boolean;
@@ -193,7 +195,7 @@ export default function MenuEditorModal({
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'info' | 'categories' | 'items' | 'branding' | 'extras'
+    'info' | 'categories' | 'items' | 'branding' | 'extras' | 'flavors'
   >('items');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [creatingCategoryForItemId, setCreatingCategoryForItemId] = useState<
@@ -939,6 +941,14 @@ export default function MenuEditorModal({
               id: 'extras',
               label: `🍟 Adicionais & Extras (${menu?.extras?.length || 0})`,
             },
+            ...(!isCatalog
+              ? [
+                  {
+                    id: 'flavors',
+                    label: `🍕 Sabores (${menu?.flavors?.length || 0})`,
+                  },
+                ]
+              : []),
             {
               id: 'branding',
               label: '🎨 Visual, Logo & Cores',
@@ -2011,6 +2021,19 @@ export default function MenuEditorModal({
                                 </div>
                               )}
                             </div>
+
+                            {/* Multi-Flavor & Sizes Configuration (Pizzarias / Pastelarias) */}
+                            {!isCatalog && (
+                              <ItemMultiFlavorSection
+                                item={item}
+                                categories={menu.categories}
+                                menuFlavors={menu.flavors || []}
+                                onUpdateItem={(patch) =>
+                                  handleUpdateItem(item.id, patch)
+                                }
+                                onGoToFlavorsTab={() => setActiveTab('flavors')}
+                              />
+                            )}
                           </div>
 
                           {/* Availability & Delete Actions */}
@@ -2203,6 +2226,33 @@ export default function MenuEditorModal({
                     </div>
                   )}
                 </div>
+              )}
+
+              {/* TAB: SABORES & RECHEIOS (PIZZARIA / PASTELARIA) */}
+              {activeTab === 'flavors' && (
+                <MenuFlavorsTab
+                  flavors={menu.flavors || []}
+                  categories={menu.categories}
+                  menuItems={menu.items}
+                  onChangeFlavors={(nextFlavors) =>
+                    setMenu({ ...menu, flavors: nextFlavors })
+                  }
+                  onCleanupDeletedFlavor={(flavorId) =>
+                    setMenu((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            items: prev.items.map((it) => ({
+                              ...it,
+                              allowedFlavorIds: (it.allowedFlavorIds || []).filter(
+                                (id) => id !== flavorId
+                              ),
+                            })),
+                          }
+                        : prev
+                    )
+                  }
+                />
               )}
 
               {/* TAB: BRANDING (THEME, COLORS, LOGO & BACKGROUND COVER) */}

@@ -31,8 +31,18 @@ import {
   Layers,
   Camera,
 } from 'lucide-react';
-import { RestaurantMenu, MenuItem, MenuExtra, SelectedExtraItem } from '@/lib/types';
+import {
+  RestaurantMenu,
+  MenuItem,
+  MenuExtra,
+  MenuFlavor,
+  SelectedExtraItem,
+  SelectedFlavorItem,
+  SelectedSizeItem,
+  FlavorPricingRule,
+} from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
+import { resolveItemAvailableFlavors } from '@/lib/flavors';
 import { isProStillValid } from '@/lib/pro-status';
 import {
   getAcceptedPaymentOptions,
@@ -45,6 +55,9 @@ import Link from 'next/link';
 import AdBanner from '@/components/AdBanner';
 import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
 import TableQrScannerModal from '@/components/TableQrScannerModal';
+import ShowcaseCustomizeModal, {
+  CustomizedSelectionPayload,
+} from '@/components/ShowcaseCustomizeModal';
 
 function extractItemPhotos(
   targetItem: MenuItem | null | undefined,
@@ -69,6 +82,9 @@ interface CartItem {
   cartKey: string;
   item: MenuItem;
   quantity: number;
+  selectedSize?: SelectedSizeItem;
+  selectedFlavors?: SelectedFlavorItem[];
+  flavorPricingRule?: FlavorPricingRule;
   selectedExtras?: MenuExtra[];
   unitPrice: number;
 }
@@ -102,11 +118,9 @@ export default function DigitalShowcasePage({
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<Record<string, CartItem>>({});
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [customizingItem, setCustomizingItem] = useState<{
-    item: MenuItem;
-    selectedExtraIds: Set<string>;
-    quantity: number;
-  } | null>(null);
+  const [customizingProduct, setCustomizingProduct] = useState<MenuItem | null>(
+    null
+  );
 
   // Order details
   const [orderMode, setOrderMode] = useState<OrderMode>(
@@ -459,18 +473,45 @@ export default function DigitalShowcasePage({
     );
   };
 
+  const getItemAllowedFlavors = (targetItem: MenuItem): MenuFlavor[] =>
+    resolveItemAvailableFlavors(targetItem, menu);
+
+  const formatItemStartingPriceLabel = (targetItem: MenuItem): string => {
+    if (targetItem.sizes && targetItem.sizes.length > 0) {
+      const nonZeroSizes = targetItem.sizes
+        .map((s) => Number(s.price) || 0)
+        .filter((p) => p > 0);
+      if (nonZeroSizes.length > 0) {
+        return `A partir de R$ ${Math.min(...nonZeroSizes).toFixed(2)}`;
+      }
+    }
+    if (targetItem.allowFlavors && targetItem.price === 0) {
+      const flPrices = getItemAllowedFlavors(targetItem)
+        .map((f) => Number(f.price) || 0)
+        .filter((p) => p > 0);
+      if (flPrices.length > 0) {
+        return `A partir de R$ ${Math.min(...flPrices).toFixed(2)}`;
+      }
+      return 'Monte seus sabores';
+    }
+    return `R$ ${targetItem.price.toFixed(2)}`;
+  };
+
   const addToCart = (item: MenuItem) => {
     const stock = getItemStockInfo(item);
     if (!stock.canOrder || stock.maxQuantity <= 0) return;
     setClosedPixOrder(null);
 
     const availableExtras = getItemAllowedExtras(item);
-    if (availableExtras.length > 0) {
-      setCustomizingItem({
-        item,
-        selectedExtraIds: new Set<string>(),
-        quantity: 1,
-      });
+    const availableFlavors = getItemAllowedFlavors(item);
+    const hasSizes = Boolean(item.sizes && item.sizes.length > 0);
+    const needsCustomModal =
+      availableExtras.length > 0 ||
+      hasSizes ||
+      (Boolean(item.allowFlavors) && availableFlavors.length > 0);
+
+    if (needsCustomModal) {
+      setCustomizingProduct(item);
       return;
     }
 
@@ -492,28 +533,39 @@ export default function DigitalShowcasePage({
     });
   };
 
-  const handleConfirmCustomizedItem = () => {
-    if (!customizingItem) return;
-    const { item, selectedExtraIds, quantity } = customizingItem;
+  const handleConfirmCustomizedItem = (selection: CustomizedSelectionPayload) => {
+    const {
+      item,
+      quantity,
+      selectedSize,
+      selectedFlavors,
+      selectedExtras,
+      unitPrice,
+    } = selection;
     const stock = getItemStockInfo(item);
     if (!stock.canOrder || stock.maxQuantity <= 0) {
-      setCustomizingItem(null);
+      setCustomizingProduct(null);
       return;
     }
 
-    const allExtras = menu?.extras || [];
-    const chosenExtras = allExtras.filter((ex) => selectedExtraIds.has(ex.id));
-    const sortedExtraIds = chosenExtras.map((e) => e.id).sort();
+    const sizeKey = selectedSize?.id || 'default';
+    const flavorsKey = (selectedFlavors || [])
+      .map((f) => f.id)
+      .sort()
+      .join('+');
+    const extrasKey = (selectedExtras || [])
+      .map((e) => e.id)
+      .sort()
+      .join('+');
+    const compositeParts = [
+      sizeKey !== 'default' ? `sz_${sizeKey}` : '',
+      flavorsKey ? `fl_${flavorsKey}` : '',
+      extrasKey ? `ex_${extrasKey}` : '',
+    ].filter(Boolean);
     const cartKey =
-      sortedExtraIds.length > 0
-        ? `${item.id}:${sortedExtraIds.join('-')}`
+      compositeParts.length > 0
+        ? `${item.id}:${compositeParts.join('|')}`
         : item.id;
-
-    const extraCost = chosenExtras.reduce(
-      (sum, ex) => sum + (Number(ex.price) || 0),
-      0
-    );
-    const unitPrice = item.price + extraCost;
 
     setCart((prev) => {
       const currentTotalItemQty = Object.values(prev)
@@ -535,13 +587,19 @@ export default function DigitalShowcasePage({
           cartKey,
           item,
           quantity: newQty,
-          selectedExtras: chosenExtras,
+          selectedSize,
+          selectedFlavors,
+          flavorPricingRule:
+            selectedFlavors && selectedFlavors.length > 0
+              ? item.flavorPricingRule || 'highest'
+              : undefined,
+          selectedExtras,
           unitPrice,
         },
       };
     });
 
-    setCustomizingItem(null);
+    setCustomizingProduct(null);
   };
 
   const removeFromCart = (cartKey: string) => {
@@ -703,7 +761,15 @@ export default function DigitalShowcasePage({
         const lineTotal = (
           c.quantity * (c.unitPrice ?? c.item.price)
         ).toFixed(2);
-        let line = `• ${c.quantity}x ${c.item.name}${prodDaysInfo} — R$ ${lineTotal}`;
+        const sizeLabel = c.selectedSize ? ` [${c.selectedSize.name}]` : '';
+        let line = `• ${c.quantity}x ${c.item.name}${sizeLabel}${prodDaysInfo} — R$ ${lineTotal}`;
+        if (c.selectedFlavors && c.selectedFlavors.length > 0) {
+          const totalFl = c.selectedFlavors.length;
+          const flavorsStr = c.selectedFlavors
+            .map((fl) => (totalFl > 1 ? `1/${totalFl} ${fl.name}` : fl.name))
+            .join(', ');
+          line += `\n   ↳ *Sabores (${totalFl}):* ${flavorsStr}`;
+        }
         if (c.selectedExtras && c.selectedExtras.length > 0) {
           const extrasStr = c.selectedExtras
             .map((ex) => `+ ${ex.name} (+R$ ${Number(ex.price).toFixed(2)})`)
@@ -905,6 +971,9 @@ export default function DigitalShowcasePage({
           items: itemsList.map((c) => ({
             id: c.item.id,
             quantity: c.quantity,
+            selectedSize: c.selectedSize,
+            selectedFlavors: c.selectedFlavors,
+            flavorPricingRule: c.flavorPricingRule,
             selectedExtras: c.selectedExtras?.map((ex) => ({
               id: ex.id,
               name: ex.name,
@@ -1052,7 +1121,11 @@ export default function DigitalShowcasePage({
     const itemStock = getItemStockInfo(targetItem);
     const itemReachedMax = totalItemInCart >= itemStock.maxQuantity;
     const availableExtras = getItemAllowedExtras(targetItem);
+    const availableFlavors = getItemAllowedFlavors(targetItem);
+    const hasSizes = Boolean(targetItem.sizes && targetItem.sizes.length > 0);
+    const hasFlavors = Boolean(targetItem.allowFlavors && availableFlavors.length > 0);
     const hasExtras = availableExtras.length > 0;
+    const hasCustomization = hasExtras || hasFlavors || hasSizes;
 
     if (!itemStock.canOrder) {
       return (
@@ -1107,8 +1180,8 @@ export default function DigitalShowcasePage({
                   ? itemStock.isUnique
                     ? 'Peça única — máximo 1 unidade'
                     : `Estoque máximo disponível: ${itemStock.maxQuantity}`
-                  : hasExtras
-                  ? 'Adicionar mais com adicionais'
+                  : hasCustomization
+                  ? 'Montar mais uma opção'
                   : 'Adicionar mais uma unidade'
               }
               className={`p-1 rounded-lg transition ${
@@ -1127,6 +1200,14 @@ export default function DigitalShowcasePage({
               {itemStock.isUnique
                 ? 'Peça única (máx. 1)'
                 : `Máx. ${itemStock.maxQuantity} disp.`}
+            </span>
+          ) : hasFlavors || hasSizes ? (
+            <span
+              className={`text-[9px] font-bold ${
+                isLight ? 'text-amber-700' : 'text-amber-300'
+              }`}
+            >
+              🍕 Tamanhos &amp; Sabores
             </span>
           ) : hasExtras ? (
             <span
@@ -1154,10 +1235,15 @@ export default function DigitalShowcasePage({
         className="group/add shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold hover:brightness-105 active:scale-[0.97] shadow-md border transition-all whitespace-nowrap"
       >
         <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
-        <span>Adicionar</span>
-        {hasExtras && (
+        <span>{hasFlavors || hasSizes ? 'Montar' : 'Adicionar'}</span>
+        {!hasFlavors && !hasSizes && hasExtras && (
           <span className="text-[10px] font-medium opacity-90">
             (Opções)
+          </span>
+        )}
+        {(hasFlavors || hasSizes) && (
+          <span className="text-[10px] font-medium opacity-90">
+            (Sabores)
           </span>
         )}
         <span
@@ -1842,7 +1928,7 @@ export default function DigitalShowcasePage({
                             className="text-sm sm:text-base font-extrabold"
                             style={{ color: theme.readableAccentText }}
                           >
-                            R$ {item.price.toFixed(2)}
+                            {formatItemStartingPriceLabel(item)}
                           </span>
                           {(imageOnLeft || extractItemPhotos(item, isPro).length === 0) && (
                             <div className="ml-auto">{cartActionControl}</div>
@@ -2434,249 +2520,30 @@ export default function DigitalShowcasePage({
         </div>
       )}
 
-      {/* Item Customization & Extras Modal */}
-      {customizingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div
-            className={`relative w-full max-w-md border rounded-3xl p-6 shadow-2xl max-h-[90vh] flex flex-col ${modalBoxClass}`}
-          >
-            {/* Header */}
-            <div
-              className={`shrink-0 flex items-center justify-between pb-3 border-b ${
-                isLight ? 'border-slate-200' : 'border-slate-800'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🍟</span>
-                <div>
-                  <h3 className={`text-sm font-extrabold ${headingTextClass}`}>
-                    Adicionais & Complementos
-                  </h3>
-                  <p className={`text-[11px] ${mutedTextClass}`}>
-                    Personalize seu pedido do seu jeito
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCustomizingItem(null)}
-                className={`p-1.5 rounded-xl transition ${
-                  isLight
-                    ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                }`}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Item Info Banner */}
-            <div
-              className={`shrink-0 p-3 rounded-2xl my-3 border ${
-                isLight
-                  ? 'bg-slate-50 border-slate-200'
-                  : 'bg-slate-900/60 border-slate-800'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h4 className={`text-xs font-bold truncate ${headingTextClass}`}>
-                    {customizingItem.item.name}
-                  </h4>
-                  {customizingItem.item.description && (
-                    <p className={`text-[11px] line-clamp-2 mt-0.5 ${mutedTextClass}`}>
-                      {customizingItem.item.description}
-                    </p>
-                  )}
-                </div>
-                <span
-                  className="text-xs font-black shrink-0"
-                  style={{ color: theme.readableAccentText }}
-                >
-                  R$ {customizingItem.item.price.toFixed(2)}
-                </span>
-              </div>
-            </div>
-
-            {/* Extras Selection List */}
-            <div className="flex-1 min-h-0 overflow-y-auto py-1 space-y-2 pr-1">
-              <span
-                className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${
-                  isLight ? 'text-slate-500' : 'text-slate-400'
-                }`}
-              >
-                Escolha os adicionais desejados:
-              </span>
-
-              {getItemAllowedExtras(customizingItem.item).map((extra) => {
-                const isSelected = customizingItem.selectedExtraIds.has(extra.id);
-                return (
-                  <button
-                    key={extra.id}
-                    type="button"
-                    onClick={() => {
-                      setCustomizingItem((prev) => {
-                        if (!prev) return null;
-                        const nextSet = new Set(prev.selectedExtraIds);
-                        if (nextSet.has(extra.id)) {
-                          nextSet.delete(extra.id);
-                        } else {
-                          nextSet.add(extra.id);
-                        }
-                        return { ...prev, selectedExtraIds: nextSet };
-                      });
-                    }}
-                    className={`w-full flex items-center justify-between p-3 rounded-2xl border text-left transition-all ${
-                      isSelected
-                        ? isLight
-                          ? 'bg-emerald-50/90 border-emerald-400 text-slate-900 shadow-sm'
-                          : 'bg-emerald-500/15 border-emerald-500/50 text-white shadow-sm'
-                        : isLight
-                        ? 'bg-white border-slate-200 hover:border-slate-300 text-slate-800'
-                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700 text-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all shrink-0 ${
-                          isSelected
-                            ? 'bg-emerald-500 border-emerald-600 text-white'
-                            : isLight
-                            ? 'border-slate-300 bg-white'
-                            : 'border-slate-600 bg-slate-800'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                      </div>
-                      <span className="text-xs font-bold">
-                        {extra.name}
-                      </span>
-                    </div>
-
-                    <span
-                      className={`text-xs font-black shrink-0 ${
-                        isSelected
-                          ? isLight
-                            ? 'text-emerald-700'
-                            : 'text-emerald-400'
-                          : mutedTextClass
-                      }`}
-                    >
-                      + R$ {Number(extra.price).toFixed(2)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Quantity Stepper & Add Button */}
-            <div
-              className={`shrink-0 pt-4 mt-2 border-t space-y-3 ${
-                isLight ? 'border-slate-200' : 'border-slate-800'
-              }`}
-            >
-              {/* Stepper */}
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-bold ${labelTextClass}`}>
-                  Quantidade deste item:
-                </span>
-                <div
-                  className={`flex items-center gap-2 rounded-xl p-1 border ${
-                    isLight
-                      ? 'bg-slate-100 border-slate-200'
-                      : 'bg-slate-900 border-slate-800'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCustomizingItem((prev) =>
-                        prev
-                          ? { ...prev, quantity: Math.max(1, prev.quantity - 1) }
-                          : null
-                      )
-                    }
-                    disabled={customizingItem.quantity <= 1}
-                    className={`p-1.5 rounded-lg transition ${
-                      customizingItem.quantity <= 1
-                        ? 'opacity-30 cursor-not-allowed'
-                        : isLight
-                        ? 'hover:bg-white text-slate-700'
-                        : 'hover:bg-slate-800 text-white'
-                    }`}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span
-                    className={`text-xs font-black px-2 ${headingTextClass}`}
-                  >
-                    {customizingItem.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const stock = getItemStockInfo(customizingItem.item);
-                      const currentTotalInCart = Object.values(cart)
-                        .filter((c) => c.item.id === customizingItem.item.id)
-                        .reduce((sum, c) => sum + c.quantity, 0);
-                      const maxPossible = Math.max(
-                        0,
-                        stock.maxQuantity - currentTotalInCart
-                      );
-                      setCustomizingItem((prev) => {
-                        if (!prev) return null;
-                        if (prev.quantity >= maxPossible) return prev;
-                        return { ...prev, quantity: prev.quantity + 1 };
-                      });
-                    }}
-                    className={`p-1.5 rounded-lg transition ${
-                      isLight
-                        ? 'hover:bg-white text-slate-700'
-                        : 'hover:bg-slate-800 text-white'
-                    }`}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Total Calculation & Confirm Button */}
-              {(() => {
-                const allExtras = menu?.extras || [];
-                const chosenExtras = allExtras.filter((ex) =>
-                  customizingItem.selectedExtraIds.has(ex.id)
-                );
-                const extrasCost = chosenExtras.reduce(
-                  (sum, ex) => sum + (Number(ex.price) || 0),
-                  0
-                );
-                const unitTotal = customizingItem.item.price + extrasCost;
-                const grandTotal = unitTotal * customizingItem.quantity;
-
-                return (
-                  <button
-                    type="button"
-                    onClick={handleConfirmCustomizedItem}
-                    style={{
-                      backgroundColor: theme.accentHex,
-                      color: theme.accentTextOnSolid,
-                    }}
-                    className="w-full py-3 px-4 rounded-2xl text-xs font-black shadow-lg transition hover:brightness-105 active:scale-[0.98] flex items-center justify-between gap-2"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <ShoppingCart className="w-4 h-4 stroke-[2.4]" />
-                      <span>Adicionar ao Pedido</span>
-                    </span>
-                    <span className="font-extrabold text-sm">
-                      R$ {grandTotal.toFixed(2)}
-                    </span>
-                  </button>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Unified Item Customization Modal (Sizes + Multi-Flavor + Extras) */}
+      <ShowcaseCustomizeModal
+        item={customizingProduct}
+        availableExtras={
+          customizingProduct ? getItemAllowedExtras(customizingProduct) : []
+        }
+        availableFlavors={
+          customizingProduct ? getItemAllowedFlavors(customizingProduct) : []
+        }
+        maxRemainingStock={(() => {
+          if (!customizingProduct) return 999;
+          const stock = getItemStockInfo(customizingProduct);
+          const alreadyInCart = Object.values(cart)
+            .filter((c) => c.item.id === customizingProduct.id)
+            .reduce((sum, c) => sum + c.quantity, 0);
+          return Math.max(0, stock.maxQuantity - alreadyInCart);
+        })()}
+        isLight={isLight}
+        accentHex={theme.accentHex}
+        accentTextOnSolid={theme.accentTextOnSolid}
+        readableAccentText={theme.readableAccentText}
+        onClose={() => setCustomizingProduct(null)}
+        onConfirm={handleConfirmCustomizedItem}
+      />
 
       {/* Cart & WhatsApp Checkout Drawer/Modal */}
       {isCartOpen && (
@@ -2798,7 +2665,29 @@ export default function DigitalShowcasePage({
                     <div className="flex-1 min-w-0 pr-3">
                       <h4 className={`text-xs font-bold ${headingTextClass}`}>
                         {c.item.name}
+                        {c.selectedSize ? ` (${c.selectedSize.name})` : ''}
                       </h4>
+
+                      {/* Selected Flavors chips */}
+                      {c.selectedFlavors && c.selectedFlavors.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {c.selectedFlavors.map((fl, fIdx) => (
+                            <span
+                              key={`${fl.id}-${fIdx}`}
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                isLight
+                                  ? 'bg-amber-50 border-amber-200 text-amber-900'
+                                  : 'bg-amber-500/15 border-amber-500/30 text-amber-200'
+                              }`}
+                            >
+                              {c.selectedFlavors && c.selectedFlavors.length > 1
+                                ? `1/${c.selectedFlavors.length} `
+                                : '🍕 '}
+                              {fl.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Selected Extras chips */}
                       {c.selectedExtras && c.selectedExtras.length > 0 && (
@@ -3662,7 +3551,7 @@ export default function DigitalShowcasePage({
                         className="text-lg font-extrabold"
                         style={{ color: theme.readableAccentText }}
                       >
-                        R$ {zoomedItem.price.toFixed(2)}
+                        {formatItemStartingPriceLabel(zoomedItem)}
                       </span>
                     </div>
                     {renderCartActionControl(zoomedItem)}

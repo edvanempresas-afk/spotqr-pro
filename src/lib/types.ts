@@ -82,6 +82,24 @@ export interface MenuExtra {
   isAvailable?: boolean;
 }
 
+export type FlavorPricingRule = 'highest' | 'average' | 'sum';
+export type FlavorSourceMode = 'custom' | 'category';
+
+export interface MenuFlavor {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  isAvailable?: boolean;
+}
+
+export interface MenuSizeOption {
+  id: string;
+  name: string;
+  price: number;
+  maxFlavors: number;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -97,6 +115,13 @@ export interface MenuItem {
   stockQuantity?: number;
   allowExtras?: boolean; // Permite adicionais/extras (Bacon, Queijo, etc.)
   allowedExtraIds?: string[]; // IDs dos adicionais permitidos para este item
+  allowFlavors?: boolean; // Permite múltiplos sabores / tamanhos (ex: Pizza meio a meio, Pastel até 4 sabores)
+  maxFlavors?: number; // Quantidade máxima de sabores (ex: 2, 3, 4...)
+  flavorPricingRule?: FlavorPricingRule; // 'highest' | 'average' | 'sum'
+  flavorSourceMode?: FlavorSourceMode; // 'custom' (aba Sabores) | 'category' (puxa de categorias do cardápio)
+  flavorCategoryIds?: string[]; // Categorias de onde puxar sabores automaticamente
+  allowedFlavorIds?: string[]; // IDs dos sabores permitidos quando source='custom'
+  sizes?: MenuSizeOption[]; // Tamanhos opcionais (ex: Brotinho, Média, Grande, Família)
 }
 
 export interface MenuCategory {
@@ -123,6 +148,7 @@ export interface RestaurantMenu {
   categories: MenuCategory[];
   items: MenuItem[];
   extras?: MenuExtra[]; // Cadastro geral de adicionais / complementos da loja
+  flavors?: MenuFlavor[]; // Cadastro geral de sabores da loja (pizzas, pastéis, etc.)
   address?: string;
   wifiInfo?: string;
   pixKey?: string;
@@ -148,6 +174,18 @@ export interface SelectedExtraItem {
   price: number;
 }
 
+export interface SelectedFlavorItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface SelectedSizeItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface StoreOrderItem {
   id: string;
   name: string;
@@ -155,6 +193,9 @@ export interface StoreOrderItem {
   quantity: number;
   stockMode?: ProductStockMode;
   stockDeducted: number;
+  selectedSize?: SelectedSizeItem;
+  selectedFlavors?: SelectedFlavorItem[];
+  flavorPricingRule?: FlavorPricingRule;
   selectedExtras?: SelectedExtraItem[];
 }
 
