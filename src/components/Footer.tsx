@@ -72,6 +72,16 @@ export default function Footer({
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Catálogos & Cardápios Digitais</a></li>
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Pedidos sem Taxa pelo WhatsApp</a></li>
               <li><a href="#precos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Display de Balcão e Mesa A6/A5</a></li>
+              <li>
+                <Link
+                  href="/regras-indique-e-ganhe"
+                  className={`transition font-semibold flex items-center gap-1 ${
+                    isLight ? 'text-amber-700 hover:text-amber-800' : 'text-amber-400 hover:text-amber-300'
+                  }`}
+                >
+                  🎁 Indique &amp; Ganhe (Regras)
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -83,6 +93,14 @@ export default function Footer({
               <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>IA de Atendimento 24h no WhatsApp</a></li>
               <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Sistemas para Salão & Barbearia</a></li>
               <li><a href="/#desenvolvedor" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>Sites de Marcação de Consultas</a></li>
+              <li>
+                <Link
+                  href="/regras-indique-e-ganhe"
+                  className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}
+                >
+                  Regras do Indique &amp; Ganhe
+                </Link>
+              </li>
               <li><Link href="/login" className={`font-bold transition ${isLight ? 'text-emerald-600 hover:text-emerald-700' : 'text-emerald-400 hover:text-emerald-300'}`}>Acessar Minha Conta</Link></li>
             </ul>
             <div className="pt-2 text-xs text-slate-500" suppressHydrationWarning>
@@ -100,6 +118,15 @@ export default function Footer({
             <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>•</span>
             <Link href="/termos" className={`transition ${isLight ? 'hover:text-emerald-600' : 'hover:text-emerald-400'}`}>
               Termos de Uso
+            </Link>
+            <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>•</span>
+            <Link
+              href="/regras-indique-e-ganhe"
+              className={`transition font-bold ${
+                isLight ? 'text-amber-700 hover:text-amber-800' : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              Regras do Indique &amp; Ganhe
             </Link>
             <span className={isLight ? 'text-slate-300' : 'text-slate-600'}>•</span>
             <span className={`flex items-center gap-1.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>

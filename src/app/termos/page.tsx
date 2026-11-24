@@ -95,6 +95,25 @@ export default function TermosPage() {
             </p>
           </section>
 
+          <section className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              4. Programa de Afiliados (Indique &amp; Ganhe)
+            </h2>
+            <p>
+              A plataforma disponibiliza o programa oficial <strong>Indique &amp; Ganhe</strong>, permitindo que usuários cadastrados convidem lojistas e estabelecimentos comerciais para a adesão ao Plano PRO.
+            </p>
+            <p>
+              O usuário indicado recebe <strong>15% de desconto</strong> na primeira mensalidade (R$ 25,50), e o indicador recebe <strong>R$ 10,00 via PIX</strong> em até 48 horas após a confirmação do pagamento do Plano PRO pelo nosso robô. As comissões são de pagamento único (CPA — não recorrente), sendo vedada a auto-indicação. As regras e condições completas estão descritas no{' '}
+              <Link
+                href="/regras-indique-e-ganhe"
+                className="text-emerald-400 hover:text-emerald-300 font-bold underline"
+              >
+                Regulamento Oficial do Indique &amp; Ganhe
+              </Link>.
+            </p>
+          </section>
+
           <div className="pt-6 border-t border-slate-800 text-center">
             <Link
               href="/"

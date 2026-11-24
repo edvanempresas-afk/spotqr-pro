@@ -800,8 +800,17 @@ export default function DashboardPage() {
                       isLight ? 'text-slate-700' : 'text-slate-300'
                     }`}
                   >
-                    Dê <strong>15% de Desconto VIP</strong> (Plano PRO por apenas <strong>R$ 25,50</strong>) para outros lojistas, restaurantes e amigos. Quando eles assinarem, nós transferimos <strong>R$ 10,00 direto na sua chave PIX</strong> com comprovante bancário!
+                    Dê <strong>15% de Desconto VIP</strong> (Plano PRO por apenas <strong>R$ 25,50</strong>) para outros lojistas, restaurantes e amigos. O valor da comissão de <strong>R$ 10,00</strong> será pago na sua conta via PIX em <strong>até 48 horas</strong> após a confirmação do pagamento pelo nosso robô, com comprovante bancário arquivado no seu painel!
                   </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-semibold text-slate-400">
+                    <span className="inline-flex items-center gap-1 text-emerald-400">
+                      <Clock className="w-3.5 h-3.5" /> Pagamento em até 48h após confirmação do robô
+                    </span>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1 text-teal-400">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Comprovante bancário arquivado
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto shrink-0">

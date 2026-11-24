@@ -413,7 +413,7 @@ export default function ClientAffiliateModal({
             <li className="flex items-start gap-2">
               <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <span>
-                <strong>4. Pagamento direto no seu PIX:</strong> O valor acumulado será transferido para a sua chave cadastrada com o <strong>comprovante bancário anexado</strong> no seu painel para sua conferência.
+                <strong>4. Pagamento via PIX em até 48h após confirmação do robô:</strong> O valor da comissão será pago após a confirmação do pagamento do Plano PRO pelo nosso robô, podendo demorar até 48 horas úteis para ser creditado na sua conta, com o <strong>comprovante bancário anexado</strong> no seu painel para conferência.
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -423,6 +423,19 @@ export default function ClientAffiliateModal({
               </span>
             </li>
           </ul>
+
+          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+            <span className="text-slate-400">Dúvidas sobre o programa?</span>
+            <a
+              href="/regras-indique-e-ganhe"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
+            >
+              <span>Ver regulamento oficial completo</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
 
         {/* STEP 5: PAYOUTS HISTORY & RECEIPT ARCHIVE (Visible to the affiliate) */}
