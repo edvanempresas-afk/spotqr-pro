@@ -1,20 +1,27 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Plus, Trash2, Sparkles, Pizza } from 'lucide-react';
 import {
   FlavorPricingRule,
   FlavorSourceMode,
   MenuCategory,
   MenuFlavor,
+  MenuFlavorGroup,
   MenuItem,
   MenuSizeOption,
 } from '@/lib/types';
-import { FLAVOR_PRICING_LABELS } from '@/lib/flavors';
+import {
+  FLAVOR_PRICING_LABELS,
+  getFlavorsInGroup,
+  resolveFlavorGroupsWithLegacy,
+  UNGROUPED_FLAVOR_GROUP_ID,
+} from '@/lib/flavors';
 
 interface ItemMultiFlavorSectionProps {
   item: MenuItem;
   categories: MenuCategory[];
+  flavorGroups: MenuFlavorGroup[];
   menuFlavors: MenuFlavor[];
   onUpdateItem: (patch: Partial<MenuItem>) => void;
   onGoToFlavorsTab: () => void;
@@ -23,6 +30,7 @@ interface ItemMultiFlavorSectionProps {
 export default function ItemMultiFlavorSection({
   item,
   categories,
+  flavorGroups,
   menuFlavors,
   onUpdateItem,
   onGoToFlavorsTab,
@@ -32,25 +40,84 @@ export default function ItemMultiFlavorSection({
   const maxFlavors = Math.max(1, Math.min(8, item.maxFlavors || 2));
   const sizes = item.sizes || [];
 
+  const allGroups = useMemo(
+    () => resolveFlavorGroupsWithLegacy(flavorGroups, menuFlavors),
+    [flavorGroups, menuFlavors]
+  );
+  const validExplicitIds = useMemo(
+    () => new Set(flavorGroups.map((g) => g.id)),
+    [flavorGroups]
+  );
+
+  // Selected flavor groups when sourceMode === 'custom'
+  const selectedGroupIds = useMemo(() => {
+    if (Array.isArray(item.flavorGroupIds) && item.flavorGroupIds.length > 0) {
+      return item.flavorGroupIds;
+    }
+    // Legacy compatibility: if allowedFlavorIds existed before groups existed
+    if (Array.isArray(item.allowedFlavorIds) && item.allowedFlavorIds.length > 0) {
+      const allowedSet = new Set(item.allowedFlavorIds);
+      const inferredGroupIds = new Set<string>();
+      for (const fl of menuFlavors) {
+        if (!allowedSet.has(fl.id)) continue;
+        if (fl.groupId && validExplicitIds.has(fl.groupId)) {
+          inferredGroupIds.add(fl.groupId);
+        } else {
+          inferredGroupIds.add(UNGROUPED_FLAVOR_GROUP_ID);
+        }
+      }
+      return Array.from(inferredGroupIds);
+    }
+    return [];
+  }, [item.flavorGroupIds, item.allowedFlavorIds, menuFlavors, validExplicitIds]);
+
+  const flavorsVisibleForSelectedGroups = useMemo(() => {
+    const out: MenuFlavor[] = [];
+    for (const grpId of selectedGroupIds) {
+      out.push(...getFlavorsInGroup(menuFlavors, grpId, validExplicitIds));
+    }
+    return out;
+  }, [selectedGroupIds, menuFlavors, validExplicitIds]);
+
+  const excludedSet = useMemo(
+    () => new Set(item.excludedFlavorIds || []),
+    [item.excludedFlavorIds]
+  );
+
   const handleToggleAllowFlavors = (enabled: boolean) => {
     if (!enabled) {
       onUpdateItem({ allowFlavors: false });
       return;
     }
 
-    const allFlavorIds = menuFlavors.map((f) => f.id);
     const defaultSource: FlavorSourceMode =
       menuFlavors.length > 0 ? 'custom' : 'category';
+
+    // Smart initial group selection: match item name (pastel vs pizza) or pick first if only 1 group
+    let defaultGroupIds = item.flavorGroupIds || [];
+    if (defaultGroupIds.length === 0 && allGroups.length > 0) {
+      const lowerName = (item.name || '').toLowerCase();
+      const matched = allGroups.find((g) => {
+        const gLow = g.name.toLowerCase();
+        if (lowerName.includes('pastel') && gLow.includes('pastel')) return true;
+        if (lowerName.includes('pizza') && gLow.includes('pizza')) return true;
+        if (lowerName.includes('esfiha') && gLow.includes('esfiha')) return true;
+        if ((lowerName.includes('açai') || lowerName.includes('açaí')) && (gLow.includes('açai') || gLow.includes('açaí'))) return true;
+        return false;
+      });
+      if (matched) {
+        defaultGroupIds = [matched.id];
+      } else if (allGroups.length === 1) {
+        defaultGroupIds = [allGroups[0].id];
+      }
+    }
 
     onUpdateItem({
       allowFlavors: true,
       maxFlavors: item.maxFlavors || 2,
       flavorPricingRule: item.flavorPricingRule || 'highest',
       flavorSourceMode: item.flavorSourceMode || defaultSource,
-      allowedFlavorIds:
-        item.allowedFlavorIds && item.allowedFlavorIds.length > 0
-          ? item.allowedFlavorIds
-          : allFlavorIds,
+      flavorGroupIds: defaultGroupIds,
       flavorCategoryIds:
         item.flavorCategoryIds && item.flavorCategoryIds.length > 0
           ? item.flavorCategoryIds
@@ -92,10 +159,13 @@ export default function ItemMultiFlavorSection({
     onUpdateItem({ sizes: next.length > 0 ? next : undefined });
   };
 
-  const selectedCountText =
+  const activeFlavorCount =
     sourceMode === 'category'
       ? `${(item.flavorCategoryIds || []).length} categoria(s)`
-      : `${(item.allowedFlavorIds || []).length} sabor(es)`;
+      : `${
+          flavorsVisibleForSelectedGroups.filter((f) => !excludedSet.has(f.id))
+            .length
+        } sabor(es)`;
 
   return (
     <div className="sm:col-span-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-3">
@@ -117,7 +187,7 @@ export default function ItemMultiFlavorSection({
 
         {item.allowFlavors && (
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
-            Até {maxFlavors} sabor(es) • {selectedCountText}
+            Até {maxFlavors} sabor(es) • {activeFlavorCount}
           </span>
         )}
       </div>
@@ -282,8 +352,8 @@ export default function ItemMultiFlavorSection({
             )}
           </div>
 
-          {/* 3. De onde vêm os sabores? (Categoria do Cardápio OU Aba Sabores) */}
-          <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5">
+          {/* 3. De onde vêm os sabores? (Categoria do Cardápio OU Grupos da Aba Sabores) */}
+          <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[11px] font-bold text-white">
                 📋 De onde puxar a lista de sabores para este produto?
@@ -302,23 +372,19 @@ export default function ItemMultiFlavorSection({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const allIds = menuFlavors.map((f) => f.id);
+                  onClick={() =>
                     onUpdateItem({
                       flavorSourceMode: 'custom',
-                      allowedFlavorIds:
-                        item.allowedFlavorIds && item.allowedFlavorIds.length > 0
-                          ? item.allowedFlavorIds
-                          : allIds,
-                    });
-                  }}
+                      flavorGroupIds: selectedGroupIds,
+                    })
+                  }
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
                     sourceMode === 'custom'
                       ? 'bg-emerald-500 text-slate-950'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  🍕 Lista da Aba &ldquo;Sabores&rdquo;
+                  🍕 Grupos da Aba &ldquo;Sabores&rdquo;
                 </button>
               </div>
             </div>
@@ -326,7 +392,7 @@ export default function ItemMultiFlavorSection({
             {sourceMode === 'category' ? (
               <div className="space-y-2">
                 <p className="text-[10px] text-slate-400">
-                  Marque qual(is) categoria(s) contêm os sabores (ex: &ldquo;Pizzas Tradicionais&rdquo;). Todos os itens daquela categoria aparecerão automaticamente como opções de sabor!
+                  Marque qual(is) categoria(s) contêm os sabores (ex: &ldquo;Pizzas Tradicionais&rdquo;). Todos os itens daquela categoria aparecerão com foto automaticamente!
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {categories.map((cat) => {
@@ -358,9 +424,9 @@ export default function ItemMultiFlavorSection({
                   })}
                 </div>
               </div>
-            ) : menuFlavors.length === 0 ? (
+            ) : allGroups.length === 0 ? (
               <div className="text-xs text-amber-300/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                <span>Nenhum sabor cadastrado na aba Sabores ainda.</span>
+                <span>Nenhum grupo de sabores cadastrado na aba Sabores ainda.</span>
                 <button
                   type="button"
                   onClick={onGoToFlavorsTab}
@@ -370,55 +436,118 @@ export default function ItemMultiFlavorSection({
                 </button>
               </div>
             ) : (
-              <div className="space-y-2">
-                <p className="text-[10px] text-slate-400">
-                  Sabores marcados abaixo ficarão disponíveis ao cliente (todos vêm marcados por padrão):
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                  {menuFlavors.map((fl) => {
-                    const isChecked = (item.allowedFlavorIds || []).includes(fl.id);
-                    return (
-                      <label
-                        key={fl.id}
-                        className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${
-                          isChecked
-                            ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                            : 'bg-slate-950 border-slate-800 text-slate-400 opacity-60'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
+              <div className="space-y-3">
+                {/* Group Selection */}
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold text-slate-300 block">
+                    Selecione qual Grupo de Sabores este item usa (ex: marque só Pizzas ou só Pastéis):
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {allGroups.map((grp) => {
+                      const count = getFlavorsInGroup(
+                        menuFlavors,
+                        grp.id,
+                        validExplicitIds
+                      ).length;
+                      const isGrpSelected = selectedGroupIds.includes(grp.id);
+                      return (
+                        <label
+                          key={grp.id}
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs cursor-pointer transition ${
+                            isGrpSelected
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-200 font-extrabold'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
                           <input
                             type="checkbox"
-                            checked={isChecked}
+                            checked={isGrpSelected}
                             onChange={(e) => {
-                              const current = item.allowedFlavorIds || [];
-                              const next = e.target.checked
-                                ? [...current, fl.id]
-                                : current.filter((id) => id !== fl.id);
-                              onUpdateItem({ allowedFlavorIds: next });
+                              const nextGroupIds = e.target.checked
+                                ? [...selectedGroupIds, grp.id]
+                                : selectedGroupIds.filter((id) => id !== grp.id);
+                              onUpdateItem({
+                                flavorGroupIds: nextGroupIds,
+                                allowedFlavorIds: undefined,
+                              });
                             }}
-                            className="w-3.5 h-3.5 rounded text-emerald-500 shrink-0"
+                            className="accent-emerald-500 w-3.5 h-3.5"
                           />
-                          {fl.imageUrl && (
-                            <img
-                              src={fl.imageUrl}
-                              alt={fl.name}
-                              className="w-6 h-6 rounded-md object-cover shrink-0 border border-slate-700"
-                            />
-                          )}
-                          <span className="font-semibold truncate">
-                            {fl.name || 'Sem nome'}
-                          </span>
-                        </div>
-                        <span className="font-mono text-emerald-400 text-[11px] shrink-0 ml-1">
-                          {fl.price > 0
-                            ? `R$ ${Number(fl.price).toFixed(2).replace('.', ',')}`
-                            : 'Incluso'}
-                        </span>
-                      </label>
-                    );
-                  })}
+                          <span>{grp.icon || '🍽️'}</span>
+                          <span>{grp.name}</span>
+                          <span className="text-[10px] opacity-75">({count})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* Only Flavors from Selected Groups */}
+                {selectedGroupIds.length === 0 ? (
+                  <p className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl">
+                    Marque pelo menos 1 grupo acima (ex: 🍕 Pizzas ou 🥟 Pastéis) para exibir os sabores deste item.
+                  </p>
+                ) : flavorsVisibleForSelectedGroups.length > 0 ? (
+                  <div className="space-y-2 pt-1 border-t border-slate-800/70">
+                    <p className="text-[10px] text-slate-400">
+                      Sabores incluídos do(s) grupo(s) selecionado(s) — todos vêm marcados, desmarque se algum não servir para este item:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                      {flavorsVisibleForSelectedGroups.map((fl) => {
+                        const isLegacyExplicit =
+                          (!item.flavorGroupIds || item.flavorGroupIds.length === 0) &&
+                          Array.isArray(item.allowedFlavorIds);
+                        const isChecked = isLegacyExplicit
+                          ? item.allowedFlavorIds!.includes(fl.id)
+                          : !excludedSet.has(fl.id);
+                        return (
+                          <label
+                            key={fl.id}
+                            className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${
+                              isChecked
+                                ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 opacity-60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  const currExcluded = item.excludedFlavorIds || [];
+                                  const nextExcluded = e.target.checked
+                                    ? currExcluded.filter((id) => id !== fl.id)
+                                    : Array.from(new Set([...currExcluded, fl.id]));
+                                  onUpdateItem({
+                                    flavorGroupIds: selectedGroupIds,
+                                    excludedFlavorIds: nextExcluded,
+                                    allowedFlavorIds: undefined,
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded text-emerald-500 shrink-0"
+                              />
+                              {fl.imageUrl && (
+                                <img
+                                  src={fl.imageUrl}
+                                  alt={fl.name}
+                                  className="w-6 h-6 rounded-md object-cover shrink-0 border border-slate-700"
+                                />
+                              )}
+                              <span className="font-semibold truncate">
+                                {fl.name || 'Sem nome'}
+                              </span>
+                            </div>
+                            <span className="font-mono text-emerald-400 text-[11px] shrink-0 ml-1">
+                              {fl.price > 0
+                                ? `R$ ${Number(fl.price).toFixed(2).replace('.', ',')}`
+                                : 'Incluso'}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>

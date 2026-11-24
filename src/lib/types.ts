@@ -85,8 +85,15 @@ export interface MenuExtra {
 export type FlavorPricingRule = 'highest' | 'average' | 'sum';
 export type FlavorSourceMode = 'custom' | 'category';
 
+export interface MenuFlavorGroup {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
 export interface MenuFlavor {
   id: string;
+  groupId?: string; // Separa sabores por tipo (ex: Pizzas, Pastéis, Esfihas...)
   name: string;
   description?: string;
   price: number;
@@ -121,7 +128,9 @@ export interface MenuItem {
   flavorPricingRule?: FlavorPricingRule; // 'highest' | 'average' | 'sum'
   flavorSourceMode?: FlavorSourceMode; // 'custom' (aba Sabores) | 'category' (puxa de categorias do cardápio)
   flavorCategoryIds?: string[]; // Categorias de onde puxar sabores automaticamente
-  allowedFlavorIds?: string[]; // IDs dos sabores permitidos quando source='custom'
+  flavorGroupIds?: string[]; // Grupos da aba Sabores selecionados (ex: só grupo Pizzas ou só grupo Pastéis)
+  excludedFlavorIds?: string[]; // Sabores desmarcados manualmente dentro dos grupos escolhidos
+  allowedFlavorIds?: string[]; // Compatibilidade com listas antigas sem grupo
   sizes?: MenuSizeOption[]; // Tamanhos opcionais (ex: Brotinho, Média, Grande, Família)
 }
 
@@ -149,6 +158,7 @@ export interface RestaurantMenu {
   categories: MenuCategory[];
   items: MenuItem[];
   extras?: MenuExtra[]; // Cadastro geral de adicionais / complementos da loja
+  flavorGroups?: MenuFlavorGroup[]; // Grupos separados de sabores (ex: Pizzas, Pastéis, Açaí)
   flavors?: MenuFlavor[]; // Cadastro geral de sabores da loja (pizzas, pastéis, etc.)
   address?: string;
   wifiInfo?: string;

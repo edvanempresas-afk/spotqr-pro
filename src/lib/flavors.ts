@@ -1,12 +1,52 @@
 import {
   FlavorPricingRule,
   MenuFlavor,
+  MenuFlavorGroup,
   MenuItem,
   RestaurantMenu,
   SelectedExtraItem,
   SelectedFlavorItem,
   SelectedSizeItem,
 } from './types';
+
+export const UNGROUPED_FLAVOR_GROUP_ID = '__ungrouped__';
+
+/**
+ * Returns flavor groups including a synthetic "Sabores Gerais" group only when
+ * legacy flavors exist without an explicit groupId.
+ */
+export function resolveFlavorGroupsWithLegacy(
+  flavorGroups: MenuFlavorGroup[] | undefined,
+  flavors: MenuFlavor[] | undefined
+): MenuFlavorGroup[] {
+  const explicit = [...(flavorGroups || [])];
+  const validIds = new Set(explicit.map((g) => g.id));
+  const hasOrphaned = (flavors || []).some(
+    (fl) => !fl.groupId || !validIds.has(fl.groupId)
+  );
+  if (hasOrphaned) {
+    explicit.push({
+      id: UNGROUPED_FLAVOR_GROUP_ID,
+      name: 'Sabores Gerais (Sem Grupo)',
+      icon: '🍽️',
+    });
+  }
+  return explicit;
+}
+
+export function getFlavorsInGroup(
+  flavors: MenuFlavor[] | undefined,
+  groupId: string,
+  validGroupIds?: Set<string>
+): MenuFlavor[] {
+  const all = flavors || [];
+  if (groupId === UNGROUPED_FLAVOR_GROUP_ID) {
+    return all.filter(
+      (fl) => !fl.groupId || (validGroupIds && !validGroupIds.has(fl.groupId))
+    );
+  }
+  return all.filter((fl) => fl.groupId === groupId);
+}
 
 export const FLAVOR_PRICING_LABELS: Record<
   FlavorPricingRule,
@@ -61,6 +101,21 @@ export function resolveItemAvailableFlavors(
         imageUrl: candidate.imageUrl,
         isAvailable: candidate.isAvailable,
       }));
+  }
+
+  if (Array.isArray(item.flavorGroupIds) && item.flavorGroupIds.length > 0) {
+    const selectedGroupSet = new Set(item.flavorGroupIds);
+    const excludedSet = new Set(item.excludedFlavorIds || []);
+    const validIds = new Set((menu.flavorGroups || []).map((g) => g.id));
+
+    return (menu.flavors || []).filter((fl) => {
+      if (fl.isAvailable === false || excludedSet.has(fl.id)) return false;
+      const inSelectedExplicit = Boolean(fl.groupId && selectedGroupSet.has(fl.groupId));
+      const inSelectedLegacy =
+        selectedGroupSet.has(UNGROUPED_FLAVOR_GROUP_ID) &&
+        (!fl.groupId || !validIds.has(fl.groupId));
+      return inSelectedExplicit || inSelectedLegacy;
+    });
   }
 
   const allowedSet = new Set(item.allowedFlavorIds || []);

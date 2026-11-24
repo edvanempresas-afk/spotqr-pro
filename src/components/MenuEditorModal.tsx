@@ -943,17 +943,17 @@ export default function MenuEditorModal({
         )}
 
         {/* Navigation Sub-Tabs */}
-        <div className="shrink-0 flex sm:flex-wrap items-center border-b border-slate-800 px-4 sm:px-6 bg-slate-900/60 gap-2 sm:gap-5 overflow-x-auto sm:overflow-visible">
+        <div className="shrink-0 flex sm:flex-wrap items-center border-b border-slate-800 px-4 sm:px-6 bg-slate-900/60 gap-1.5 sm:gap-3.5 overflow-x-auto sm:overflow-visible">
           {[
             {
               id: 'items',
               label: isCatalog
                 ? `🛍️ Produtos (${menu?.items.length || 0})`
-                : `🍔 Pratos & Produtos (${menu?.items.length || 0})`,
+                : `🍔 Pratos (${menu?.items.length || 0})`,
             },
             {
               id: 'extras',
-              label: `🍟 Adicionais & Extras (${menu?.extras?.length || 0})`,
+              label: `🍟 Adicionais (${menu?.extras?.length || 0})`,
             },
             ...(!isCatalog
               ? [
@@ -965,14 +965,14 @@ export default function MenuEditorModal({
               : []),
             {
               id: 'branding',
-              label: '🎨 Visual, Logo & Cores',
+              label: '🎨 Visual & Logo',
             },
             { id: 'categories', label: `📂 Categorias (${menu?.categories.length || 0})` },
             {
               id: 'info',
               label: isCatalog
-                ? '⚙️ Dados da Loja, WhatsApp & PIX'
-                : '⚙️ Dados do Restaurante, WhatsApp & PIX',
+                ? '⚙️ Dados & PIX'
+                : '⚙️ Dados, Entrega & PIX',
             },
           ].map((tab) => (
             <button
@@ -2041,6 +2041,7 @@ export default function MenuEditorModal({
                               <ItemMultiFlavorSection
                                 item={item}
                                 categories={menu.categories}
+                                flavorGroups={menu.flavorGroups || []}
                                 menuFlavors={menu.flavors || []}
                                 onUpdateItem={(patch) =>
                                   handleUpdateItem(item.id, patch)
@@ -2245,11 +2246,16 @@ export default function MenuEditorModal({
               {/* TAB: SABORES & RECHEIOS (PIZZARIA / PASTELARIA) */}
               {activeTab === 'flavors' && (
                 <MenuFlavorsTab
+                  flavorGroups={menu.flavorGroups || []}
                   flavors={menu.flavors || []}
                   categories={menu.categories}
                   menuItems={menu.items}
-                  onChangeFlavors={(nextFlavors) =>
-                    setMenu({ ...menu, flavors: nextFlavors })
+                  onChangeFlavorData={(nextGroups, nextFlavors) =>
+                    setMenu({
+                      ...menu,
+                      flavorGroups: nextGroups,
+                      flavors: nextFlavors,
+                    })
                   }
                   onCleanupDeletedFlavor={(flavorId) =>
                     setMenu((prev) =>
@@ -2260,6 +2266,24 @@ export default function MenuEditorModal({
                               ...it,
                               allowedFlavorIds: (it.allowedFlavorIds || []).filter(
                                 (id) => id !== flavorId
+                              ),
+                              excludedFlavorIds: (it.excludedFlavorIds || []).filter(
+                                (id) => id !== flavorId
+                              ),
+                            })),
+                          }
+                        : prev
+                    )
+                  }
+                  onCleanupDeletedGroup={(groupId) =>
+                    setMenu((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            items: prev.items.map((it) => ({
+                              ...it,
+                              flavorGroupIds: (it.flavorGroupIds || []).filter(
+                                (id) => id !== groupId
                               ),
                             })),
                           }
