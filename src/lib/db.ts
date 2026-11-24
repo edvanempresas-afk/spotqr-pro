@@ -3000,6 +3000,36 @@ export async function createStoreOrder(
     return { success: false, error: 'Seu carrinho está vazio.' };
   }
 
+  const trimmedCustomerName = String(params.customerName || '').trim();
+  if (!trimmedCustomerName) {
+    return { success: false, error: 'Informe o seu nome para finalizar o pedido.' };
+  }
+
+  const isMenuTableOrder =
+    params.orderMode === 'table' && menu.mode !== 'catalog';
+  const menuAllowOnSite = menu.allowOnSite ?? menu.mode !== 'catalog';
+  if (params.orderMode === 'table' && !menuAllowOnSite) {
+    return {
+      success: false,
+      error: 'Este estabelecimento não trabalha com pedidos na mesa no momento.',
+    };
+  }
+  if (isMenuTableOrder && !String(params.tableNumber || '').trim()) {
+    return {
+      success: false,
+      error: 'Informe o número da sua mesa ou escaneie o QR Code da mesa.',
+    };
+  }
+  if (
+    params.orderMode === 'delivery' &&
+    !String(params.deliveryAddress || '').trim()
+  ) {
+    return {
+      success: false,
+      error: 'Informe o endereço completo para entrega.',
+    };
+  }
+
   // 1. Pre-validate stock for limited and unique items
   for (const reqItem of params.items) {
     const target = menu.items.find((i) => i.id === reqItem.id);

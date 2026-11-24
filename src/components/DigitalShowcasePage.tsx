@@ -29,6 +29,7 @@ import {
   AlertCircle,
   ArrowUp,
   Layers,
+  Camera,
 } from 'lucide-react';
 import { RestaurantMenu, MenuItem, MenuExtra, SelectedExtraItem } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
@@ -43,6 +44,7 @@ import { renderPixQrDataUrl } from '@/lib/qr-canvas';
 import Link from 'next/link';
 import AdBanner from '@/components/AdBanner';
 import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
+import TableQrScannerModal from '@/components/TableQrScannerModal';
 
 function extractItemPhotos(
   targetItem: MenuItem | null | undefined,
@@ -111,6 +113,8 @@ export default function DigitalShowcasePage({
     defaultMode === 'catalog' ? 'delivery' : 'table'
   );
   const [tableNumber, setTableNumber] = useState('');
+  const [tableScannedFromQr, setTableScannedFromQr] = useState(false);
+  const [isTableScannerOpen, setIsTableScannerOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<string>('');
@@ -119,6 +123,11 @@ export default function DigitalShowcasePage({
   const [notes, setNotes] = useState('');
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutFieldErrors, setCheckoutFieldErrors] = useState<{
+    table?: string;
+    name?: string;
+    address?: string;
+  }>({});
 
   // Quick actions & post-checkout PIX order lock
   const [copiedWifi, setCopiedWifi] = useState(false);
@@ -222,6 +231,7 @@ export default function DigitalShowcasePage({
           ? cleanMesa
           : `Mesa ${cleanMesa}`;
         setTableNumber(formatted);
+        setTableScannedFromQr(true);
         setOrderMode('table');
       }
     }
@@ -796,9 +806,50 @@ export default function DigitalShowcasePage({
   const handleConfirmCheckout = async () => {
     if (!menu || checkoutSubmitting) return;
     setCheckoutError(null);
+    setCheckoutFieldErrors({});
 
     const itemsList = Object.values(cart);
     if (itemsList.length === 0) return;
+
+    const activeOrderMode = enabledModes.length > 0 ? orderMode : 'direct';
+    const fieldErrors: { table?: string; name?: string; address?: string } = {};
+
+    if (activeOrderMode === 'table') {
+      if (!isCatalog && !tableNumber.trim()) {
+        fieldErrors.table =
+          'Informe o número da sua mesa ou use o leitor de QR Code.';
+      }
+      if (!customerName.trim()) {
+        fieldErrors.name =
+          'Informe o seu nome para identificarmos o seu pedido.';
+      }
+    } else if (activeOrderMode === 'delivery') {
+      if (!deliveryAddress.trim()) {
+        fieldErrors.address =
+          'Informe o endereço completo para a entrega.';
+      }
+      if (!customerName.trim()) {
+        fieldErrors.name = 'Informe o seu nome para identificarmos o pedido.';
+      }
+    } else if (activeOrderMode === 'pickup') {
+      if (!customerName.trim()) {
+        fieldErrors.name =
+          'Informe o seu nome para identificarmos seu pedido na retirada.';
+      }
+    } else if (!customerName.trim()) {
+      fieldErrors.name = 'Informe o seu nome para enviar o pedido.';
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      setCheckoutFieldErrors(fieldErrors);
+      setCheckoutError(
+        fieldErrors.table ||
+          fieldErrors.address ||
+          fieldErrors.name ||
+          'Preencha os campos obrigatórios para finalizar.'
+      );
+      return;
+    }
 
     if (showCashChangeOption && needsChange) {
       if (parsedChangeFor <= 0) {
@@ -823,7 +874,6 @@ export default function DigitalShowcasePage({
     let orderId = `PED${Date.now().toString().slice(-6)}`;
 
     try {
-      const activeOrderMode = enabledModes.length > 0 ? orderMode : 'direct';
       const resolvedPaymentText =
         acceptedPaymentOptions.length > 0
           ? paymentMethod || acceptedPaymentOptions[0].whatsappLabel
@@ -842,7 +892,7 @@ export default function DigitalShowcasePage({
         body: JSON.stringify({
           action: 'create',
           slug: menu.slug,
-          customerName: customerName.trim() || 'Cliente WhatsApp',
+          customerName: customerName.trim(),
           customerPhone: undefined,
           orderMode: activeOrderMode,
           tableNumber:
@@ -1441,15 +1491,22 @@ export default function DigitalShowcasePage({
                       <span>Retirada no Local</span>
                     </span>
                   )}
-                  {allowOnSite && isCatalog && (
+                  {allowOnSite && (
                     <span
                       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${pillMutedClass}`}
                     >
-                      <ShoppingBag
-                        className="w-3 h-3"
-                        style={{ color: theme.readableAccentText }}
-                      />
-                      <span>Presencial</span>
+                      {isCatalog ? (
+                        <ShoppingBag
+                          className="w-3 h-3"
+                          style={{ color: theme.readableAccentText }}
+                        />
+                      ) : (
+                        <Utensils
+                          className="w-3 h-3"
+                          style={{ color: theme.readableAccentText }}
+                        />
+                      )}
+                      <span>{isCatalog ? 'Presencial' : 'Pedidos na Mesa'}</span>
                     </span>
                   )}
                   {acceptedPaymentOptions.length > 0 && (
@@ -1490,12 +1547,14 @@ export default function DigitalShowcasePage({
               </div>
             </div>
 
-            {/* Quick Assistance Bar (Waiter/Seller) — Só exibe se o cliente leu o QR da mesa (?mesa=X) e o lojista ativou a opção */}
+            {/* Quick Assistance Bar (Waiter/Seller) — Só exibe se o lojista aceitar atendimento na mesa + ativou o botão + cliente leu o QR da mesa */}
             {(() => {
               const allowCallWaiter = menu?.allowCallWaiter !== false;
-              const hasTableScanned = Boolean(tableNumber && tableNumber.trim());
+              const hasTableScanned =
+                tableScannedFromQr && Boolean(tableNumber && tableNumber.trim());
               const canShowCallWaiter =
                 !isCatalog &&
+                allowOnSite &&
                 allowCallWaiter &&
                 hasTableScanned &&
                 Boolean(menu?.whatsappNumber);
@@ -2688,7 +2747,11 @@ export default function DigitalShowcasePage({
                     <button
                       key={modeKey}
                       type="button"
-                      onClick={() => setOrderMode(modeKey)}
+                      onClick={() => {
+                        setOrderMode(modeKey);
+                        setCheckoutFieldErrors({});
+                        setCheckoutError(null);
+                      }}
                       style={
                         isActive
                           ? {
@@ -2841,48 +2904,129 @@ export default function DigitalShowcasePage({
                     <label
                       className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
                     >
-                      Seu Nome:
+                      Seu Nome <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="text"
                       placeholder="Ex: Carlos"
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                      onChange={(e) => {
+                        setCustomerName(e.target.value);
+                        setCheckoutFieldErrors((p) => ({ ...p, name: undefined }));
+                        setCheckoutError(null);
+                      }}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                        checkoutFieldErrors.name
+                          ? 'border-rose-500 ring-1 ring-rose-500/40'
+                          : ''
+                      }`}
                     />
+                    {checkoutFieldErrors.name && (
+                      <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                        {checkoutFieldErrors.name}
+                      </p>
+                    )}
                   </div>
                 )}
 
                 {enabledModes.includes('table') && orderMode === 'table' && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label
-                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
-                      >
-                        {isCatalog ? 'Balcão / Stand (opcional):' : 'Número da Mesa:'}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={isCatalog ? 'Ex: Balcão Principal' : 'Ex: Mesa 04'}
-                        value={tableNumber}
-                        onChange={(e) => setTableNumber(e.target.value)}
-                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
-                      />
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label
+                          className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                        >
+                          {isCatalog ? (
+                            'Balcão / Stand (opcional):'
+                          ) : (
+                            <>
+                              Número da Mesa{' '}
+                              <span className="text-rose-400">*</span>
+                            </>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={
+                            isCatalog ? 'Ex: Balcão Principal' : 'Ex: Mesa 04'
+                          }
+                          value={tableNumber}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setTableNumber(v);
+                            if (!v.trim()) setTableScannedFromQr(false);
+                            setCheckoutFieldErrors((p) => ({
+                              ...p,
+                              table: undefined,
+                            }));
+                            setCheckoutError(null);
+                          }}
+                          className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                            checkoutFieldErrors.table
+                              ? 'border-rose-500 ring-1 ring-rose-500/40'
+                              : ''
+                          }`}
+                        />
+                        {checkoutFieldErrors.table && (
+                          <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                            {checkoutFieldErrors.table}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label
+                          className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+                        >
+                          Seu Nome <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Carlos"
+                          value={customerName}
+                          onChange={(e) => {
+                            setCustomerName(e.target.value);
+                            setCheckoutFieldErrors((p) => ({
+                              ...p,
+                              name: undefined,
+                            }));
+                            setCheckoutError(null);
+                          }}
+                          className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                            checkoutFieldErrors.name
+                              ? 'border-rose-500 ring-1 ring-rose-500/40'
+                              : ''
+                          }`}
+                        />
+                        {checkoutFieldErrors.name && (
+                          <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                            {checkoutFieldErrors.name}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label
-                        className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
+
+                    {!isCatalog && (
+                      <button
+                        type="button"
+                        onClick={() => setIsTableScannerOpen(true)}
+                        className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border text-[11px] font-bold transition ${
+                          tableScannedFromQr && tableNumber.trim()
+                            ? isLight
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                              : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                            : isLight
+                            ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                            : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-200'
+                        }`}
                       >
-                        Seu Nome:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Carlos"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
-                      />
-                    </div>
+                        <Camera className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {tableScannedFromQr && tableNumber.trim()
+                            ? `✅ QR Code da ${tableNumber} lido • Ler outra mesa (opcional)`
+                            : '📷 Ler QR Code da Mesa (opcional)'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -2892,29 +3036,62 @@ export default function DigitalShowcasePage({
                       <label
                         className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
                       >
-                        Endereço Completo para Entrega / Envio:
+                        Endereço Completo para Entrega / Envio{' '}
+                        <span className="text-rose-400">*</span>
                       </label>
                       <input
                         type="text"
                         placeholder="Rua, Número, Bairro, Cidade / CEP"
                         value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                        onChange={(e) => {
+                          setDeliveryAddress(e.target.value);
+                          setCheckoutFieldErrors((p) => ({
+                            ...p,
+                            address: undefined,
+                          }));
+                          setCheckoutError(null);
+                        }}
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                          checkoutFieldErrors.address
+                            ? 'border-rose-500 ring-1 ring-rose-500/40'
+                            : ''
+                        }`}
                       />
+                      {checkoutFieldErrors.address && (
+                        <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                          {checkoutFieldErrors.address}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <label
                         className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
                       >
-                        Seu Nome:
+                        Seu Nome <span className="text-rose-400">*</span>
                       </label>
                       <input
                         type="text"
                         placeholder="Ex: Carlos"
                         value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                        onChange={(e) => {
+                          setCustomerName(e.target.value);
+                          setCheckoutFieldErrors((p) => ({
+                            ...p,
+                            name: undefined,
+                          }));
+                          setCheckoutError(null);
+                        }}
+                        className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                          checkoutFieldErrors.name
+                            ? 'border-rose-500 ring-1 ring-rose-500/40'
+                            : ''
+                        }`}
                       />
+                      {checkoutFieldErrors.name && (
+                        <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                          {checkoutFieldErrors.name}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2924,15 +3101,32 @@ export default function DigitalShowcasePage({
                     <label
                       className={`text-xs font-semibold block mb-1 ${labelTextClass}`}
                     >
-                      Seu Nome para Retirada:
+                      Seu Nome para Retirada{' '}
+                      <span className="text-rose-400">*</span>
                     </label>
                     <input
                       type="text"
                       placeholder="Ex: Carlos"
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass}`}
+                      onChange={(e) => {
+                        setCustomerName(e.target.value);
+                        setCheckoutFieldErrors((p) => ({
+                          ...p,
+                          name: undefined,
+                        }));
+                        setCheckoutError(null);
+                      }}
+                      className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none ${inputFieldClass} ${
+                        checkoutFieldErrors.name
+                          ? 'border-rose-500 ring-1 ring-rose-500/40'
+                          : ''
+                      }`}
                     />
+                    {checkoutFieldErrors.name && (
+                      <p className="text-[11px] text-rose-400 font-semibold mt-1">
+                        {checkoutFieldErrors.name}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -3478,6 +3672,22 @@ export default function DigitalShowcasePage({
             </div>
           );
         })()}
+
+      {/* Optional Table QR Code Scanner Modal */}
+      <TableQrScannerModal
+        isOpen={isTableScannerOpen}
+        onClose={() => setIsTableScannerOpen(false)}
+        onTableDetected={(detectedTable) => {
+          setTableNumber(detectedTable);
+          setTableScannedFromQr(true);
+          setCheckoutFieldErrors((p) => ({ ...p, table: undefined }));
+          setCheckoutError(null);
+          setIsTableScannerOpen(false);
+        }}
+        isLight={isLight}
+        accentHex={theme.accentHex}
+        accentTextOnSolid={theme.accentTextOnSolid}
+      />
     </div>
   );
 }

@@ -1088,9 +1088,14 @@ export default function MenuEditorModal({
 
                         <button
                           type="button"
-                          onClick={() =>
-                            setMenu({ ...menu, allowOnSite: !allowOnSite })
-                          }
+                          onClick={() => {
+                            const nextOnSite = !allowOnSite;
+                            setMenu({
+                              ...menu,
+                              allowOnSite: nextOnSite,
+                              ...(nextOnSite ? {} : { allowCallWaiter: false }),
+                            });
+                          }}
                           className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
                             allowOnSite
                               ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
@@ -3170,18 +3175,28 @@ export default function MenuEditorModal({
                           <input
                             type="checkbox"
                             checked={allowOnSite}
-                            onChange={(e) =>
-                              setMenu({ ...menu, allowOnSite: e.target.checked })
-                            }
+                            onChange={(e) => {
+                              const nextOnSite = e.target.checked;
+                              setMenu({
+                                ...menu,
+                                allowOnSite: nextOnSite,
+                                ...(nextOnSite ? {} : { allowCallWaiter: false }),
+                              });
+                            }}
                             className="accent-emerald-500 w-4 h-4"
                           />
                           <span>
                             {isCatalog
                               ? 'Atendimento Presencial / Balcão'
-                              : 'Pedidos na Mesa (QR nas Mesas)'}
+                              : 'Pedidos na Mesa (desmarque se só faz Retirada/Delivery)'}
                           </span>
                         </label>
                       </div>
+                      {!allowDelivery && allowPickup && !allowOnSite && (
+                        <p className="text-[10px] text-emerald-300/90 mt-2 bg-emerald-500/10 border border-emerald-500/25 rounded-lg px-2.5 py-1">
+                          ✓ Modo exclusivo <strong>Retirada no Local</strong>: o cliente não verá opção de Mesa nem de Delivery.
+                        </p>
+                      )}
                     </div>
 
                     <div className="md:col-span-2 pt-3 border-t border-slate-800/80">
@@ -3276,7 +3291,11 @@ export default function MenuEditorModal({
                   </div>
 
                   {/* Botão Chamar Garçom na Mesa (Switch Estilo iPhone / iOS) */}
-                  <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 gap-4">
+                  <div
+                    className={`flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 gap-4 ${
+                      !isCatalog && !allowOnSite ? 'opacity-55' : ''
+                    }`}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <Bell className="w-4 h-4 text-amber-400 shrink-0" />
@@ -3287,17 +3306,23 @@ export default function MenuEditorModal({
                         </span>
                         <span
                           className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
-                            allowCallWaiter
+                            (isCatalog || allowOnSite) && allowCallWaiter
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                               : 'bg-slate-800 text-slate-400 border border-slate-700'
                           }`}
                         >
-                          {allowCallWaiter ? 'Ativado' : 'Desativado'}
+                          {!isCatalog && !allowOnSite
+                            ? 'Sem Mesa'
+                            : allowCallWaiter
+                            ? 'Ativado'
+                            : 'Desativado'}
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-400 block mt-1 leading-relaxed">
                         {isCatalog
                           ? 'Exibe o botão de contato direto no WhatsApp para tirar dúvidas sobre produtos.'
+                          : !allowOnSite
+                          ? 'Ative "Pedidos na Mesa" acima caso seu estabelecimento possua atendimento em mesas.'
                           : 'Quando ativado, o botão SÓ aparece quando o cliente lê o QR Code da mesa (?mesa=X), para o garçom saber exatamente a mesa de onde veio o chamado.'}
                       </span>
                     </div>
@@ -3306,7 +3331,8 @@ export default function MenuEditorModal({
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={allowCallWaiter}
+                      disabled={!isCatalog && !allowOnSite}
+                      aria-checked={(isCatalog || allowOnSite) && allowCallWaiter}
                       onClick={() =>
                         setMenu({
                           ...menu,
@@ -3314,18 +3340,26 @@ export default function MenuEditorModal({
                         })
                       }
                       title={
-                        allowCallWaiter
+                        !isCatalog && !allowOnSite
+                          ? 'Disponível apenas quando Pedidos na Mesa estiver ativo'
+                          : allowCallWaiter
                           ? 'Clique para desativar a chamada de garçom'
                           : 'Clique para ativar a chamada de garçom'
                       }
-                      className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner ${
-                        allowCallWaiter ? 'bg-emerald-500' : 'bg-slate-700'
+                      className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner ${
+                        !isCatalog && !allowOnSite
+                          ? 'bg-slate-800 cursor-not-allowed'
+                          : allowCallWaiter
+                          ? 'bg-emerald-500 cursor-pointer'
+                          : 'bg-slate-700 cursor-pointer'
                       }`}
                     >
                       <span
                         aria-hidden="true"
                         className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          allowCallWaiter ? 'translate-x-5' : 'translate-x-0'
+                          (isCatalog || allowOnSite) && allowCallWaiter
+                            ? 'translate-x-5'
+                            : 'translate-x-0'
                         }`}
                       />
                     </button>
