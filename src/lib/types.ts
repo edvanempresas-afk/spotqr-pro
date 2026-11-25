@@ -150,7 +150,9 @@ export interface MenuItem {
   originalPrice?: number;         // Preço anterior "De: R$ ..." (exibe desconto % e risco)
   promoEffect?: PromoVisualEffect; // Destaque visual no card (Neon, Pisca-Pisca Natalino, Oferta Ouro)
   showPriceSplash?: boolean;      // Etiqueta Splash / Explosão de oferta junto ao preço
-  maxInstallments?: number;       // Parcelamento máximo sem juros (ex: 12 => "12x sem juros")
+  maxInstallments?: number;       // Parcelamento máximo (ex: 12 => "12x sem juros")
+  installmentsHasInterest?: boolean; // false/undefined = sem juros; true = com juros
+  customInstallmentAmount?: number;  // Opcional: valor da parcela quando "com juros"
   variantGroupTitle?: string;     // Rótulo das variações no anúncio (ex: "Voltagem", "Cor")
   variants?: MenuItemVariant[];   // Variações no mesmo anúncio (110V/220V, cores, modelos)
 }

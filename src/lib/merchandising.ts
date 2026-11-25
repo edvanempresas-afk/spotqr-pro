@@ -127,11 +127,23 @@ export function formatMoneyBR(value: number, currency = 'R$'): string {
   return `${currency} ${safe.toFixed(2).replace('.', ',')}`;
 }
 
-export function formatInstallmentLabel(
+export interface InstallmentDisplayInfo {
+  count: number;
+  perInstallment: number;
+  perInstallmentFormatted: string;
+  hasInterest: boolean;
+  interestSuffix: 'sem juros' | 'com juros';
+  cashPriceFormatted: string;
+  totalCreditFormatted?: string;
+}
+
+export function resolveInstallmentInfo(
   effectivePrice: number,
   maxInstallments?: number,
+  hasInterest?: boolean,
+  customInstallmentAmount?: number,
   currency = 'R$'
-): string | null {
+): InstallmentDisplayInfo | null {
   if (
     typeof maxInstallments !== 'number' ||
     !Number.isFinite(maxInstallments) ||
@@ -141,9 +153,50 @@ export function formatInstallmentLabel(
     return null;
   }
   const count = Math.min(24, Math.floor(maxInstallments));
-  const perInstallment = effectivePrice / count;
+  const useCustom =
+    Boolean(hasInterest) &&
+    typeof customInstallmentAmount === 'number' &&
+    Number.isFinite(customInstallmentAmount) &&
+    customInstallmentAmount > 0;
+  const perInstallment = useCustom
+    ? customInstallmentAmount!
+    : effectivePrice / count;
   if (perInstallment < 1) return null;
-  return `ou até ${count}x de ${formatMoneyBR(perInstallment, currency)} sem juros`;
+
+  const isInterest = Boolean(hasInterest);
+  const totalCredit = Number((perInstallment * count).toFixed(2));
+  const showTotalCredit =
+    isInterest && totalCredit > effectivePrice + 0.05;
+
+  return {
+    count,
+    perInstallment,
+    perInstallmentFormatted: formatMoneyBR(perInstallment, currency),
+    hasInterest: isInterest,
+    interestSuffix: isInterest ? 'com juros' : 'sem juros',
+    cashPriceFormatted: formatMoneyBR(effectivePrice, currency),
+    totalCreditFormatted: showTotalCredit
+      ? formatMoneyBR(totalCredit, currency)
+      : undefined,
+  };
+}
+
+export function formatInstallmentLabel(
+  effectivePrice: number,
+  maxInstallments?: number,
+  currency = 'R$',
+  hasInterest?: boolean,
+  customInstallmentAmount?: number
+): string | null {
+  const info = resolveInstallmentInfo(
+    effectivePrice,
+    maxInstallments,
+    hasInterest,
+    customInstallmentAmount,
+    currency
+  );
+  if (!info) return null;
+  return `${info.count}x de ${info.perInstallmentFormatted} ${info.interestSuffix}`;
 }
 
 export function getActiveItemVariants(item: MenuItem, isPro: boolean): MenuItemVariant[] {

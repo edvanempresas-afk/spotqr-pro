@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
           promoEffect: undefined,
           showPriceSplash: undefined,
           maxInstallments: undefined,
+          installmentsHasInterest: undefined,
+          customInstallmentAmount: undefined,
           variantGroupTitle: undefined,
           variants: undefined,
         }
@@ -309,6 +311,12 @@ export async function POST(request: NextRequest) {
         item.maxInstallments >= 2
           ? Math.min(24, Math.floor(item.maxInstallments))
           : undefined;
+      const cleanCustomInstallmentAmount =
+        typeof item.customInstallmentAmount === 'number' &&
+        Number.isFinite(item.customInstallmentAmount) &&
+        item.customInstallmentAmount > 0
+          ? Number(item.customInstallmentAmount.toFixed(2))
+          : undefined;
       const cleanVariants = Array.isArray(item.variants)
         ? item.variants
             .filter((v) => v && typeof v.label === 'string' && v.label.trim().length > 0)
@@ -351,6 +359,12 @@ export async function POST(request: NextRequest) {
         maxInstallments: isEffectivePro
           ? cleanMaxInstallments
           : existingItem?.maxInstallments,
+        installmentsHasInterest: isEffectivePro
+          ? Boolean(item.installmentsHasInterest)
+          : existingItem?.installmentsHasInterest,
+        customInstallmentAmount: isEffectivePro
+          ? cleanCustomInstallmentAmount
+          : existingItem?.customInstallmentAmount,
         variantGroupTitle: isEffectivePro
           ? typeof item.variantGroupTitle === 'string' && item.variantGroupTitle.trim()
             ? item.variantGroupTitle.trim().slice(0, 30)

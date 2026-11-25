@@ -28,6 +28,7 @@ import {
   calculateDiscountPercent,
   formatInstallmentLabel,
   formatMoneyBR,
+  resolveInstallmentInfo,
   resolvePriceFontOption,
   resolveVariantEffectivePrice,
 } from '../lib/merchandising';
@@ -65,10 +66,20 @@ export function ItemProMerchandisingSection({
     Number(item.price) || 0,
     item.originalPrice
   );
-  const installmentPreview = formatInstallmentLabel(
-    resolveVariantEffectivePrice(item, variants[0]),
+  const effectiveSamplePrice = resolveVariantEffectivePrice(item, variants[0]);
+  const installmentInfo = resolveInstallmentInfo(
+    effectiveSamplePrice,
     item.maxInstallments,
+    item.installmentsHasInterest,
+    item.customInstallmentAmount,
     currency
+  );
+  const installmentPreview = formatInstallmentLabel(
+    effectiveSamplePrice,
+    item.maxInstallments,
+    currency,
+    item.installmentsHasInterest,
+    item.customInstallmentAmount
   );
 
   // Deduplicated photos configured on this product (main + galleryImages) so owner can bind to variations
@@ -200,7 +211,7 @@ export function ItemProMerchandisingSection({
               )}
               {item.maxInstallments && item.maxInstallments >= 2 && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-500/35 text-sky-200">
-                  {item.maxInstallments}x s/ juros
+                  {item.maxInstallments}x {item.installmentsHasInterest ? 'c/ juros' : 's/ juros'}
                 </span>
               )}
               {variants.length > 0 && (
@@ -301,12 +312,13 @@ export function ItemProMerchandisingSection({
                 </span>
                 <RetailPriceTag
                   formattedPrice={formatMoneyBR(
-                    resolveVariantEffectivePrice(item, variants[0]),
+                    effectiveSamplePrice,
                     currency
                   )}
                   originalPrice={item.originalPrice}
                   discountPct={discountPct}
                   showSplash={Boolean(item.showPriceSplash)}
+                  installmentInfo={installmentInfo}
                   currency={currency}
                   priceScaleClass="text-xl leading-none"
                   priceFont={resolvePriceFontOption('modern')}
@@ -358,16 +370,16 @@ export function ItemProMerchandisingSection({
             </div>
           </div>
 
-          {/* 2. PARCELAMENTO MAXIMO SEM JUROS */}
+          {/* 2. PARCELAMENTO (COM OU SEM JUROS) */}
           <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h5 className="text-[11px] font-extrabold text-white flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-sky-400" />
-                <span>Parcelamento Máximo sem Juros (Itens de Maior Valor)</span>
+                <span>Parcelamento em Destaque (Itens de Maior Valor)</span>
               </h5>
               {installmentPreview && (
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/35 text-sky-300">
-                  {installmentPreview}
+                  {installmentPreview} • À vista {formatMoneyBR(effectiveSamplePrice, currency)}
                 </span>
               )}
             </div>
@@ -390,7 +402,7 @@ export function ItemProMerchandisingSection({
                         : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
-                    {parc === 0 ? 'Não exibir' : `${parc}x sem juros`}
+                    {parc === 0 ? 'Não exibir' : `${parc}x`}
                   </button>
                 );
               })}
@@ -429,6 +441,83 @@ export function ItemProMerchandisingSection({
                 />
               </div>
             </div>
+
+            {typeof item.maxInstallments === 'number' && item.maxInstallments >= 2 && (
+              <div className="pt-2 border-t border-slate-800/70 flex flex-wrap items-center gap-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  Condição da Parcela:
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateItem({
+                      installmentsHasInterest: false,
+                      customInstallmentAmount: undefined,
+                    })
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    !item.installmentsHasInterest
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  ✅ Sem juros
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateItem({ installmentsHasInterest: true })}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                    item.installmentsHasInterest
+                      ? 'bg-rose-500/20 border-rose-400 text-rose-200'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  📈 Com juros
+                </button>
+
+                {item.installmentsHasInterest && (
+                  <div className="flex items-center gap-1.5 ml-auto bg-slate-950 border border-rose-500/35 rounded-lg px-2.5 py-1">
+                    <span className="text-[10px] text-rose-200 font-semibold">
+                      Parcela ({currency}):
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={
+                        effectiveSamplePrice > 0
+                          ? (effectiveSamplePrice / item.maxInstallments)
+                              .toFixed(2)
+                              .replace('.', ',')
+                          : 'Auto'
+                      }
+                      value={
+                        typeof item.customInstallmentAmount === 'number' &&
+                        item.customInstallmentAmount > 0
+                          ? item.customInstallmentAmount
+                          : ''
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(',', '.').trim();
+                        if (!raw) {
+                          onUpdateItem({ customInstallmentAmount: undefined });
+                          return;
+                        }
+                        const parsed = parseFloat(raw);
+                        onUpdateItem({
+                          customInstallmentAmount:
+                            Number.isFinite(parsed) && parsed > 0
+                              ? parsed
+                              : undefined,
+                        });
+                      }}
+                      title="Informe o valor exato de cada parcela com juros (ou deixe vazio para divisão padrão)"
+                      className="w-20 bg-transparent text-xs font-extrabold text-rose-200 outline-none text-right"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 3. VARIACOES NO MESMO ANUNCIO COM FOTO ATRELADA */}

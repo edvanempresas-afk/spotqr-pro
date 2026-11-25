@@ -48,9 +48,9 @@ import { getItemStockInfo } from '@/lib/stock';
 import { resolveItemAvailableFlavors } from '@/lib/flavors';
 import {
   calculateDiscountPercent,
-  formatInstallmentLabel,
   formatMoneyBR,
   getActiveItemVariants,
+  resolveInstallmentInfo,
   resolvePriceFontOption,
   resolvePriceScaleClasses,
   resolveVariantEffectivePrice,
@@ -1950,10 +1950,12 @@ export default function DigitalShowcasePage({
                 const discountPct = isPro
                   ? calculateDiscountPercent(effectivePrice, item.originalPrice)
                   : null;
-                const installmentLabel = isPro
-                  ? formatInstallmentLabel(
+                const installmentInfo = isPro
+                  ? resolveInstallmentInfo(
                       effectivePrice,
                       item.maxInstallments,
+                      item.installmentsHasInterest,
+                      item.customInstallmentAmount,
                       menu.currency || 'R$'
                     )
                   : null;
@@ -2177,7 +2179,7 @@ export default function DigitalShowcasePage({
                             originalPrice={isPro ? item.originalPrice : undefined}
                             discountPct={discountPct}
                             showSplash={Boolean(isPro && item.showPriceSplash)}
-                            installmentLabel={installmentLabel}
+                            installmentInfo={installmentInfo}
                             currency={menu.currency || 'R$'}
                             priceScaleClass={activePriceScaleClass}
                             priceFont={activePriceFont}
@@ -3584,10 +3586,12 @@ export default function DigitalShowcasePage({
                 zoomedItem.originalPrice
               )
             : null;
-          const zoomedInstallmentLabel = isPro
-            ? formatInstallmentLabel(
+          const zoomedInstallmentInfo = isPro
+            ? resolveInstallmentInfo(
                 zoomedEffectivePrice,
                 zoomedItem.maxInstallments,
+                zoomedItem.installmentsHasInterest,
+                zoomedItem.customInstallmentAmount,
                 menu.currency || 'R$'
               )
             : null;
@@ -3912,7 +3916,7 @@ export default function DigitalShowcasePage({
                       originalPrice={isPro ? zoomedItem.originalPrice : undefined}
                       discountPct={zoomedDiscountPct}
                       showSplash={Boolean(isPro && zoomedItem.showPriceSplash)}
-                      installmentLabel={zoomedInstallmentLabel}
+                      installmentInfo={zoomedInstallmentInfo}
                       currency={menu.currency || 'R$'}
                       priceScaleClass={activePriceScaleClass}
                       priceFont={activePriceFont}
