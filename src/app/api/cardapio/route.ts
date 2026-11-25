@@ -250,7 +250,50 @@ export async function POST(request: NextRequest) {
             .map((u) => u.trim())
             .slice(0, 4)
         : undefined;
-      const existingGallery = existingItemsById.get(item.id)?.galleryImages;
+      const existingItem = existingItemsById.get(item.id);
+      const existingGallery = existingItem?.galleryImages;
+
+      const cleanOriginalPrice =
+        typeof item.originalPrice === 'number' &&
+        Number.isFinite(item.originalPrice) &&
+        item.originalPrice > 0
+          ? Number(item.originalPrice.toFixed(2))
+          : undefined;
+      const cleanPromoEffect =
+        item.promoEffect === 'neon' ||
+        item.promoEffect === 'christmas' ||
+        item.promoEffect === 'flash_gold' ||
+        item.promoEffect === 'none'
+          ? item.promoEffect
+          : undefined;
+      const cleanMaxInstallments =
+        typeof item.maxInstallments === 'number' &&
+        Number.isFinite(item.maxInstallments) &&
+        item.maxInstallments >= 2
+          ? Math.min(24, Math.floor(item.maxInstallments))
+          : undefined;
+      const cleanVariants = Array.isArray(item.variants)
+        ? item.variants
+            .filter((v) => v && typeof v.label === 'string' && v.label.trim().length > 0)
+            .slice(0, 20)
+            .map((v) => ({
+              id: String(v.id || `var-${Math.random().toString(36).slice(2, 8)}`),
+              label: v.label.trim().slice(0, 40),
+              groupLabel:
+                typeof v.groupLabel === 'string' && v.groupLabel.trim()
+                  ? v.groupLabel.trim().slice(0, 30)
+                  : undefined,
+              price:
+                typeof v.price === 'number' && Number.isFinite(v.price) && v.price > 0
+                  ? Number(v.price.toFixed(2))
+                  : undefined,
+              colorHex:
+                typeof v.colorHex === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v.colorHex.trim())
+                  ? v.colorHex.trim()
+                  : undefined,
+              isAvailable: v.isAvailable !== false,
+            }))
+        : undefined;
 
       return {
         ...item,
@@ -259,8 +302,40 @@ export async function POST(request: NextRequest) {
             ? cleanGallery
             : undefined
           : existingGallery,
+        originalPrice: isEffectivePro ? cleanOriginalPrice : existingItem?.originalPrice,
+        promoEffect: isEffectivePro ? cleanPromoEffect : existingItem?.promoEffect,
+        showPriceSplash: isEffectivePro
+          ? Boolean(item.showPriceSplash)
+          : existingItem?.showPriceSplash,
+        maxInstallments: isEffectivePro
+          ? cleanMaxInstallments
+          : existingItem?.maxInstallments,
+        variantGroupTitle: isEffectivePro
+          ? typeof item.variantGroupTitle === 'string' && item.variantGroupTitle.trim()
+            ? item.variantGroupTitle.trim().slice(0, 30)
+            : undefined
+          : existingItem?.variantGroupTitle,
+        variants: isEffectivePro
+          ? cleanVariants && cleanVariants.length > 0
+            ? cleanVariants
+            : undefined
+          : existingItem?.variants,
       };
     });
+
+    const cleanPriceFontStyle =
+      cleanMenuBody.priceFontStyle === 'modern' ||
+      cleanMenuBody.priceFontStyle === 'impact' ||
+      cleanMenuBody.priceFontStyle === 'classic' ||
+      cleanMenuBody.priceFontStyle === 'digital'
+        ? cleanMenuBody.priceFontStyle
+        : undefined;
+    const cleanPriceScale =
+      cleanMenuBody.priceScale === 'normal' ||
+      cleanMenuBody.priceScale === 'large' ||
+      cleanMenuBody.priceScale === 'xlarge'
+        ? cleanMenuBody.priceScale
+        : undefined;
 
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
@@ -268,6 +343,10 @@ export async function POST(request: NextRequest) {
       coverVideo: isEffectivePro
         ? incomingCoverVideo || undefined
         : existingCoverVideo || undefined,
+      priceFontStyle: isEffectivePro
+        ? cleanPriceFontStyle
+        : existingMenu?.priceFontStyle,
+      priceScale: isEffectivePro ? cleanPriceScale : existingMenu?.priceScale,
       mode: isCatalog ? 'catalog' : 'menu',
       slug: cleanSlug,
       ownerId: clientUser?.id || body.ownerId,

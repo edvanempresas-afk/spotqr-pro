@@ -19,6 +19,7 @@ import {
   SelectedExtraItem,
   SelectedFlavorItem,
   SelectedSizeItem,
+  SelectedVariantItem,
 } from '@/lib/types';
 import {
   calculateCustomizedUnitPrice,
@@ -30,6 +31,7 @@ export interface CustomizedSelectionPayload {
   item: MenuItem;
   quantity: number;
   selectedSize?: SelectedSizeItem;
+  selectedVariant?: SelectedVariantItem;
   selectedFlavors?: SelectedFlavorItem[];
   selectedExtras?: MenuExtra[];
   unitPrice: number;
@@ -37,6 +39,7 @@ export interface CustomizedSelectionPayload {
 
 interface ShowcaseCustomizeModalProps {
   item: MenuItem | null;
+  selectedVariant?: SelectedVariantItem | null;
   availableExtras: MenuExtra[];
   availableFlavors: MenuFlavor[];
   maxRemainingStock: number;
@@ -50,6 +53,7 @@ interface ShowcaseCustomizeModalProps {
 
 export default function ShowcaseCustomizeModal({
   item,
+  selectedVariant,
   availableExtras,
   availableFlavors,
   maxRemainingStock,
@@ -200,8 +204,15 @@ export default function ShowcaseCustomizeModal({
     price: Number(ex.price) || 0,
   }));
 
+  const effectiveBasePrice =
+    selectedVariant &&
+    typeof selectedVariant.price === 'number' &&
+    selectedVariant.price > 0
+      ? selectedVariant.price
+      : item.price;
+
   const priceSummary = calculateCustomizedUnitPrice({
-    baseItemPrice: item.price,
+    baseItemPrice: effectiveBasePrice,
     selectedSize: selectedSize
       ? { id: selectedSize.id, name: selectedSize.name, price: selectedSize.price }
       : null,
@@ -257,6 +268,7 @@ export default function ShowcaseCustomizeModal({
             price: selectedSize.price,
           }
         : undefined,
+      selectedVariant: selectedVariant || undefined,
       selectedFlavors:
         chosenFlavorsList.length > 0 ? chosenFlavorsList : undefined,
       selectedExtras: chosenExtrasList.length > 0 ? chosenExtrasList : undefined,
@@ -284,8 +296,12 @@ export default function ShowcaseCustomizeModal({
                 className={`text-sm font-extrabold truncate ${headingTextClass}`}
               >
                 {item.name}
+                {selectedVariant ? ` — ${selectedVariant.label}` : ''}
               </h3>
               <p className={`text-[11px] truncate ${mutedTextClass}`}>
+                {selectedVariant
+                  ? `${selectedVariant.groupLabel || 'Opção'}: ${selectedVariant.label} • `
+                  : ''}
                 {hasFlavorsEnabled
                   ? sizes.length > 0
                     ? 'Escolha tamanho, sabores e complementos'

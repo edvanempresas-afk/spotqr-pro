@@ -19,6 +19,7 @@ import {
   SelectedExtraItem,
   SelectedFlavorItem,
   SelectedSizeItem,
+  SelectedVariantItem,
   FlavorPricingRule,
   StoreOrderStatus,
   PixKeyType,
@@ -2976,6 +2977,7 @@ export interface CreateOrderParams {
     id: string;
     quantity: number;
     selectedSize?: SelectedSizeItem;
+    selectedVariant?: SelectedVariantItem;
     selectedFlavors?: SelectedFlavorItem[];
     flavorPricingRule?: FlavorPricingRule;
     selectedExtras?: SelectedExtraItem[];
@@ -3074,6 +3076,18 @@ export async function createStoreOrder(
         };
       }
     }
+
+    if (reqItem.selectedVariant?.id && Array.isArray(target.variants)) {
+      const matchedVariantPre = target.variants.find(
+        (v) => v.id === reqItem.selectedVariant?.id
+      );
+      if (matchedVariantPre && matchedVariantPre.isAvailable === false) {
+        return {
+          success: false,
+          error: `A opção "${matchedVariantPre.label}" de "${target.name}" está indisponível no momento.`,
+        };
+      }
+    }
   }
 
   // 2. Deduct stock and compile order items
@@ -3105,6 +3119,33 @@ export async function createStoreOrder(
     }
 
     const itemPrice = typeof target.price === 'number' ? target.price : 0;
+
+    let resolvedVariant: SelectedVariantItem | undefined;
+    let variantEffectiveBasePrice = itemPrice;
+    if (
+      reqItem.selectedVariant &&
+      reqItem.selectedVariant.label &&
+      Array.isArray(target.variants) &&
+      target.variants.length > 0
+    ) {
+      const matchedVariant = target.variants.find(
+        (v) => v.id === reqItem.selectedVariant?.id
+      );
+      if (matchedVariant) {
+        resolvedVariant = {
+          id: matchedVariant.id,
+          label: matchedVariant.label,
+          groupLabel: matchedVariant.groupLabel || target.variantGroupTitle,
+          price:
+            typeof matchedVariant.price === 'number' && matchedVariant.price > 0
+              ? matchedVariant.price
+              : undefined,
+        };
+        if (resolvedVariant.price) {
+          variantEffectiveBasePrice = resolvedVariant.price;
+        }
+      }
+    }
 
     let resolvedSize: SelectedSizeItem | undefined;
     if (reqItem.selectedSize && reqItem.selectedSize.name) {
@@ -3156,7 +3197,7 @@ export async function createStoreOrder(
     const pricingRule: FlavorPricingRule =
       target.flavorPricingRule || reqItem.flavorPricingRule || 'highest';
     const { unitPrice: unitCalculatedPrice } = calculateCustomizedUnitPrice({
-      baseItemPrice: itemPrice,
+      baseItemPrice: variantEffectiveBasePrice,
       selectedSize: resolvedSize,
       selectedFlavors,
       flavorPricingRule: pricingRule,
@@ -3173,6 +3214,7 @@ export async function createStoreOrder(
       stockMode: target.stockMode || 'unlimited',
       stockDeducted,
       selectedSize: resolvedSize,
+      selectedVariant: resolvedVariant,
       selectedFlavors: selectedFlavors.length > 0 ? selectedFlavors : undefined,
       flavorPricingRule: selectedFlavors.length > 0 ? pricingRule : undefined,
       selectedExtras: selectedExtras.length > 0 ? selectedExtras : undefined,

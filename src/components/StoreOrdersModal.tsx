@@ -546,7 +546,16 @@ export function StoreOrdersModal({
                                 <span className="font-medium">
                                   {it.name}
                                   {it.selectedSize ? ` (${it.selectedSize.name})` : ''}
+                                  {it.selectedVariant ? ` — ${it.selectedVariant.label}` : ''}
                                 </span>
+                                {it.selectedVariant && (
+                                  <span className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/35 text-sky-300 text-[10px] font-bold">
+                                    {it.selectedVariant.groupLabel
+                                      ? `${it.selectedVariant.groupLabel}: `
+                                      : ''}
+                                    {it.selectedVariant.label}
+                                  </span>
+                                )}
                                 {it.stockMode === 'unique' && (
                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 border border-purple-500/35 text-purple-300">
                                     💎 Peça Única {isPending ? '(Reservada)' : isCancelled ? '(Devolvida)' : '(Baixada)'}

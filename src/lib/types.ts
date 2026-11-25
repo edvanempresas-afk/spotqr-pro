@@ -108,6 +108,19 @@ export interface MenuSizeOption {
   maxFlavors: number;
 }
 
+export type PriceFontStyle = 'modern' | 'impact' | 'classic' | 'digital';
+export type PriceScale = 'normal' | 'large' | 'xlarge';
+export type PromoVisualEffect = 'none' | 'neon' | 'christmas' | 'flash_gold';
+
+export interface MenuItemVariant {
+  id: string;
+  label: string;
+  groupLabel?: string;
+  price?: number;
+  colorHex?: string;
+  isAvailable?: boolean;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -132,6 +145,13 @@ export interface MenuItem {
   excludedFlavorIds?: string[]; // Sabores desmarcados manualmente dentro dos grupos escolhidos
   allowedFlavorIds?: string[]; // Compatibilidade com listas antigas sem grupo
   sizes?: MenuSizeOption[]; // Tamanhos opcionais (ex: Brotinho, Média, Grande, Família)
+  // Recursos PRO de Merchandising & Marketplace:
+  originalPrice?: number;         // Preço anterior "De: R$ ..." (exibe desconto % e risco)
+  promoEffect?: PromoVisualEffect; // Destaque visual no card (Neon, Pisca-Pisca Natalino, Oferta Ouro)
+  showPriceSplash?: boolean;      // Etiqueta Splash / Explosão de oferta junto ao preço
+  maxInstallments?: number;       // Parcelamento máximo sem juros (ex: 12 => "12x sem juros")
+  variantGroupTitle?: string;     // Rótulo das variações no anúncio (ex: "Voltagem", "Cor")
+  variants?: MenuItemVariant[];   // Variações no mesmo anúncio (110V/220V, cores, modelos)
 }
 
 export interface MenuCategory {
@@ -172,6 +192,8 @@ export interface RestaurantMenu {
   allowCallWaiter?: boolean; // Se o cliente pode chamar o garçom pelo WhatsApp (só exibe se leu o QR da mesa)
   acceptedPayments?: ShowcasePaymentMethod[];
   productImagePosition?: 'left' | 'right';
+  priceFontStyle?: PriceFontStyle; // Recurso PRO: estilo de fonte dos preços
+  priceScale?: PriceScale;         // Recurso PRO: tamanho dos preços na vitrine
   ownerId?: string;
   ownerEmail?: string;
   updatedAt: string;
@@ -197,6 +219,13 @@ export interface SelectedSizeItem {
   price: number;
 }
 
+export interface SelectedVariantItem {
+  id: string;
+  label: string;
+  groupLabel?: string;
+  price?: number;
+}
+
 export interface StoreOrderItem {
   id: string;
   name: string;
@@ -205,6 +234,7 @@ export interface StoreOrderItem {
   stockMode?: ProductStockMode;
   stockDeducted: number;
   selectedSize?: SelectedSizeItem;
+  selectedVariant?: SelectedVariantItem;
   selectedFlavors?: SelectedFlavorItem[];
   flavorPricingRule?: FlavorPricingRule;
   selectedExtras?: SelectedExtraItem[];

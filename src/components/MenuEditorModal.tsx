@@ -68,6 +68,12 @@ import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import ImageCropModal from './ImageCropModal';
 import MenuFlavorsTab from './MenuFlavorsTab';
 import ItemMultiFlavorSection from './ItemMultiFlavorSection';
+import { ItemProMerchandisingSection } from './ItemProMerchandisingSection';
+import {
+  PRICE_FONT_OPTIONS,
+  PRICE_SCALE_OPTIONS,
+  resolvePriceFontOption,
+} from '@/lib/merchandising';
 
 interface MenuEditorModalProps {
   isOpen: boolean;
@@ -2049,6 +2055,16 @@ export default function MenuEditorModal({
                                 onGoToFlavorsTab={() => setActiveTab('flavors')}
                               />
                             )}
+
+                            {/* Recursos PRO: Promoção Neon/Natal, Splash no Preço, Parcelas & Variações (110V/220V, Cores) */}
+                            <ItemProMerchandisingSection
+                              item={item}
+                              currency={menu.currency || 'R$'}
+                              isPro={isProShowcase}
+                              onUpdateItem={(patch) =>
+                                handleUpdateItem(item.id, patch)
+                              }
+                            />
                           </div>
 
                           {/* Availability & Delete Actions */}
@@ -2397,12 +2413,22 @@ export default function MenuEditorModal({
                           </div>
 
                           <div className="hidden sm:flex items-center gap-2 shrink-0">
-                            <span
-                              className="text-xs font-extrabold"
-                              style={{ color: theme.readableAccentText }}
-                            >
-                              R$ 49,90
-                            </span>
+                            {(() => {
+                              const previewFont = resolvePriceFontOption(
+                                isProShowcase ? menu.priceFontStyle : 'modern'
+                              );
+                              return (
+                                <span
+                                  className={`text-base ${previewFont.className}`}
+                                  style={{
+                                    color: theme.readableAccentText,
+                                    fontFamily: previewFont.fontFamily,
+                                  }}
+                                >
+                                  R$ 49,90
+                                </span>
+                              );
+                            })()}
                             <span
                               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold shadow-sm"
                               style={{
@@ -2557,6 +2583,127 @@ export default function MenuEditorModal({
                           </label>
                         </div>
                       </div>
+                    </div>
+
+                    {/* PRO Tipografia e Tamanho dos Preços */}
+                    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                            <DollarSign className="w-4 h-4 text-emerald-400" />
+                            <span>Estilo da Fonte &amp; Tamanho dos Preços na Vitrine</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Destaque os valores dos seus produtos com fontes de grande varejo e maior visibilidade.
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
+                            isProShowcase
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                              : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                          }`}
+                        >
+                          {isProShowcase ? (
+                            <>
+                              <Sparkles className="w-2.5 h-2.5" />
+                              <span>PRO Liberado</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Exclusivo PRO</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {isProShowcase ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            {PRICE_FONT_OPTIONS.map((fontOpt) => {
+                              const currentFont = menu.priceFontStyle || 'modern';
+                              const isSelected = currentFont === fontOpt.id;
+                              return (
+                                <button
+                                  key={fontOpt.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setMenu({
+                                      ...menu,
+                                      priceFontStyle: fontOpt.id,
+                                    })
+                                  }
+                                  className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 ${
+                                    isSelected
+                                      ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40'
+                                      : 'bg-slate-950/80 border-slate-800 hover:border-slate-600'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[11px] font-bold text-white">
+                                      {fontOpt.label}
+                                    </span>
+                                    {isSelected && (
+                                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    )}
+                                  </div>
+                                  <span
+                                    className={`text-lg text-emerald-400 ${fontOpt.className}`}
+                                    style={{ fontFamily: fontOpt.fontFamily }}
+                                  >
+                                    R$ 189,90
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 leading-tight">
+                                    {fontOpt.description}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">
+                              Tamanho do Preço:
+                            </span>
+                            {PRICE_SCALE_OPTIONS.map((scaleOpt) => {
+                              const currentScale = menu.priceScale || 'large';
+                              const isSelected = currentScale === scaleOpt.id;
+                              return (
+                                <button
+                                  key={scaleOpt.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setMenu({
+                                      ...menu,
+                                      priceScale: scaleOpt.id,
+                                    })
+                                  }
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
+                                    isSelected
+                                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  {scaleOpt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-1.5">
+                          <p className="text-[11px] text-amber-200 font-semibold flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>
+                              Fontes especiais de preço e destaque XL exclusivos do Plano PRO.
+                            </span>
+                          </p>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            No PRO você escolhe entre fontes estilo Impacto Marketplace, Editorial Clássica ou Etiqueta Digital e aumenta ainda mais a presença dos valores.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {/* Logo & Cover Upload Cards */}

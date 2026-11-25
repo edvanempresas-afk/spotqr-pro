@@ -31,18 +31,30 @@ import {
   Layers,
   Camera,
 } from 'lucide-react';
+import '@/app/merchandising.css';
 import {
   RestaurantMenu,
   MenuItem,
+  MenuItemVariant,
   MenuExtra,
   MenuFlavor,
   SelectedExtraItem,
   SelectedFlavorItem,
   SelectedSizeItem,
+  SelectedVariantItem,
   FlavorPricingRule,
 } from '@/lib/types';
 import { getItemStockInfo } from '@/lib/stock';
 import { resolveItemAvailableFlavors } from '@/lib/flavors';
+import {
+  calculateDiscountPercent,
+  formatInstallmentLabel,
+  formatMoneyBR,
+  getActiveItemVariants,
+  resolvePriceFontOption,
+  resolvePriceScaleClasses,
+  resolveVariantEffectivePrice,
+} from '@/lib/merchandising';
 import { isProStillValid } from '@/lib/pro-status';
 import {
   getAcceptedPaymentOptions,
@@ -83,6 +95,7 @@ interface CartItem {
   item: MenuItem;
   quantity: number;
   selectedSize?: SelectedSizeItem;
+  selectedVariant?: SelectedVariantItem;
   selectedFlavors?: SelectedFlavorItem[];
   flavorPricingRule?: FlavorPricingRule;
   selectedExtras?: MenuExtra[];
@@ -121,6 +134,9 @@ export default function DigitalShowcasePage({
   const [customizingProduct, setCustomizingProduct] = useState<MenuItem | null>(
     null
   );
+  const [selectedVariants, setSelectedVariants] = useState<
+    Record<string, string>
+  >({});
 
   // Order details
   const [orderMode, setOrderMode] = useState<OrderMode>(
@@ -476,30 +492,71 @@ export default function DigitalShowcasePage({
   const getItemAllowedFlavors = (targetItem: MenuItem): MenuFlavor[] =>
     resolveItemAvailableFlavors(targetItem, menu);
 
+  const activePriceFont = resolvePriceFontOption(
+    isPro ? menu?.priceFontStyle : 'modern'
+  );
+  const activePriceScaleClass = resolvePriceScaleClasses(
+    menu?.priceScale,
+    isPro
+  );
+
+  const resolveSelectedVariant = (targetItem: MenuItem): MenuItemVariant | null => {
+    const variants = getActiveItemVariants(targetItem, isPro);
+    if (variants.length === 0) return null;
+    const chosenId = selectedVariants[targetItem.id];
+    const found = chosenId ? variants.find((v) => v.id === chosenId) : null;
+    if (found && found.isAvailable !== false) return found;
+    return variants.find((v) => v.isAvailable !== false) || null;
+  };
+
+  const toSelectedVariantItem = (
+    targetItem: MenuItem,
+    variant: MenuItemVariant | null
+  ): SelectedVariantItem | undefined => {
+    if (!variant) return undefined;
+    return {
+      id: variant.id,
+      label: variant.label,
+      groupLabel: variant.groupLabel || targetItem.variantGroupTitle,
+      price:
+        typeof variant.price === 'number' && variant.price > 0
+          ? variant.price
+          : undefined,
+    };
+  };
+
   const formatItemStartingPriceLabel = (targetItem: MenuItem): string => {
+    const currency = menu?.currency || 'R$';
     if (targetItem.sizes && targetItem.sizes.length > 0) {
       const nonZeroSizes = targetItem.sizes
         .map((s) => Number(s.price) || 0)
         .filter((p) => p > 0);
       if (nonZeroSizes.length > 0) {
-        return `A partir de R$ ${Math.min(...nonZeroSizes).toFixed(2)}`;
+        return `A partir de ${formatMoneyBR(Math.min(...nonZeroSizes), currency)}`;
       }
     }
-    if (targetItem.allowFlavors && targetItem.price === 0) {
+    const chosenVar = resolveSelectedVariant(targetItem);
+    const effectivePrice = resolveVariantEffectivePrice(targetItem, chosenVar);
+    if (targetItem.allowFlavors && effectivePrice === 0) {
       const flPrices = getItemAllowedFlavors(targetItem)
         .map((f) => Number(f.price) || 0)
         .filter((p) => p > 0);
       if (flPrices.length > 0) {
-        return `A partir de R$ ${Math.min(...flPrices).toFixed(2)}`;
+        return `A partir de ${formatMoneyBR(Math.min(...flPrices), currency)}`;
       }
       return 'Monte seus sabores';
     }
-    return `R$ ${targetItem.price.toFixed(2)}`;
+    return formatMoneyBR(effectivePrice, currency);
   };
 
   const addToCart = (item: MenuItem) => {
     const stock = getItemStockInfo(item);
     if (!stock.canOrder || stock.maxQuantity <= 0) return;
+
+    const allVariants = getActiveItemVariants(item, isPro);
+    const chosenVariant = resolveSelectedVariant(item);
+    if (allVariants.length > 0 && !chosenVariant) return;
+
     setClosedPixOrder(null);
 
     const availableExtras = getItemAllowedExtras(item);
@@ -515,19 +572,29 @@ export default function DigitalShowcasePage({
       return;
     }
 
+    const selectedVariantObj = toSelectedVariantItem(item, chosenVariant);
+    const targetCartKey = selectedVariantObj
+      ? `${item.id}:var_${selectedVariantObj.id}`
+      : item.id;
+    const effectiveUnitPrice = resolveVariantEffectivePrice(item, chosenVariant);
+
     setCart((prev) => {
-      const existing = prev[item.id];
-      const currentQty = existing ? existing.quantity : 0;
-      if (currentQty >= stock.maxQuantity) {
+      const totalItemQty = Object.values(prev)
+        .filter((c) => c.item.id === item.id)
+        .reduce((sum, c) => sum + c.quantity, 0);
+      if (totalItemQty >= stock.maxQuantity) {
         return prev;
       }
+      const existing = prev[targetCartKey];
+      const currentQty = existing ? existing.quantity : 0;
       return {
         ...prev,
-        [item.id]: {
-          cartKey: item.id,
+        [targetCartKey]: {
+          cartKey: targetCartKey,
           item,
           quantity: currentQty + 1,
-          unitPrice: item.price,
+          selectedVariant: selectedVariantObj,
+          unitPrice: effectiveUnitPrice,
         },
       };
     });
@@ -538,6 +605,7 @@ export default function DigitalShowcasePage({
       item,
       quantity,
       selectedSize,
+      selectedVariant,
       selectedFlavors,
       selectedExtras,
       unitPrice,
@@ -549,6 +617,7 @@ export default function DigitalShowcasePage({
     }
 
     const sizeKey = selectedSize?.id || 'default';
+    const variantKey = selectedVariant?.id ? `var_${selectedVariant.id}` : '';
     const flavorsKey = (selectedFlavors || [])
       .map((f) => f.id)
       .sort()
@@ -558,6 +627,7 @@ export default function DigitalShowcasePage({
       .sort()
       .join('+');
     const compositeParts = [
+      variantKey,
       sizeKey !== 'default' ? `sz_${sizeKey}` : '',
       flavorsKey ? `fl_${flavorsKey}` : '',
       extrasKey ? `ex_${extrasKey}` : '',
@@ -588,6 +658,7 @@ export default function DigitalShowcasePage({
           item,
           quantity: newQty,
           selectedSize,
+          selectedVariant,
           selectedFlavors,
           flavorPricingRule:
             selectedFlavors && selectedFlavors.length > 0
@@ -763,6 +834,9 @@ export default function DigitalShowcasePage({
         ).toFixed(2);
         const sizeLabel = c.selectedSize ? ` [${c.selectedSize.name}]` : '';
         let line = `• ${c.quantity}x ${c.item.name}${sizeLabel}${prodDaysInfo} — R$ ${lineTotal}`;
+        if (c.selectedVariant) {
+          line += `\n   ↳ *${c.selectedVariant.groupLabel || 'Opção'}:* ${c.selectedVariant.label}`;
+        }
         if (c.selectedFlavors && c.selectedFlavors.length > 0) {
           const totalFl = c.selectedFlavors.length;
           const flavorsStr = c.selectedFlavors
@@ -974,6 +1048,7 @@ export default function DigitalShowcasePage({
             id: c.item.id,
             quantity: c.quantity,
             selectedSize: c.selectedSize,
+            selectedVariant: c.selectedVariant,
             selectedFlavors: c.selectedFlavors,
             flavorPricingRule: c.flavorPricingRule,
             selectedExtras: c.selectedExtras?.map((ex) => ({
@@ -1120,6 +1195,9 @@ export default function DigitalShowcasePage({
       (sum, c) => sum + c.quantity,
       0
     );
+    const allVariants = getActiveItemVariants(targetItem, isPro);
+    const activeVariant = resolveSelectedVariant(targetItem);
+    const allVariantsUnavailable = allVariants.length > 0 && !activeVariant;
     const itemStock = getItemStockInfo(targetItem);
     const itemReachedMax = totalItemInCart >= itemStock.maxQuantity;
     const availableExtras = getItemAllowedExtras(targetItem);
@@ -1129,7 +1207,7 @@ export default function DigitalShowcasePage({
     const hasExtras = availableExtras.length > 0;
     const hasCustomization = hasExtras || hasFlavors || hasSizes;
 
-    if (!itemStock.canOrder) {
+    if (!itemStock.canOrder || allVariantsUnavailable) {
       return (
         <span
           className={`inline-flex items-center gap-1 text-[11px] font-bold border px-3 py-1.5 rounded-xl shrink-0 ${
@@ -1143,7 +1221,16 @@ export default function DigitalShowcasePage({
       );
     }
 
-    if (totalItemInCart > 0) {
+    const activeVariantEntry =
+      !hasCustomization && activeVariant
+        ? cart[`${targetItem.id}:var_${activeVariant.id}`]
+        : null;
+    const activeStepperCount =
+      !hasCustomization && activeVariant
+        ? activeVariantEntry?.quantity || 0
+        : totalItemInCart;
+
+    if (activeStepperCount > 0) {
       return (
         <div className="flex flex-col items-end gap-1 shrink-0">
           <div
@@ -1158,7 +1245,9 @@ export default function DigitalShowcasePage({
             <button
               type="button"
               onClick={() => {
-                if (matchingEntries.length === 1) {
+                if (activeVariantEntry) {
+                  removeFromCart(activeVariantEntry.cartKey);
+                } else if (matchingEntries.length === 1) {
                   removeFromCart(matchingEntries[0].cartKey || targetItem.id);
                 } else {
                   setIsCartOpen(true);
@@ -1170,7 +1259,7 @@ export default function DigitalShowcasePage({
               <Minus className="w-3.5 h-3.5 stroke-[2.6]" />
             </button>
             <span className="text-xs font-extrabold px-1 min-w-[1.25rem] text-center">
-              {totalItemInCart}
+              {activeStepperCount}
             </span>
             <button
               type="button"
@@ -1219,43 +1308,67 @@ export default function DigitalShowcasePage({
             >
               + Adicionais disponíveis
             </span>
+          ) : totalItemInCart > activeStepperCount ? (
+            <span
+              className={`text-[9px] font-bold ${
+                isLight ? 'text-slate-600' : 'text-slate-400'
+              }`}
+            >
+              {totalItemInCart} total na sacola
+            </span>
           ) : null}
         </div>
       );
     }
 
     return (
-      <button
-        type="button"
-        onClick={() => addToCart(targetItem)}
-        aria-label={`Adicionar ${targetItem.name} ao carrinho`}
-        style={{
-          backgroundColor: theme.accentHex,
-          color: theme.accentTextOnSolid,
-          borderColor: theme.accentBorder,
-        }}
-        className="group/add shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold hover:brightness-105 active:scale-[0.97] shadow-md border transition-all whitespace-nowrap"
-      >
-        <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
-        <span>{hasFlavors || hasSizes ? 'Montar' : 'Adicionar'}</span>
-        {!hasFlavors && !hasSizes && hasExtras && (
-          <span className="text-[10px] font-medium opacity-90">
-            (Opções)
-          </span>
-        )}
-        {(hasFlavors || hasSizes) && (
-          <span className="text-[10px] font-medium opacity-90">
-            (Sabores)
-          </span>
-        )}
-        <span
-          className={`inline-flex items-center justify-center w-4 h-4 rounded-md ${
-            theme.accentTextOnSolid === '#0f172a' ? 'bg-black/15' : 'bg-white/20'
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={() => addToCart(targetItem)}
+          disabled={itemReachedMax}
+          aria-label={`Adicionar ${targetItem.name} ao carrinho`}
+          style={{
+            backgroundColor: theme.accentHex,
+            color: theme.accentTextOnSolid,
+            borderColor: theme.accentBorder,
+          }}
+          className={`group/add shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold shadow-md border transition-all whitespace-nowrap ${
+            itemReachedMax
+              ? 'opacity-45 cursor-not-allowed'
+              : 'hover:brightness-105 active:scale-[0.97]'
           }`}
         >
-          <Plus className="w-3 h-3 stroke-[2.8]" />
-        </span>
-      </button>
+          <ShoppingCart className="w-3.5 h-3.5 stroke-[2.4] shrink-0 transition-transform group-hover/add:-rotate-6 group-hover/add:scale-110" />
+          <span>{hasFlavors || hasSizes ? 'Montar' : 'Adicionar'}</span>
+          {!hasFlavors && !hasSizes && hasExtras && (
+            <span className="text-[10px] font-medium opacity-90">
+              (Opções)
+            </span>
+          )}
+          {(hasFlavors || hasSizes) && (
+            <span className="text-[10px] font-medium opacity-90">
+              (Sabores)
+            </span>
+          )}
+          <span
+            className={`inline-flex items-center justify-center w-4 h-4 rounded-md ${
+              theme.accentTextOnSolid === '#0f172a' ? 'bg-black/15' : 'bg-white/20'
+            }`}
+          >
+            <Plus className="w-3 h-3 stroke-[2.8]" />
+          </span>
+        </button>
+        {totalItemInCart > 0 && activeVariant && (
+          <span
+            className={`text-[9px] font-bold ${
+              isLight ? 'text-slate-600' : 'text-slate-400'
+            }`}
+          >
+            {totalItemInCart} de outra opção na sacola
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -1800,6 +1913,29 @@ export default function DigitalShowcasePage({
               filteredItems.map((item, index) => {
                 const stock = getItemStockInfo(item);
                 const prodDays = getItemProductionDays(item);
+                const activeVariants = getActiveItemVariants(item, isPro);
+                const selectedVariant = resolveSelectedVariant(item);
+                const effectivePrice = resolveVariantEffectivePrice(item, selectedVariant);
+                const discountPct = isPro
+                  ? calculateDiscountPercent(effectivePrice, item.originalPrice)
+                  : null;
+                const installmentLabel = isPro
+                  ? formatInstallmentLabel(
+                      effectivePrice,
+                      item.maxInstallments,
+                      menu.currency || 'R$'
+                    )
+                  : null;
+                const promoEffect =
+                  isPro && stock.canOrder ? item.promoEffect || 'none' : 'none';
+                const promoFrameClass =
+                  promoEffect === 'neon'
+                    ? 'promo-card-neon'
+                    : promoEffect === 'christmas'
+                    ? 'promo-card-christmas'
+                    : promoEffect === 'flash_gold'
+                    ? 'promo-card-flash-gold'
+                    : '';
                 const cartActionControl = renderCartActionControl(item);
 
                 return (
@@ -1815,7 +1951,7 @@ export default function DigitalShowcasePage({
                             ? 'hover:border-slate-300 hover:shadow-md'
                             : 'hover:border-slate-700'
                           : 'opacity-60 grayscale-[40%]'
-                      }`}
+                      } ${promoFrameClass}`}
                     >
                       {imageOnLeft &&
                         renderProductThumbnail(item, 'self-start sm:self-center')}
@@ -1849,6 +1985,16 @@ export default function DigitalShowcasePage({
                                 </span>
                               ) : null;
                             })()}
+                            {promoEffect === 'christmas' && (
+                              <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 border-rose-500/35 text-rose-400">
+                                🎄 Especial Natal
+                              </span>
+                            )}
+                            {promoEffect === 'neon' && (
+                              <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 border-cyan-500/35 text-cyan-300">
+                                ⚡ Destaque
+                              </span>
+                            )}
                             {item.badge && stock.canOrder && (
                               <span
                                 className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1923,15 +2069,121 @@ export default function DigitalShowcasePage({
                               </span>
                             </p>
                           )}
+                          {isPro && activeVariants.length > 0 && stock.canOrder && (
+                            <div className="pt-1 space-y-1">
+                              <span
+                                className={`text-[10px] font-bold uppercase tracking-wider block ${mutedTextClass}`}
+                              >
+                                {item.variantGroupTitle || 'Opção'}:{' '}
+                                <strong className={headingTextClass}>
+                                  {selectedVariant?.label || 'Indisponível'}
+                                </strong>
+                              </span>
+                              <div className="flex flex-wrap gap-1.5">
+                                {activeVariants.map((variant) => {
+                                  const isSelectedVar =
+                                    selectedVariant?.id === variant.id;
+                                  const isVarAvailable =
+                                    variant.isAvailable !== false;
+                                  return (
+                                    <button
+                                      key={variant.id}
+                                      type="button"
+                                      disabled={!isVarAvailable}
+                                      onClick={() =>
+                                        setSelectedVariants((prev) => ({
+                                          ...prev,
+                                          [item.id]: variant.id,
+                                        }))
+                                      }
+                                      style={
+                                        isSelectedVar
+                                          ? {
+                                              backgroundColor: theme.accentHex,
+                                              color: theme.accentTextOnSolid,
+                                              borderColor: theme.accentHex,
+                                            }
+                                          : undefined
+                                      }
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                                        !isVarAvailable
+                                          ? 'opacity-40 line-through cursor-not-allowed border-slate-700 text-slate-500'
+                                          : isSelectedVar
+                                          ? 'shadow-sm'
+                                          : isLight
+                                          ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400'
+                                          : 'bg-slate-900/80 border-slate-700 text-slate-200 hover:border-slate-500'
+                                      }`}
+                                    >
+                                      {variant.colorHex && (
+                                        <span
+                                          className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
+                                          style={{ backgroundColor: variant.colorHex }}
+                                        />
+                                      )}
+                                      <span>{variant.label}</span>
+                                      {typeof variant.price === 'number' &&
+                                        variant.price > 0 &&
+                                        variant.price !== item.price && (
+                                          <span className="opacity-80 text-[10px]">
+                                            ({formatMoneyBR(variant.price, menu.currency || 'R$')})
+                                          </span>
+                                        )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="pt-1 flex flex-wrap items-center justify-between gap-2.5">
-                          <span
-                            className="text-sm sm:text-base font-extrabold"
-                            style={{ color: theme.readableAccentText }}
-                          >
-                            {formatItemStartingPriceLabel(item)}
-                          </span>
+                        <div className="pt-1.5 flex flex-wrap items-end justify-between gap-2.5">
+                          <div className="space-y-0.5 min-w-0">
+                            {discountPct && typeof item.originalPrice === 'number' && (
+                              <span
+                                className={`text-xs line-through font-semibold block ${mutedTextClass}`}
+                              >
+                                De {formatMoneyBR(item.originalPrice, menu.currency || 'R$')}
+                              </span>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`${activePriceScaleClass} ${activePriceFont.className}`}
+                                style={{
+                                  color: theme.readableAccentText,
+                                  fontFamily: activePriceFont.fontFamily,
+                                }}
+                              >
+                                {formatItemStartingPriceLabel(item)}
+                              </span>
+                              {isPro && item.showPriceSplash && (
+                                <span className="price-splash-badge text-[10px]">
+                                  {discountPct ? `💥 -${discountPct}% OFF` : '🔥 OFERTA!'}
+                                </span>
+                              )}
+                              {isPro && !item.showPriceSplash && discountPct && (
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                                    isLight
+                                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                      : 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+                                  }`}
+                                >
+                                  -{discountPct}% OFF
+                                </span>
+                              )}
+                            </div>
+                            {installmentLabel && (
+                              <p
+                                className={`text-[11px] font-bold flex items-center gap-1 ${
+                                  isLight ? 'text-emerald-700' : 'text-emerald-300'
+                                }`}
+                              >
+                                <CreditCard className="w-3 h-3 shrink-0 opacity-85" />
+                                <span>{installmentLabel}</span>
+                              </p>
+                            )}
+                          </div>
                           {(imageOnLeft || extractItemPhotos(item, isPro).length === 0) && (
                             <div className="ml-auto">{cartActionControl}</div>
                           )}
@@ -2525,6 +2777,14 @@ export default function DigitalShowcasePage({
       {/* Unified Item Customization Modal (Sizes + Multi-Flavor + Extras) */}
       <ShowcaseCustomizeModal
         item={customizingProduct}
+        selectedVariant={
+          customizingProduct
+            ? toSelectedVariantItem(
+                customizingProduct,
+                resolveSelectedVariant(customizingProduct)
+              )
+            : undefined
+        }
         availableExtras={
           customizingProduct ? getItemAllowedExtras(customizingProduct) : []
         }
@@ -2668,7 +2928,26 @@ export default function DigitalShowcasePage({
                       <h4 className={`text-xs font-bold ${headingTextClass}`}>
                         {c.item.name}
                         {c.selectedSize ? ` (${c.selectedSize.name})` : ''}
+                        {c.selectedVariant ? ` — ${c.selectedVariant.label}` : ''}
                       </h4>
+
+                      {/* Selected Variant chip */}
+                      {c.selectedVariant && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                              isLight
+                                ? 'bg-sky-50 border-sky-200 text-sky-900'
+                                : 'bg-sky-500/15 border-sky-500/30 text-sky-200'
+                            }`}
+                          >
+                            {c.selectedVariant.groupLabel
+                              ? `${c.selectedVariant.groupLabel}: `
+                              : ''}
+                            {c.selectedVariant.label}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Selected Flavors chips */}
                       {c.selectedFlavors && c.selectedFlavors.length > 0 && (
@@ -3550,11 +3829,38 @@ export default function DigitalShowcasePage({
                         Preço
                       </span>
                       <span
-                        className="text-lg font-extrabold"
-                        style={{ color: theme.readableAccentText }}
+                        className={`${activePriceScaleClass} ${activePriceFont.className}`}
+                        style={{
+                          color: theme.readableAccentText,
+                          fontFamily: activePriceFont.fontFamily,
+                        }}
                       >
                         {formatItemStartingPriceLabel(zoomedItem)}
                       </span>
+                      {isPro &&
+                        formatInstallmentLabel(
+                          resolveVariantEffectivePrice(
+                            zoomedItem,
+                            resolveSelectedVariant(zoomedItem)
+                          ),
+                          zoomedItem.maxInstallments,
+                          menu.currency || 'R$'
+                        ) && (
+                          <p
+                            className={`text-[11px] font-bold mt-0.5 ${
+                              isLight ? 'text-emerald-700' : 'text-emerald-300'
+                            }`}
+                          >
+                            {formatInstallmentLabel(
+                              resolveVariantEffectivePrice(
+                                zoomedItem,
+                                resolveSelectedVariant(zoomedItem)
+                              ),
+                              zoomedItem.maxInstallments,
+                              menu.currency || 'R$'
+                            )}
+                          </p>
+                        )}
                     </div>
                     {renderCartActionControl(zoomedItem)}
                   </div>
