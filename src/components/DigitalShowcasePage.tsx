@@ -2042,21 +2042,33 @@ export default function DigitalShowcasePage({
                     const renderMiniThumbnailsStrip = () => {
                       if (!isPro || itemPhotos.length <= 1) return null;
                       return (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <div className="w-full flex flex-wrap items-center justify-center gap-1.5 pt-1">
                           {itemPhotos.slice(0, 5).map((pUrl, pIdx) => {
                             const isCurrentThumb = activePhotoUrl === pUrl;
                             return (
                               <button
                                 key={`${item.id}-mini-${pIdx}`}
                                 type="button"
-                                onClick={() =>
+                                onClick={() => {
+                                  const matchingVar = activeVariants.find(
+                                    (v) =>
+                                      v.imageUrl &&
+                                      v.imageUrl.trim() === pUrl &&
+                                      v.isAvailable !== false
+                                  );
+                                  if (matchingVar) {
+                                    setSelectedVariants((prev) => ({
+                                      ...prev,
+                                      [item.id]: matchingVar.id,
+                                    }));
+                                  }
                                   setPreviewPhotoOverrides((prev) => ({
                                     ...prev,
                                     [item.id]: pUrl,
-                                  }))
-                                }
+                                  }));
+                                }}
                                 title={`Ver ângulo/foto ${pIdx + 1}`}
-                                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                                className={`w-10 h-10 rounded-lg overflow-hidden border-2 transition shrink-0 ${
                                   isCurrentThumb
                                     ? 'border-emerald-400 ring-1 ring-emerald-400/50 scale-105'
                                     : isLight
@@ -2285,7 +2297,7 @@ export default function DigitalShowcasePage({
                         {activeLayoutMode === 'grid_2col' ? (
                           <div
                             className={`border rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3 h-full transition shadow-sm ${
-                              promoEffect === 'christmas' ? 'mt-2 mb-1 overflow-visible' : ''
+                              promoEffect === 'christmas' ? 'mt-3 mb-4 overflow-visible' : ''
                             } ${
                               isLight
                                 ? 'bg-white border-slate-200/90'
@@ -2373,7 +2385,7 @@ export default function DigitalShowcasePage({
                             className={`border rounded-2xl p-4 sm:p-5 flex ${
                               isPro ? 'flex-col md:flex-row' : 'flex-row'
                             } gap-4 sm:gap-5 items-stretch justify-between transition shadow-sm ${
-                              promoEffect === 'christmas' ? 'my-3 overflow-visible' : ''
+                              promoEffect === 'christmas' ? 'my-4 overflow-visible' : ''
                             } ${
                               isLight
                                 ? 'bg-white border-slate-200/90'
@@ -2393,12 +2405,12 @@ export default function DigitalShowcasePage({
                                 {/* Galeria Ampliada + Miolo Central Equilibrado */}
                                 <div className="flex-1 min-w-0 flex flex-col sm:flex-row gap-4 sm:gap-5 items-stretch sm:items-start">
                                   {imageOnLeft && itemPhotos.length > 0 && (
-                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center sm:items-start gap-2 shrink-0">
+                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center gap-2 shrink-0">
                                       {renderProductThumbnail(item, '', 'pro_list')}
                                       {itemPhotos.length > 1 ? (
                                         renderMiniThumbnailsStrip()
                                       ) : (
-                                        <span className={`text-[10px] font-medium ${mutedTextClass}`}>
+                                        <span className={`text-[10px] font-medium text-center ${mutedTextClass}`}>
                                           🔍 Toque na foto p/ ampliar
                                         </span>
                                       )}
@@ -2455,12 +2467,12 @@ export default function DigitalShowcasePage({
                                   </div>
 
                                   {!imageOnLeft && itemPhotos.length > 0 && (
-                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center sm:items-end gap-2 shrink-0">
+                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center gap-2 shrink-0">
                                       {renderProductThumbnail(item, '', 'pro_list')}
                                       {itemPhotos.length > 1 ? (
                                         renderMiniThumbnailsStrip()
                                       ) : (
-                                        <span className={`text-[10px] font-medium ${mutedTextClass}`}>
+                                        <span className={`text-[10px] font-medium text-center ${mutedTextClass}`}>
                                           🔍 Toque na foto p/ ampliar
                                         </span>
                                       )}
