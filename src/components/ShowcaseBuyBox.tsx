@@ -29,6 +29,7 @@ interface ShowcaseBuyBoxProps {
   prodDays: number;
   pixDiscountInfo: PixDiscountInfo | null;
   acceptedPaymentSummary?: string;
+  cardFeeNotice?: string | null;
   effectivePriceFormatted?: string;
   storeOpen?: boolean;
   whatsappNumber?: string;
@@ -59,6 +60,7 @@ export function ShowcaseBuyBox({
   prodDays,
   pixDiscountInfo,
   acceptedPaymentSummary,
+  cardFeeNotice,
   effectivePriceFormatted,
   storeOpen = true,
   whatsappNumber,
@@ -126,6 +128,18 @@ export function ShowcaseBuyBox({
             <span className={`inline-flex items-center gap-1 ${mutedLineClass}`}>
               <Store className="w-3 h-3 shrink-0 opacity-80" />
               <span>Retira</span>
+            </span>
+          )}
+          {cardFeeNotice && stockCanOrder && (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold ${
+                isLight
+                  ? 'bg-amber-50 border-amber-300 text-amber-800'
+                  : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+              }`}
+            >
+              <CreditCard className="w-3 h-3 shrink-0" />
+              <span>{cardFeeNotice}</span>
             </span>
           )}
         </div>
@@ -221,25 +235,39 @@ export function ShowcaseBuyBox({
 
         {/* Bloco Central da Buy Box: PIX Destaque OU Resumo Real de Pagamento/Seleção */}
         {isPro && pixDiscountInfo && stockCanOrder ? (
-          <div
-            className={`px-2.5 py-2 rounded-xl border space-y-0.5 ${
-              isLight
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-emerald-500/12 border-emerald-500/35 text-emerald-200'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-1 text-[9.5px] font-black uppercase tracking-wider">
-              <span className="flex items-center gap-1">
-                <Zap className="w-3 h-3 text-emerald-400 shrink-0" />
-                <span>Economize no PIX</span>
-              </span>
-              <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-slate-950">
-                -{pixDiscountInfo.percent}% OFF
-              </span>
+          <div className="space-y-1.5">
+            <div
+              className={`px-2.5 py-2 rounded-xl border space-y-0.5 ${
+                isLight
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  : 'bg-emerald-500/12 border-emerald-500/35 text-emerald-200'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 text-[9.5px] font-black uppercase tracking-wider">
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-emerald-400 shrink-0" />
+                  <span>Economize no PIX</span>
+                </span>
+                <span className="px-1.5 py-0.2 rounded bg-emerald-500 text-slate-950">
+                  -{pixDiscountInfo.percent}% OFF
+                </span>
+              </div>
+              <div className="text-sm font-black leading-tight text-emerald-400">
+                {pixDiscountInfo.pixPriceFormatted} à vista
+              </div>
             </div>
-            <div className="text-sm font-black leading-tight text-emerald-400">
-              {pixDiscountInfo.pixPriceFormatted} à vista
-            </div>
+            {cardFeeNotice && (
+              <div
+                className={`px-2.5 py-1.5 rounded-lg border flex items-start gap-1.5 text-[10px] font-bold ${
+                  isLight
+                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-amber-500/12 border-amber-500/35 text-amber-200'
+                }`}
+              >
+                <CreditCard className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                <span className="leading-snug">{cardFeeNotice}</span>
+              </div>
+            )}
           </div>
         ) : (
           <div className={`px-2.5 py-2 rounded-xl border space-y-1.5 text-[10.5px] ${subPanelClass}`}>
@@ -263,14 +291,27 @@ export function ShowcaseBuyBox({
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 text-[10px] font-bold opacity-85">
-              <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span>
-                {storeOpen
-                  ? 'Pedido direto sem taxas'
-                  : 'Agende seu pedido'}
-              </span>
-            </div>
+            {cardFeeNotice ? (
+              <div
+                className={`flex items-start gap-1.5 px-2 py-1.5 rounded-lg border text-[10px] font-bold ${
+                  isLight
+                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-amber-500/12 border-amber-500/35 text-amber-200'
+                }`}
+              >
+                <CreditCard className="w-3 h-3 text-amber-400 shrink-0 mt-0.5" />
+                <span className="leading-snug">{cardFeeNotice}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[10px] font-bold opacity-85">
+                <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span>
+                  {storeOpen
+                    ? 'Pedido direto sem taxas'
+                    : 'Agende seu pedido'}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

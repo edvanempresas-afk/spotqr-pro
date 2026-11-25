@@ -43,6 +43,91 @@ import { compressImageFileToDataUrl } from '../lib/image-upload';
 import { ChristmasCardDecor } from './ChristmasCardDecor';
 import { RetailPriceTag } from './RetailPriceTag';
 
+export interface CreditCardInstallmentNoticeProps {
+  mpAffiliatePointUrl?: string;
+  onEnableCreditCard?: () => void;
+  compact?: boolean;
+  headline?: string;
+  description?: string;
+}
+
+/**
+ * Shared aviso informing merchants that installment pricing is restricted to
+ * stores accepting Credit Card, offering 1-click activation and optional Mercado Pago Point link.
+ */
+export function CreditCardInstallmentNotice({
+  mpAffiliatePointUrl = 'https://www.mercadopago.com.br/point',
+  onEnableCreditCard,
+  compact = false,
+  headline = 'Aviso: Parcelamento exige pagamento em Cartão de Crédito',
+  description = 'Você só pode criar preços parcelados (ex.: 2x, 6x, 12x) se aceitar pagamentos em Cartão de Crédito. Se você ainda não tem maquininha para aceitar cartão, oferecemos nosso link de indicação do Mercado Pago abaixo caso queira adquirir uma.',
+}: CreditCardInstallmentNoticeProps) {
+  const safeMpUrl = mpAffiliatePointUrl || 'https://www.mercadopago.com.br/point';
+  return (
+    <div
+      className={`rounded-xl border border-amber-500/40 bg-amber-950/30 ${
+        compact ? 'p-2.5 space-y-2' : 'p-3 space-y-2.5'
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <div className="space-y-0.5 min-w-0">
+          <span
+            className={`font-extrabold text-amber-200 block leading-snug ${
+              compact ? 'text-[11px]' : 'text-xs'
+            }`}
+          >
+            {headline}
+          </span>
+          <p
+            className={`text-slate-200/90 leading-relaxed ${
+              compact ? 'text-[10px]' : 'text-[11px]'
+            }`}
+          >
+            {description}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        {onEnableCreditCard && (
+          <button
+            type="button"
+            onClick={onEnableCreditCard}
+            className={`inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold transition shadow-sm ${
+              compact ? 'px-2.5 py-1 text-[10.5px]' : 'px-3 py-1.5 text-[11px]'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            <span>
+              {compact
+                ? 'Ativar Cartão de Crédito'
+                : 'Já aceito Cartão — Ativar e Liberar Parcelas'}
+            </span>
+          </button>
+        )}
+
+        <a
+          href={safeMpUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/45 text-sky-200 font-bold transition ${
+            compact ? 'px-2.5 py-1 text-[10.5px]' : 'px-3 py-1.5 text-[11px]'
+          }`}
+        >
+          <span>
+            💳{' '}
+            {compact
+              ? 'Não tem maquininha? Adquirir Mercado Pago (Opcional)'
+              : 'Não tem maquininha? Adquirir Mercado Pago (Link de Indicação)'}
+          </span>
+          <ExternalLink className="w-3 h-3 shrink-0" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
 interface ItemProMerchandisingSectionProps {
   item: MenuItem;
   currency?: string;
@@ -238,7 +323,7 @@ export function ItemProMerchandisingSection({
         </div>
 
         <div className="flex items-center gap-1.5 ml-auto">
-          {hasAnyActiveProMerchandising && (
+          {(hasAnyActiveProMerchandising || !isCardAccepted) && (
             <div className="flex flex-wrap items-center gap-1">
               {activeEffect !== 'none' && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/35 text-violet-200">
@@ -255,15 +340,27 @@ export function ItemProMerchandisingSection({
                   💥 Splash Gôndola
                 </span>
               )}
-              {item.maxInstallments && item.maxInstallments >= 2 && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-500/35 text-sky-200">
-                  {item.maxInstallments}x
-                  {resolvedInterestMode === 'with_interest'
-                    ? ' c/ juros'
-                    : resolvedInterestMode === 'no_interest'
-                    ? ' s/ juros'
-                    : ''}
-                </span>
+              {item.maxInstallments && item.maxInstallments >= 2 ? (
+                isCardAccepted ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/20 border border-sky-500/35 text-sky-200">
+                    {item.maxInstallments}x
+                    {resolvedInterestMode === 'with_interest'
+                      ? ' c/ juros'
+                      : resolvedInterestMode === 'no_interest'
+                      ? ' s/ juros'
+                      : ''}
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/45 text-amber-200">
+                    🔒 {item.maxInstallments}x bloqueado (sem Cartão)
+                  </span>
+                )
+              ) : (
+                !isCardAccepted && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-200">
+                    🔒 Parcelas exigem Cartão
+                  </span>
+                )
               )}
               {pixDiscountPreview && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/35 text-emerald-200">
@@ -367,7 +464,7 @@ export function ItemProMerchandisingSection({
               </div>
 
               {/* Prévia Ao Vivo da Etiqueta / Splash encima do Preço */}
-              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col items-start justify-center gap-1.5">
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col items-start justify-center gap-2">
                 <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">
                   Prévia do Preço na Vitrine:
                 </span>
@@ -387,6 +484,15 @@ export function ItemProMerchandisingSection({
                   isLight={false}
                   mutedTextClass="text-slate-400"
                 />
+                {!isCardAccepted && (
+                  <CreditCardInstallmentNotice
+                    compact
+                    mpAffiliatePointUrl={mpAffiliatePointUrl}
+                    onEnableCreditCard={onEnableCreditCard}
+                    headline="Prévia à vista: parcelamento bloqueado sem Cartão de Crédito"
+                    description="Você só pode criar preços parcelados se aceitar Cartão de Crédito. Se ainda não tem maquininha, use nosso link do Mercado Pago (opcional)."
+                  />
+                )}
               </div>
             </div>
 
@@ -438,51 +544,24 @@ export function ItemProMerchandisingSection({
                 <CreditCard className="w-3.5 h-3.5 text-sky-400" />
                 <span>Parcelamento no Cartão de Crédito (Itens de Maior Valor)</span>
               </h5>
-              {installmentPreview && (
-                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/35 text-sky-300">
-                  {installmentPreview} • À vista {formatMoneyBR(effectiveSamplePrice, currency)}
+              {!isCardAccepted ? (
+                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/45 text-amber-200">
+                  🔒 Exige Cartão de Crédito ativo
                 </span>
+              ) : (
+                installmentPreview && (
+                  <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/35 text-sky-300">
+                    {installmentPreview} • À vista {formatMoneyBR(effectiveSamplePrice, currency)}
+                  </span>
+                )
               )}
             </div>
 
             {!isCardAccepted ? (
-              <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/35 space-y-2.5">
-                <div className="flex items-start gap-2">
-                  <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <span className="text-xs font-extrabold text-amber-200 block">
-                      Parcelamento exclusivo para quem aceita Cartão de Crédito
-                    </span>
-                    <p className="text-[10.5px] text-slate-300 leading-relaxed">
-                      No Brasil, vendas parceladas são permitidas apenas via{' '}
-                      <strong className="text-white">Cartão de Crédito</strong>. Lojas que aceitam somente PIX ou Dinheiro não podem parcelar na vitrine.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  {onEnableCreditCard && (
-                    <button
-                      type="button"
-                      onClick={onEnableCreditCard}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-extrabold transition shadow-sm"
-                    >
-                      <CreditCard className="w-3.5 h-3.5" />
-                      <span>Aceitar Cartão de Crédito e Liberar</span>
-                    </button>
-                  )}
-
-                  <a
-                    href={mpAffiliatePointUrl || 'https://www.mercadopago.com.br/point'}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/45 text-sky-200 text-[11px] font-bold transition"
-                  >
-                    <span>💳 Não aceita cartão? Pedir Mercado Pago (Opcional)</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
+              <CreditCardInstallmentNotice
+                mpAffiliatePointUrl={mpAffiliatePointUrl}
+                onEnableCreditCard={onEnableCreditCard}
+              />
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-1.5">

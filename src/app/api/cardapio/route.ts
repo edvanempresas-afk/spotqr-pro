@@ -22,7 +22,11 @@ import { isTimestampActiveFuture, normalizePixKeyForCompare } from '@/lib/securi
 import { RestaurantMenu, DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
-import { getAcceptedPaymentsList } from '@/lib/payments';
+import {
+  getAcceptedPaymentsList,
+  acceptsAnyCardPayment,
+  resolveCardFeeNotice,
+} from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,10 +114,16 @@ export async function GET(request: NextRequest) {
       ? accountPro.proExpiresAt || null
       : null;
 
+  const storeAcceptsAnyCard = acceptsAnyCardPayment(menu);
+  const resolvedCardFeeNotice = resolveCardFeeNotice(menu);
+
   return NextResponse.json(
     {
       ...menu,
       items: sanitizedItems,
+      passCardFeeToBuyer: storeAcceptsAnyCard && Boolean(menu.passCardFeeToBuyer),
+      cardFeeNoticeText: resolvedCardFeeNotice || undefined,
+      christmasPageSkin: Boolean(menu.christmasPageSkin),
       coverVideo: isPaid ? menu.coverVideo : undefined,
       priceFontStyle: isPaid ? menu.priceFontStyle : undefined,
       priceScale: isPaid ? menu.priceScale : undefined,
@@ -453,10 +463,26 @@ export async function POST(request: NextRequest) {
       cleanMenuBody.catalogLayoutMode === 'list'
         ? cleanMenuBody.catalogLayoutMode
         : undefined;
+    const saveAcceptsAnyCard = acceptsAnyCardPayment({
+      acceptedPayments: cleanMenuBody.acceptedPayments,
+      slug: cleanSlug,
+    });
+    const cleanPassCardFee = Boolean(
+      saveAcceptsAnyCard && cleanMenuBody.passCardFeeToBuyer
+    );
+    const cleanCardFeeNotice =
+      cleanPassCardFee &&
+      typeof cleanMenuBody.cardFeeNoticeText === 'string' &&
+      cleanMenuBody.cardFeeNoticeText.trim()
+        ? cleanMenuBody.cardFeeNoticeText.trim().slice(0, 70)
+        : undefined;
 
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
       items: sanitizedIncomingItems,
+      passCardFeeToBuyer: cleanPassCardFee,
+      cardFeeNoticeText: cleanCardFeeNotice,
+      christmasPageSkin: Boolean(cleanMenuBody.christmasPageSkin),
       coverVideo: isEffectivePro
         ? incomingCoverVideo || undefined
         : existingCoverVideo || undefined,

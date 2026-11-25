@@ -181,6 +181,7 @@ export interface RestaurantMenu {
   tableNumberPrompt: boolean;
   themeColor: string;
   themeMode?: ShowcaseThemeMode;
+  christmasPageSkin?: boolean; // Skin natalina na página inteira (topo, diagonais e laterais) liberada para Free e PRO
   coverImage?: string;
   coverVideo?: string;
   logoImage?: string;
@@ -200,6 +201,8 @@ export interface RestaurantMenu {
   allowOnSite?: boolean;
   allowCallWaiter?: boolean; // Se o cliente pode chamar o garçom pelo WhatsApp (só exibe se leu o QR da mesa)
   acceptedPayments?: ShowcasePaymentMethod[];
+  passCardFeeToBuyer?: boolean; // Opcional: avisa no card/checkout que pagamentos no cartão têm repasse da taxa da maquininha
+  cardFeeNoticeText?: string;   // Texto opcional do aviso da taxa (ex: "Taxa da maquininha +4% no cartão")
   productImagePosition?: 'left' | 'right';
   priceFontStyle?: PriceFontStyle; // Recurso PRO: estilo de fonte dos preços
   priceScale?: PriceScale;         // Recurso PRO: tamanho dos preços na vitrine

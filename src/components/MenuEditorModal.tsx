@@ -55,6 +55,9 @@ import { getItemStockInfo } from '@/lib/stock';
 import { isProStillValid, getProRenewalAlert } from '@/lib/pro-status';
 import {
   SHOWCASE_PAYMENT_OPTIONS,
+  CARD_FEE_NOTICE_SUGGESTIONS,
+  DEFAULT_CARD_FEE_NOTICE,
+  acceptsAnyCardPayment,
   getAcceptedPaymentsList,
 } from '@/lib/payments';
 import {
@@ -68,7 +71,11 @@ import { renderStyledQR, getDefaultFrameTexts } from '@/lib/qr-canvas';
 import ImageCropModal from './ImageCropModal';
 import MenuFlavorsTab from './MenuFlavorsTab';
 import ItemMultiFlavorSection from './ItemMultiFlavorSection';
-import { ItemProMerchandisingSection } from './ItemProMerchandisingSection';
+import {
+  ItemProMerchandisingSection,
+  CreditCardInstallmentNotice,
+} from './ItemProMerchandisingSection';
+import { ChristmasPageSkin } from './ChristmasPageSkin';
 import {
   CATALOG_LAYOUT_OPTIONS,
   PRICE_FONT_OPTIONS,
@@ -177,6 +184,96 @@ const normalizeMenuItemsProductionDays = (items: MenuItem[]): MenuItem[] =>
     };
   });
 
+interface CardFeePassThroughControlProps {
+  passCardFee: boolean;
+  noticeText: string;
+  compact?: boolean;
+  onToggle: (enabled: boolean) => void;
+  onChangeText: (text: string) => void;
+}
+
+/** Optional toggle and custom note allowing merchants to disclose card machine fee pass-throughs. */
+function CardFeePassThroughControl({
+  passCardFee,
+  noticeText,
+  compact = false,
+  onToggle,
+  onChangeText,
+}: CardFeePassThroughControlProps) {
+  const previewText = noticeText.trim() || DEFAULT_CARD_FEE_NOTICE;
+  return (
+    <div
+      className={`rounded-xl border transition ${
+        passCardFee
+          ? 'bg-amber-950/30 border-amber-500/45'
+          : 'bg-slate-950/60 border-slate-800'
+      } ${compact ? 'p-2.5 space-y-2' : 'p-3 space-y-2.5'}`}
+    >
+      <label className="flex items-start gap-2.5 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={passCardFee}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="accent-amber-500 w-4 h-4 mt-0.5 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <span className="text-[11.5px] font-bold text-white block leading-snug">
+            💳 Repassar Taxa da Maquininha no Cartão (Aviso Opcional)
+          </span>
+          <span className="text-[10px] text-slate-400 block leading-snug mt-0.5">
+            {passCardFee
+              ? 'Ativo: em vez de "Pedido direto sem taxas", o cliente verá o aviso abaixo na vitrine, no checkout e no pedido WhatsApp quando escolher Cartão.'
+              : 'Opcional: ative caso sua loja cobre ou repasse a taxa da maquininha nos pagamentos no cartão (crédito/débito).'}
+          </span>
+        </div>
+      </label>
+
+      {passCardFee && (
+        <div className="space-y-2 pt-1 border-t border-amber-500/20">
+          <div>
+            <label className="text-[10px] font-bold text-amber-200 uppercase block mb-1">
+              Texto do aviso exibido para o comprador (opcional):
+            </label>
+            <input
+              type="text"
+              maxLength={70}
+              value={noticeText}
+              onChange={(e) => onChangeText(e.target.value)}
+              placeholder={`Ex: ${DEFAULT_CARD_FEE_NOTICE}`}
+              className="w-full bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none"
+            />
+          </div>
+
+          {!compact && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-semibold">
+                Sugestões:
+              </span>
+              {CARD_FEE_NOTICE_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => onChangeText(suggestion)}
+                  className="px-2 py-0.5 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] text-amber-200 transition"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-[10px] text-amber-200/90 flex items-center gap-1.5">
+            <span>Prévia no card:</span>
+            <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 font-bold">
+              💳 {previewText}
+            </span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MenuEditorModal({
   isOpen,
   onClose,
@@ -193,6 +290,8 @@ export default function MenuEditorModal({
   const [downloadingQR, setDownloadingQR] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
+  const [installmentsStrippedWarning, setInstallmentsStrippedWarning] =
+    useState(false);
   const [originalPixKey, setOriginalPixKey] = useState<string>('');
   const [pixPasswordConfirmation, setPixPasswordConfirmation] =
     useState<string>('');
@@ -219,10 +318,10 @@ export default function MenuEditorModal({
     isObjectUrl: boolean;
     preset: ImageUploadPreset;
     target:
-      | { kind: 'item'; itemId: string }
-      | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
-      | { kind: 'flavor'; flavorId: string }
-      | { kind: 'brand'; field: 'logoImage' | 'coverImage' };
+    | { kind: 'item'; itemId: string }
+    | { kind: 'item-gallery'; itemId: string; galleryIndex?: number }
+    | { kind: 'flavor'; flavorId: string }
+    | { kind: 'brand'; field: 'logoImage' | 'coverImage' };
   } | null>(null);
 
   // Drag & Drop snap-card ordering state
@@ -239,6 +338,7 @@ export default function MenuEditorModal({
   const allowOnSite = menu?.allowOnSite ?? defaultFulfill;
   const allowCallWaiter = menu?.allowCallWaiter ?? true;
   const acceptedPayments = getAcceptedPaymentsList(menu);
+  const acceptsAnyCard = acceptsAnyCardPayment(menu);
 
   const toggleAcceptedPayment = (method: ShowcasePaymentMethod) => {
     if (!menu) return;
@@ -246,6 +346,9 @@ export default function MenuEditorModal({
     const next = current.includes(method)
       ? current.filter((m) => m !== method)
       : [...current, method];
+    if (method === 'credit_card' && next.includes('credit_card')) {
+      setInstallmentsStrippedWarning(false);
+    }
     setMenu({ ...menu, acceptedPayments: next });
   };
 
@@ -256,6 +359,7 @@ export default function MenuEditorModal({
       ? `&title=${encodeURIComponent(defaultTitle)}`
       : '';
     setSaveErrorMsg(null);
+    setInstallmentsStrippedWarning(false);
     setPixPasswordConfirmation('');
     fetch('/api/auth', { cache: 'no-store' })
       .then((r) => r.json())
@@ -268,7 +372,7 @@ export default function MenuEditorModal({
           setPixLockedUntil(null);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     fetch('/api/pro-price', { cache: 'no-store' })
       .then((r) => r.json())
       .then((pData) => {
@@ -276,7 +380,7 @@ export default function MenuEditorModal({
           setMpAffiliatePointUrl(pData.mpAffiliatePointUrl.trim());
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     fetch(
       `/api/cardapio?slug=${encodeURIComponent(slug)}&mode=${mode}${titleQuery}&t=${Date.now()}`,
       { cache: 'no-store' }
@@ -327,35 +431,35 @@ export default function MenuEditorModal({
 
   const proMeta = menu as
     | (RestaurantMenu & {
-        isPaid?: boolean;
-        proExpiresAt?: string | null;
-        autoRenewSummary?: {
-          enabled: boolean;
-          status: 'active' | 'past_due' | 'canceled' | 'suspended_free';
-          graceEndsAt?: string | null;
-          retryCount: number;
-          lastError?: string | null;
-        } | null;
-      })
+      isPaid?: boolean;
+      proExpiresAt?: string | null;
+      autoRenewSummary?: {
+        enabled: boolean;
+        status: 'active' | 'past_due' | 'canceled' | 'suspended_free';
+        graceEndsAt?: string | null;
+        retryCount: number;
+        lastError?: string | null;
+      } | null;
+    })
     | null;
   const isProShowcase = Boolean(
     proMeta &&
-      (isProStillValid({
-        slug,
-        isPaid: proMeta.isPaid,
-        proExpiresAt: proMeta.proExpiresAt,
-        autoRenew: proMeta.autoRenewSummary || undefined,
-      }) ||
-        slug === 'demo-restaurante' ||
-        slug === 'demo-catalogo')
+    (isProStillValid({
+      slug,
+      isPaid: proMeta.isPaid,
+      proExpiresAt: proMeta.proExpiresAt,
+      autoRenew: proMeta.autoRenewSummary || undefined,
+    }) ||
+      slug === 'demo-restaurante' ||
+      slug === 'demo-catalogo')
   );
   const editorRenewalAlert = proMeta
     ? getProRenewalAlert({
-        slug,
-        isPaid: proMeta.isPaid,
-        proExpiresAt: proMeta.proExpiresAt,
-        autoRenew: proMeta.autoRenewSummary || undefined,
-      })
+      slug,
+      isPaid: proMeta.isPaid,
+      proExpiresAt: proMeta.proExpiresAt,
+      autoRenew: proMeta.autoRenewSummary || undefined,
+    })
     : null;
 
   const buildCurrentPayload = (source: RestaurantMenu): RestaurantMenu => ({
@@ -364,9 +468,9 @@ export default function MenuEditorModal({
       ? normalizeMenuItemsProductionDays(source.items)
       : [],
     mode: source.mode || mode,
-    allowDelivery: source.allowDelivery ?? !( (source.mode || mode) === 'catalog' ),
-    allowPickup: source.allowPickup ?? !( (source.mode || mode) === 'catalog' ),
-    allowOnSite: source.allowOnSite ?? !( (source.mode || mode) === 'catalog' ),
+    allowDelivery: source.allowDelivery ?? !((source.mode || mode) === 'catalog'),
+    allowPickup: source.allowPickup ?? !((source.mode || mode) === 'catalog'),
+    allowOnSite: source.allowOnSite ?? !((source.mode || mode) === 'catalog'),
     allowCallWaiter: source.allowCallWaiter ?? true,
     acceptedPayments: getAcceptedPaymentsList(source),
     themeMode: source.themeMode === 'light' ? 'light' : 'dark',
@@ -382,6 +486,11 @@ export default function MenuEditorModal({
     if (!menu) return false;
     setSaveErrorMsg(null);
     const payload = buildCurrentPayload(menu);
+    const hadInstallmentsWithoutCard =
+      !(payload.acceptedPayments || []).includes('credit_card') &&
+      payload.items.some(
+        (it) => typeof it.maxInstallments === 'number' && it.maxInstallments >= 2
+      );
     const isPixBeingChanged =
       Boolean(originalPixKey) &&
       originalPixKey.toLowerCase() !== (payload.pixKey || '').trim().toLowerCase();
@@ -404,19 +513,29 @@ export default function MenuEditorModal({
         }),
       });
       if (res.ok) {
+        const resData = await res.json().catch(() => null);
+        const persistedMenu: RestaurantMenu = resData?.menu
+          ? ({
+            ...resData.menu,
+            isPaid: proMeta?.isPaid,
+            proExpiresAt: proMeta?.proExpiresAt,
+            autoRenewSummary: proMeta?.autoRenewSummary,
+          } as RestaurantMenu)
+          : payload;
         if (typeof window !== 'undefined') {
           try {
             localStorage.setItem(
               `spotqr_live_showcase_${slug}`,
-              JSON.stringify(payload)
+              JSON.stringify(persistedMenu)
             );
           } catch {
             // Ignore quota exceeded on private browsing
           }
         }
-        setOriginalPixKey((payload.pixKey || '').trim());
+        setOriginalPixKey((persistedMenu.pixKey || '').trim());
         setPixPasswordConfirmation('');
-        setMenu(payload);
+        setInstallmentsStrippedWarning(hadInstallmentsWithoutCard);
+        setMenu(persistedMenu);
         if (onSaved) onSaved();
         return true;
       }
@@ -839,11 +958,11 @@ export default function MenuEditorModal({
       setMenu((prev) =>
         prev
           ? {
-              ...prev,
-              flavors: (prev.flavors || []).map((fl) =>
-                fl.id === targetFlavorId ? { ...fl, imageUrl: croppedDataUrl } : fl
-              ),
-            }
+            ...prev,
+            flavors: (prev.flavors || []).map((fl) =>
+              fl.id === targetFlavorId ? { ...fl, imageUrl: croppedDataUrl } : fl
+            ),
+          }
           : prev
       );
     } else {
@@ -895,8 +1014,8 @@ export default function MenuEditorModal({
                 {downloadingQR
                   ? 'Baixando...'
                   : isCatalog
-                  ? 'Baixar QR do Catálogo'
-                  : 'Baixar QR do Cardápio'}
+                    ? 'Baixar QR do Catálogo'
+                    : 'Baixar QR do Cardápio'}
               </span>
             </button>
 
@@ -950,11 +1069,10 @@ export default function MenuEditorModal({
         {/* Expiration Alert Banner inside Editor (<= 10 days or past_due) */}
         {editorRenewalAlert && (
           <div
-            className={`px-6 py-2.5 border-b text-xs font-semibold flex flex-wrap items-center justify-between gap-2 ${
-              editorRenewalAlert.kind === 'past_due'
+            className={`px-6 py-2.5 border-b text-xs font-semibold flex flex-wrap items-center justify-between gap-2 ${editorRenewalAlert.kind === 'past_due'
                 ? 'bg-red-950/50 border-red-500/40 text-red-200'
                 : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
-            }`}
+              }`}
           >
             <span>⏳ {editorRenewalAlert.headline} — renove no Painel para manter o vídeo animado e link personalizado ativos.</span>
           </div>
@@ -975,11 +1093,11 @@ export default function MenuEditorModal({
             },
             ...(!isCatalog
               ? [
-                  {
-                    id: 'flavors',
-                    label: `🍕 Sabores (${menu?.flavors?.length || 0})`,
-                  },
-                ]
+                {
+                  id: 'flavors',
+                  label: `🍕 Sabores (${menu?.flavors?.length || 0})`,
+                },
+              ]
               : []),
             {
               id: 'branding',
@@ -997,11 +1115,10 @@ export default function MenuEditorModal({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as any)}
-              className={`shrink-0 py-3 px-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
-                activeTab === tab.id
+              className={`shrink-0 py-3 px-2.5 text-xs font-bold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${activeTab === tab.id
                   ? 'border-emerald-500 text-emerald-400'
                   : 'border-transparent text-slate-400 hover:text-white'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -1045,6 +1162,30 @@ export default function MenuEditorModal({
           </div>
         )}
 
+        {installmentsStrippedWarning &&
+          !acceptedPayments.includes('credit_card') && (
+            <div className="px-4 sm:px-6 py-2.5 bg-amber-950/35 border-b border-amber-500/35 shrink-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <CreditCardInstallmentNotice
+                    compact
+                    mpAffiliatePointUrl={mpAffiliatePointUrl}
+                    onEnableCreditCard={() => toggleAcceptedPayment('credit_card')}
+                    headline="Parcelamento não exibido na vitrine: Cartão de Crédito desativado"
+                    description="Os produtos foram salvos apenas com preço à vista porque você só pode criar preços parcelados se aceitar pagamentos em Cartão de Crédito. Ative abaixo ou adquira sua maquininha pelo nosso link do Mercado Pago."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setInstallmentsStrippedWarning(false)}
+                  className="text-amber-300 hover:text-white text-xs font-bold shrink-0 px-2 py-1"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+
         {/* Body Content */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
           {loading || !menu ? (
@@ -1071,11 +1212,10 @@ export default function MenuEditorModal({
                             onClick={() =>
                               setMenu({ ...menu, productImagePosition: 'left' })
                             }
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
-                              imagePos === 'left'
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${imagePos === 'left'
                                 ? 'bg-emerald-500 text-white shadow-sm'
                                 : 'text-slate-400 hover:text-white'
-                            }`}
+                              }`}
                           >
                             ◧ Lado Esquerdo
                           </button>
@@ -1084,15 +1224,31 @@ export default function MenuEditorModal({
                             onClick={() =>
                               setMenu({ ...menu, productImagePosition: 'right' })
                             }
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${
-                              imagePos === 'right'
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold transition ${imagePos === 'right'
                                 ? 'bg-emerald-500 text-white shadow-sm'
                                 : 'text-slate-400 hover:text-white'
-                            }`}
+                              }`}
                           >
                             ◨ Lado Direito
                           </button>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenu({
+                              ...menu,
+                              christmasPageSkin: !menu.christmasPageSkin,
+                            })
+                          }
+                          title="Ativar ou desativar o tema natalino nas bordas e laterais de toda a página (liberado grátis para Free e PRO)"
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
+                            menu.christmasPageSkin
+                              ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200 shadow-sm'
+                              : 'bg-slate-950 border-slate-700 text-slate-300 hover:border-emerald-500/40'
+                          }`}
+                        >
+                          {menu.christmasPageSkin ? '✅' : '○'} 🎄 Skin Natalina (Grátis)
+                        </button>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -1104,11 +1260,10 @@ export default function MenuEditorModal({
                           onClick={() =>
                             setMenu({ ...menu, allowDelivery: !allowDelivery })
                           }
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                            allowDelivery
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${allowDelivery
                               ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                          }`}
+                            }`}
                         >
                           {allowDelivery ? '✅' : '○'}{' '}
                           {isCatalog ? 'Fazemos Envio' : 'Delivery'}
@@ -1119,11 +1274,10 @@ export default function MenuEditorModal({
                           onClick={() =>
                             setMenu({ ...menu, allowPickup: !allowPickup })
                           }
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                            allowPickup
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${allowPickup
                               ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                          }`}
+                            }`}
                         >
                           {allowPickup ? '✅' : '○'} Retirada no Local
                         </button>
@@ -1138,11 +1292,10 @@ export default function MenuEditorModal({
                               ...(nextOnSite ? {} : { allowCallWaiter: false }),
                             });
                           }}
-                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                            allowOnSite
+                          className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${allowOnSite
                               ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                          }`}
+                            }`}
                         >
                           {allowOnSite ? '✅' : '○'}{' '}
                           {isCatalog ? 'Presencial / Balcão' : 'Na Mesa'}
@@ -1161,11 +1314,10 @@ export default function MenuEditorModal({
                             key={opt.id}
                             type="button"
                             onClick={() => toggleAcceptedPayment(opt.id)}
-                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${
-                              enabled
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold transition ${enabled
                                 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
                                 : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                            }`}
+                              }`}
                           >
                             {enabled ? '✅' : '○'} {opt.icon} {opt.shortLabel}
                           </button>
@@ -1175,6 +1327,38 @@ export default function MenuEditorModal({
                         <span className="text-[10px] text-amber-300 font-semibold">
                           (Nenhum marcado: pedido irá como &ldquo;A combinar no WhatsApp&rdquo;)
                         </span>
+                      )}
+                      {acceptsAnyCard && (
+                        <div className="w-full pt-1.5">
+                          <CardFeePassThroughControl
+                            compact
+                            passCardFee={Boolean(menu.passCardFeeToBuyer)}
+                            noticeText={menu.cardFeeNoticeText || ''}
+                            onToggle={(enabled) =>
+                              setMenu({
+                                ...menu,
+                                passCardFeeToBuyer: enabled,
+                              })
+                            }
+                            onChangeText={(text) =>
+                              setMenu({
+                                ...menu,
+                                cardFeeNoticeText: text,
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+                      {!acceptedPayments.includes('credit_card') && (
+                        <div className="w-full pt-1.5">
+                          <CreditCardInstallmentNotice
+                            compact
+                            mpAffiliatePointUrl={mpAffiliatePointUrl}
+                            onEnableCreditCard={() =>
+                              toggleAcceptedPayment('credit_card')
+                            }
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1261,15 +1445,14 @@ export default function MenuEditorModal({
                             setDragOverId(null);
                             setDragArmedId(null);
                           }}
-                          className={`rounded-2xl border transition-all ${
-                            isBeingDragged
+                          className={`rounded-2xl border transition-all ${isBeingDragged
                               ? 'opacity-45 scale-[0.98] border-dashed border-emerald-500 bg-slate-900'
                               : isDropTarget
-                              ? 'ring-2 ring-emerald-400 border-emerald-400 bg-emerald-500/10 shadow-glow'
-                              : item.isAvailable
-                              ? 'bg-slate-900/70 border-slate-800'
-                              : 'bg-rose-950/20 border-rose-500/30 opacity-75'
-                          }`}
+                                ? 'ring-2 ring-emerald-400 border-emerald-400 bg-emerald-500/10 shadow-glow'
+                                : item.isAvailable
+                                  ? 'bg-slate-900/70 border-slate-800'
+                                  : 'bg-rose-950/20 border-rose-500/30 opacity-75'
+                            }`}
                         >
                           {isDropTarget && (
                             <div className="px-4 py-1.5 bg-emerald-500/20 border-b border-emerald-500/40 rounded-t-2xl text-[11px] font-extrabold text-emerald-300 text-center">
@@ -1404,717 +1587,714 @@ export default function MenuEditorModal({
                               </div>
                             </div>
 
-                          {/* Fields */}
-                          <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <div className="sm:col-span-2">
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                {isCatalog ? 'Nome do Produto:' : 'Nome do Prato / Produto:'}
-                              </label>
-                              <input
-                                type="text"
-                                value={item.name}
-                                placeholder={
-                                  isCatalog
-                                    ? 'Ex: Camiseta, Caneca, Luminária 3D...'
-                                    : 'Ex: X-Bacon Especial, Pizza Calabresa...'
-                                }
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, { name: e.target.value })
-                                }
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Preço (R$):
-                              </label>
-                              <input
-                                type="number"
-                                step="0.10"
-                                min="0"
-                                value={item.price === 0 ? '' : item.price}
-                                placeholder="0,00"
-                                onFocus={(e) => e.target.select()}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (val === '') {
-                                    handleUpdateItem(item.id, { price: 0 });
-                                  } else {
-                                    const parsed = parseFloat(val);
-                                    handleUpdateItem(item.id, {
-                                      price: isNaN(parsed) ? 0 : parsed,
-                                    });
-                                  }
-                                }}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-400 font-bold"
-                              />
-                            </div>
-
-                            <div className="sm:col-span-3">
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                {isCatalog
-                                  ? 'Descrição, Tamanhos, Cores ou Material:'
-                                  : 'Descrição e Ingredientes:'}
-                              </label>
-                              <input
-                                type="text"
-                                value={item.description}
-                                placeholder={
-                                  isCatalog
-                                    ? 'Informe detalhes como material, tamanhos, cores disponíveis ou personalização...'
-                                    : 'Descreva os ingredientes e acompanhamento...'
-                                }
-                                onChange={(e) =>
-                                  handleUpdateItem(item.id, {
-                                    description: e.target.value,
-                                  })
-                                }
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600"
-                              />
-                            </div>
-
-                            <div
-                              className={
-                                creatingCategoryForItemId === item.id
-                                  ? 'sm:col-span-3 min-w-0'
-                                  : 'min-w-0'
-                              }
-                            >
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <label className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1">
-                                  <span>Categoria:</span>
+                            {/* Fields */}
+                            <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="sm:col-span-2">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                  {isCatalog ? 'Nome do Produto:' : 'Nome do Prato / Produto:'}
                                 </label>
-                                {creatingCategoryForItemId !== item.id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setCreatingCategoryForItemId(item.id);
-                                      setInlineCategoryName('');
-                                    }}
-                                    className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline transition shrink-0"
-                                    title="Criar nova categoria sem sair deste produto"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                    <span>Nova Categoria</span>
-                                  </button>
-                                )}
-                              </div>
-
-                              {creatingCategoryForItemId === item.id ? (
-                                <div className="p-2.5 bg-slate-950 border border-emerald-500/60 rounded-xl space-y-2 shadow-lg animate-fade-in">
-                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                    <input
-                                      type="text"
-                                      autoFocus
-                                      placeholder="Digite o nome da nova categoria..."
-                                      value={inlineCategoryName}
-                                      onChange={(e) => setInlineCategoryName(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          handleCreateCategoryForProduct(item.id, inlineCategoryName);
-                                        } else if (e.key === 'Escape') {
-                                          setCreatingCategoryForItemId(null);
-                                          setInlineCategoryName('');
-                                        }
-                                      }}
-                                      className="w-full min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
-                                    />
-                                    <div className="flex items-center gap-1.5 shrink-0">
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          handleCreateCategoryForProduct(item.id, inlineCategoryName)
-                                        }
-                                        disabled={!inlineCategoryName.trim()}
-                                        className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-extrabold rounded-lg transition whitespace-nowrap"
-                                      >
-                                        Salvar Categoria
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setCreatingCategoryForItemId(null);
-                                          setInlineCategoryName('');
-                                        }}
-                                        className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition shrink-0"
-                                        title="Cancelar"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                  <p className="text-[10px] text-emerald-400 font-medium">
-                                    ✓ Cria a categoria e já vincula imediatamente a este produto.
-                                  </p>
-                                </div>
-                              ) : (
-                                <select
-                                  value={item.category}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__CREATE_NEW_CAT__') {
-                                      setCreatingCategoryForItemId(item.id);
-                                      setInlineCategoryName('');
-                                    } else {
-                                      handleUpdateItem(item.id, { category: e.target.value });
-                                    }
-                                  }}
-                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
-                                >
-                                  {menu.categories.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name}
-                                    </option>
-                                  ))}
-                                  {item.category &&
-                                    !menu.categories.some(
-                                      (c) => c.id === item.category || c.name === item.category
-                                    ) && (
-                                      <option value={item.category}>
-                                        {item.category}
-                                      </option>
-                                    )}
-                                  <option
-                                    value="__CREATE_NEW_CAT__"
-                                    className="text-emerald-400 font-bold bg-slate-900"
-                                  >
-                                    ➕ + Criar Nova Categoria...
-                                  </option>
-                                </select>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Selo de Destaque:
-                              </label>
-                              <select
-                                value={item.badge || ''}
-                                onChange={(e) => {
-                                  const nextBadge = e.target.value || undefined;
-                                  handleUpdateItem(item.id, {
-                                    badge: nextBadge,
-                                    productionDays:
-                                      nextBadge === 'Sob Encomenda'
-                                        ? item.productionDays &&
-                                          item.productionDays > 0
-                                          ? item.productionDays
-                                          : 3
-                                        : undefined,
-                                  });
-                                }}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-amber-400"
-                              >
-                                <option value="">Sem selo</option>
-                                <option value="Mais Vendido">🔥 Mais Vendido</option>
-                                <option value="Promoção">💸 Promoção</option>
-                                <option value="Novo">✨ Novo</option>
-                                <option value="Pronta Entrega">📦 Pronta Entrega</option>
-                                <option value="Sob Encomenda">🛠️ Sob Encomenda</option>
-                                <option value="Feito à Mão">🧶 Feito à Mão</option>
-                                <option value="Exclusivo">💎 Exclusivo</option>
-                                {!isCatalog && (
-                                  <>
-                                    <option value="Chef Especial">⭐ Chef Especial</option>
-                                    <option value="Vegetariano">🌿 Vegetariano</option>
-                                  </>
-                                )}
-                              </select>
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                Foto do Produto (Upload ou URL):
-                              </label>
-                              {item.imageUrl?.startsWith('data:') ? (
-                                <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-300">
-                                  <span className="truncate font-semibold">
-                                    ✅ Foto própria enviada
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleUpdateItem(item.id, { imageUrl: '' })
-                                    }
-                                    className="text-slate-400 hover:text-rose-400 text-[10px] underline shrink-0"
-                                  >
-                                    Remover
-                                  </button>
-                                </div>
-                              ) : (
                                 <input
                                   type="text"
-                                  value={item.imageUrl || ''}
-                                  onChange={(e) =>
-                                    handleUpdateItem(item.id, { imageUrl: e.target.value })
+                                  value={item.name}
+                                  placeholder={
+                                    isCatalog
+                                      ? 'Ex: Camiseta, Caneca, Luminária 3D...'
+                                      : 'Ex: X-Bacon Especial, Pizza Calabresa...'
                                   }
-                                  placeholder="https://... ou use Enviar Foto"
-                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono"
+                                  onChange={(e) =>
+                                    handleUpdateItem(item.id, { name: e.target.value })
+                                  }
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
                                 />
-                              )}
-                            </div>
-
-                            {/* PRO Multi-Photo / Extra Angles Gallery */}
-                            <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
-                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">
-                                    📸 Fotos Extras / Outros Ângulos do Produto
-                                  </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    (até 4 fotos extras + principal)
-                                  </span>
-                                </div>
-                                <span
-                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                                    isProShowcase
-                                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                                      : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                                  }`}
-                                >
-                                  {isProShowcase ? (
-                                    <>
-                                      <Sparkles className="w-2.5 h-2.5" />
-                                      <span>PRO Liberado</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Lock className="w-2.5 h-2.5" />
-                                      <span>Exclusivo PRO</span>
-                                    </>
-                                  )}
-                                </span>
                               </div>
 
-                              {isProShowcase ? (
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                  {(item.galleryImages || []).map((gUrl, gIdx) => (
-                                    <div
-                                      key={`${item.id}-gal-${gIdx}`}
-                                      className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0"
-                                    >
-                                      <img
-                                        src={gUrl}
-                                        alt={`Ângulo ${gIdx + 2}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <span className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-black/75 text-[8px] font-bold text-slate-200">
-                                        #{gIdx + 2}
-                                      </span>
-                                      <div className="absolute inset-x-0 bottom-0 p-0.5 bg-black/80 flex items-center justify-around gap-0.5">
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handlePromoteGalleryPhotoToMain(item.id, gIdx)
-                                          }
-                                          title="Definir como foto principal"
-                                          className="p-0.5 text-amber-300 hover:text-amber-200 transition"
-                                        >
-                                          <Star className="w-2.5 h-2.5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setCropSession({
-                                              src: gUrl,
-                                              isObjectUrl: false,
-                                              preset: 'product',
-                                              target: {
-                                                kind: 'item-gallery',
-                                                itemId: item.id,
-                                                galleryIndex: gIdx,
-                                              },
-                                            })
-                                          }
-                                          title="Enquadrar este ângulo"
-                                          className="p-0.5 text-sky-300 hover:text-sky-200 transition"
-                                        >
-                                          <Crop className="w-2.5 h-2.5" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleRemoveGalleryPhoto(item.id, gIdx)
-                                          }
-                                          title="Remover foto extra"
-                                          className="p-0.5 text-rose-400 hover:text-rose-300 transition"
-                                        >
-                                          <X className="w-2.5 h-2.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-
-                                  {(item.galleryImages?.length || 0) < 4 && (
-                                    <label className="h-16 px-3 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center">
-                                      <Plus className="w-4 h-4" />
-                                      <span className="text-[10px] font-bold leading-tight">
-                                        + Foto / Ângulo
-                                      </span>
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) =>
-                                          handleGalleryPhotoUpload(item.id, e)
-                                        }
-                                        className="hidden"
-                                      />
-                                    </label>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-amber-500/25 flex items-center gap-2 text-[11px] text-slate-400">
-                                  <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                  <span>
-                                    Ative o <strong className="text-amber-300">Plano PRO</strong> para adicionar até 4 fotos extras de outros ângulos em cada produto (galeria interativa).
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Stock / Quantity Control per Order */}
-                            {(() => {
-                              const currentStockMode: ProductStockMode =
-                                item.stockMode || 'unlimited';
-                              const stockInfo = getItemStockInfo(item);
-                              const setStockMode = (nextMode: ProductStockMode) => {
-                                if (nextMode === 'unlimited') {
-                                  handleUpdateItem(item.id, {
-                                    stockMode: 'unlimited',
-                                  });
-                                } else if (nextMode === 'unique') {
-                                  handleUpdateItem(item.id, {
-                                    stockMode: 'unique',
-                                    stockQuantity: 1,
-                                  });
-                                } else {
-                                  handleUpdateItem(item.id, {
-                                    stockMode: 'limited',
-                                    stockQuantity:
-                                      typeof item.stockQuantity === 'number' &&
-                                      item.stockQuantity >= 1
-                                        ? item.stockQuantity
-                                        : 5,
-                                  });
-                                }
-                              };
-                              return (
-                                <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                                      Limite / Estoque Disponível:
-                                    </label>
-                                    {stockInfo.badgeText && item.isAvailable && (
-                                      <span
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                          stockInfo.isUnique
-                                            ? 'bg-purple-500/15 border-purple-500/35 text-purple-300'
-                                            : stockInfo.maxQuantity <= 0
-                                            ? 'bg-rose-500/15 border-rose-500/35 text-rose-300'
-                                            : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
-                                        }`}
-                                      >
-                                        {stockInfo.isUnique
-                                          ? '💎 Peça Única (máx. 1 por pedido)'
-                                          : stockInfo.maxQuantity <= 0
-                                          ? '🚫 Sem estoque (Esgotado)'
-                                          : `📦 Cliente pode pedir até ${stockInfo.maxQuantity} unid.`}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                    <button
-                                      type="button"
-                                      onClick={() => setStockMode('unlimited')}
-                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
-                                        currentStockMode === 'unlimited'
-                                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                      }`}
-                                    >
-                                      ∞ Ilimitado
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setStockMode('limited')}
-                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
-                                        currentStockMode === 'limited'
-                                          ? 'bg-amber-500/20 border-amber-500 text-amber-300'
-                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                      }`}
-                                    >
-                                      📦 Limitar Qtd
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setStockMode('unique')}
-                                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
-                                        currentStockMode === 'unique'
-                                          ? 'bg-purple-500/20 border-purple-500 text-purple-300'
-                                          : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                      }`}
-                                    >
-                                      💎 Peça Única (Máx. 1)
-                                    </button>
-
-                                    {currentStockMode === 'limited' && (
-                                      <div className="flex items-center gap-1.5 ml-auto bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1">
-                                        <span className="text-[10px] font-semibold text-slate-400">
-                                          Qtd máx:
-                                        </span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step={1}
-                                          value={
-                                            typeof item.stockQuantity === 'number'
-                                              ? item.stockQuantity
-                                              : 1
-                                          }
-                                          onChange={(e) => {
-                                            const parsed = parseInt(e.target.value, 10);
-                                            handleUpdateItem(item.id, {
-                                              stockQuantity: Number.isNaN(parsed)
-                                                ? 0
-                                                : Math.max(0, parsed),
-                                            });
-                                          }}
-                                          className="w-14 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {item.badge === 'Sob Encomenda' && (
-                                    <div className="mt-3 pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2.5">
-                                      <div>
-                                        <label className="text-[10px] font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
-                                          <span>⏱️ Prazo para ficar pronto (Sob Encomenda):</span>
-                                        </label>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">
-                                          Quantos dias leva para produzir e entregar ao cliente.
-                                        </p>
-                                      </div>
-
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        {[2, 3, 5, 7, 15].map((daysOption) => {
-                                          const selected = item.productionDays === daysOption;
-                                          return (
-                                            <button
-                                              key={daysOption}
-                                              type="button"
-                                              onClick={() =>
-                                                handleUpdateItem(item.id, {
-                                                  productionDays: daysOption,
-                                                })
-                                              }
-                                              className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
-                                                selected
-                                                  ? 'bg-amber-500/25 border-amber-400 text-amber-200'
-                                                  : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                              }`}
-                                            >
-                                              {daysOption}d
-                                            </button>
-                                          );
-                                        })}
-                                        <div className="flex items-center gap-1.5 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1">
-                                          <input
-                                            type="number"
-                                            min={1}
-                                            max={365}
-                                            step={1}
-                                            placeholder="Ex: 5"
-                                            value={
-                                              typeof item.productionDays === 'number' &&
-                                              item.productionDays > 0
-                                                ? item.productionDays
-                                                : ''
-                                            }
-                                            onChange={(e) => {
-                                              const raw = e.target.value.trim();
-                                              if (!raw) {
-                                                handleUpdateItem(item.id, {
-                                                  productionDays: undefined,
-                                                });
-                                                return;
-                                              }
-                                              const parsed = parseInt(raw, 10);
-                                              handleUpdateItem(item.id, {
-                                                productionDays: Number.isNaN(parsed)
-                                                  ? undefined
-                                                  : Math.max(1, Math.min(365, parsed)),
-                                              });
-                                            }}
-                                            className="w-12 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
-                                          />
-                                          <span className="text-[10px] font-semibold text-slate-400">
-                                            {item.productionDays === 1 ? 'dia' : 'dias'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-
-                            {/* Extras / Adicionais Section for this Item */}
-                            <div className="sm:col-span-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2.5">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                  <input
-                                    type="checkbox"
-                                    checked={Boolean(item.allowExtras)}
-                                    onChange={(e) => {
-                                      const allow = e.target.checked;
-                                      if (allow) {
-                                        const allExtraIds = (menu.extras || []).map((ex) => ex.id);
-                                        handleUpdateItem(item.id, {
-                                          allowExtras: true,
-                                          allowedExtraIds:
-                                            item.allowedExtraIds && item.allowedExtraIds.length > 0
-                                              ? item.allowedExtraIds
-                                              : allExtraIds,
-                                        });
-                                      } else {
-                                        handleUpdateItem(item.id, { allowExtras: false });
-                                      }
-                                    }}
-                                    className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 focus:ring-offset-slate-900"
-                                  />
-                                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                                    🍟 Permitir Itens Adicionais / Extras neste produto?
-                                  </span>
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                  Preço (R$):
                                 </label>
-                                {item.allowExtras && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                                    {(item.allowedExtraIds || []).length} selecionado(s)
-                                  </span>
+                                <input
+                                  type="number"
+                                  step="0.10"
+                                  min="0"
+                                  value={item.price === 0 ? '' : item.price}
+                                  placeholder="0,00"
+                                  onFocus={(e) => e.target.select()}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === '') {
+                                      handleUpdateItem(item.id, { price: 0 });
+                                    } else {
+                                      const parsed = parseFloat(val);
+                                      handleUpdateItem(item.id, {
+                                        price: isNaN(parsed) ? 0 : parsed,
+                                      });
+                                    }
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-emerald-400 font-bold"
+                                />
+                                {!acceptedPayments.includes('credit_card') && (
+                                  <p className="text-[10px] text-amber-300/90 mt-1 leading-tight">
+                                    🔒 Parcelamento só libera com Cartão de Crédito ativo.
+                                  </p>
                                 )}
                               </div>
 
-                              {item.allowExtras && (
-                                <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                                  {(!menu.extras || menu.extras.length === 0) ? (
-                                    <div className="text-xs text-amber-300/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                                      <span>Nenhum adicional cadastrado ainda na loja.</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveTab('extras')}
-                                        className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] whitespace-nowrap self-start sm:self-auto"
-                                      >
-                                        Cadastrar Adicionais Agora
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="text-[11px] text-slate-400">
-                                        Selecione quais adicionais podem ser incluídos pelo cliente neste item (já vêm todos marcados por padrão):
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                        {menu.extras.map((extra) => {
-                                          const isChecked = (item.allowedExtraIds || []).includes(extra.id);
-                                          return (
-                                            <label
-                                              key={extra.id}
-                                              className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${
-                                                isChecked
-                                                  ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
-                                                  : 'bg-slate-900 border-slate-800 text-slate-400 opacity-60'
-                                              }`}
-                                            >
-                                              <div className="flex items-center gap-2 truncate">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={isChecked}
-                                                  onChange={(e) => {
-                                                    const current = item.allowedExtraIds || [];
-                                                    const next = e.target.checked
-                                                      ? [...current, extra.id]
-                                                      : current.filter((id) => id !== extra.id);
-                                                    handleUpdateItem(item.id, { allowedExtraIds: next });
-                                                  }}
-                                                  className="w-3.5 h-3.5 rounded text-emerald-500"
-                                                />
-                                                <span className="font-semibold truncate">{extra.name || 'Sem nome'}</span>
-                                              </div>
-                                              <span className="font-mono text-emerald-400 text-[11px] shrink-0 ml-1">
-                                                +R$ {Number(extra.price || 0).toFixed(2).replace('.', ',')}
-                                              </span>
-                                            </label>
-                                          );
-                                        })}
-                                      </div>
-                                    </>
+                              <div className="sm:col-span-3">
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                  {isCatalog
+                                    ? 'Descrição, Tamanhos, Cores ou Material:'
+                                    : 'Descrição e Ingredientes:'}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.description}
+                                  placeholder={
+                                    isCatalog
+                                      ? 'Informe detalhes como material, tamanhos, cores disponíveis ou personalização...'
+                                      : 'Descreva os ingredientes e acompanhamento...'
+                                  }
+                                  onChange={(e) =>
+                                    handleUpdateItem(item.id, {
+                                      description: e.target.value,
+                                    })
+                                  }
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600"
+                                />
+                              </div>
+
+                              <div
+                                className={
+                                  creatingCategoryForItemId === item.id
+                                    ? 'sm:col-span-3 min-w-0'
+                                    : 'min-w-0'
+                                }
+                              >
+                                <div className="flex items-center justify-between gap-2 mb-1">
+                                  <label className="text-[10px] font-semibold text-slate-400 uppercase flex items-center gap-1">
+                                    <span>Categoria:</span>
+                                  </label>
+                                  {creatingCategoryForItemId !== item.id && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCreatingCategoryForItemId(item.id);
+                                        setInlineCategoryName('');
+                                      }}
+                                      className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 hover:underline transition shrink-0"
+                                      title="Criar nova categoria sem sair deste produto"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                      <span>Nova Categoria</span>
+                                    </button>
                                   )}
                                 </div>
-                              )}
-                            </div>
 
-                            {/* Multi-Flavor & Sizes Configuration (Pizzarias / Pastelarias) */}
-                            {!isCatalog && (
-                              <ItemMultiFlavorSection
+                                {creatingCategoryForItemId === item.id ? (
+                                  <div className="p-2.5 bg-slate-950 border border-emerald-500/60 rounded-xl space-y-2 shadow-lg animate-fade-in">
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                      <input
+                                        type="text"
+                                        autoFocus
+                                        placeholder="Digite o nome da nova categoria..."
+                                        value={inlineCategoryName}
+                                        onChange={(e) => setInlineCategoryName(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleCreateCategoryForProduct(item.id, inlineCategoryName);
+                                          } else if (e.key === 'Escape') {
+                                            setCreatingCategoryForItemId(null);
+                                            setInlineCategoryName('');
+                                          }
+                                        }}
+                                        className="w-full min-w-0 flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                                      />
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleCreateCategoryForProduct(item.id, inlineCategoryName)
+                                          }
+                                          disabled={!inlineCategoryName.trim()}
+                                          className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-extrabold rounded-lg transition whitespace-nowrap"
+                                        >
+                                          Salvar Categoria
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setCreatingCategoryForItemId(null);
+                                            setInlineCategoryName('');
+                                          }}
+                                          className="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition shrink-0"
+                                          title="Cancelar"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <p className="text-[10px] text-emerald-400 font-medium">
+                                      ✓ Cria a categoria e já vincula imediatamente a este produto.
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <select
+                                    value={item.category}
+                                    onChange={(e) => {
+                                      if (e.target.value === '__CREATE_NEW_CAT__') {
+                                        setCreatingCategoryForItemId(item.id);
+                                        setInlineCategoryName('');
+                                      } else {
+                                        handleUpdateItem(item.id, { category: e.target.value });
+                                      }
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                  >
+                                    {menu.categories.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                    {item.category &&
+                                      !menu.categories.some(
+                                        (c) => c.id === item.category || c.name === item.category
+                                      ) && (
+                                        <option value={item.category}>
+                                          {item.category}
+                                        </option>
+                                      )}
+                                    <option
+                                      value="__CREATE_NEW_CAT__"
+                                      className="text-emerald-400 font-bold bg-slate-900"
+                                    >
+                                      ➕ + Criar Nova Categoria...
+                                    </option>
+                                  </select>
+                                )}
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                  Selo de Destaque:
+                                </label>
+                                <select
+                                  value={item.badge || ''}
+                                  onChange={(e) => {
+                                    const nextBadge = e.target.value || undefined;
+                                    handleUpdateItem(item.id, {
+                                      badge: nextBadge,
+                                      productionDays:
+                                        nextBadge === 'Sob Encomenda'
+                                          ? item.productionDays &&
+                                            item.productionDays > 0
+                                            ? item.productionDays
+                                            : 3
+                                          : undefined,
+                                    });
+                                  }}
+                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-amber-400"
+                                >
+                                  <option value="">Sem selo</option>
+                                  <option value="Mais Vendido">🔥 Mais Vendido</option>
+                                  <option value="Promoção">💸 Promoção</option>
+                                  <option value="Novo">✨ Novo</option>
+                                  <option value="Pronta Entrega">📦 Pronta Entrega</option>
+                                  <option value="Sob Encomenda">🛠️ Sob Encomenda</option>
+                                  <option value="Feito à Mão">🧶 Feito à Mão</option>
+                                  <option value="Exclusivo">💎 Exclusivo</option>
+                                  {!isCatalog && (
+                                    <>
+                                      <option value="Chef Especial">⭐ Chef Especial</option>
+                                      <option value="Vegetariano">🌿 Vegetariano</option>
+                                    </>
+                                  )}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                  Foto do Produto (Upload ou URL):
+                                </label>
+                                {item.imageUrl?.startsWith('data:') ? (
+                                  <div className="flex items-center justify-between gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-1.5 text-[11px] text-emerald-300">
+                                    <span className="truncate font-semibold">
+                                      ✅ Foto própria enviada
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleUpdateItem(item.id, { imageUrl: '' })
+                                      }
+                                      className="text-slate-400 hover:text-rose-400 text-[10px] underline shrink-0"
+                                    >
+                                      Remover
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={item.imageUrl || ''}
+                                    onChange={(e) =>
+                                      handleUpdateItem(item.id, { imageUrl: e.target.value })
+                                    }
+                                    placeholder="https://... ou use Enviar Foto"
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-400 font-mono"
+                                  />
+                                )}
+                              </div>
+
+                              {/* PRO Multi-Photo / Extra Angles Gallery */}
+                              <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wide">
+                                      📸 Fotos Extras / Outros Ângulos do Produto
+                                    </span>
+                                    <span className="text-[10px] text-slate-500">
+                                      (até 4 fotos extras + principal)
+                                    </span>
+                                  </div>
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${isProShowcase
+                                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                                        : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                                      }`}
+                                  >
+                                    {isProShowcase ? (
+                                      <>
+                                        <Sparkles className="w-2.5 h-2.5" />
+                                        <span>PRO Liberado</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Lock className="w-2.5 h-2.5" />
+                                        <span>Exclusivo PRO</span>
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
+
+                                {isProShowcase ? (
+                                  <div className="flex flex-wrap items-center gap-2.5">
+                                    {(item.galleryImages || []).map((gUrl, gIdx) => (
+                                      <div
+                                        key={`${item.id}-gal-${gIdx}`}
+                                        className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 shrink-0"
+                                      >
+                                        <img
+                                          src={gUrl}
+                                          alt={`Ângulo ${gIdx + 2}`}
+                                          className="w-full h-full object-cover"
+                                        />
+                                        <span className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-black/75 text-[8px] font-bold text-slate-200">
+                                          #{gIdx + 2}
+                                        </span>
+                                        <div className="absolute inset-x-0 bottom-0 p-0.5 bg-black/80 flex items-center justify-around gap-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handlePromoteGalleryPhotoToMain(item.id, gIdx)
+                                            }
+                                            title="Definir como foto principal"
+                                            className="p-0.5 text-amber-300 hover:text-amber-200 transition"
+                                          >
+                                            <Star className="w-2.5 h-2.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setCropSession({
+                                                src: gUrl,
+                                                isObjectUrl: false,
+                                                preset: 'product',
+                                                target: {
+                                                  kind: 'item-gallery',
+                                                  itemId: item.id,
+                                                  galleryIndex: gIdx,
+                                                },
+                                              })
+                                            }
+                                            title="Enquadrar este ângulo"
+                                            className="p-0.5 text-sky-300 hover:text-sky-200 transition"
+                                          >
+                                            <Crop className="w-2.5 h-2.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRemoveGalleryPhoto(item.id, gIdx)
+                                            }
+                                            title="Remover foto extra"
+                                            className="p-0.5 text-rose-400 hover:text-rose-300 transition"
+                                          >
+                                            <X className="w-2.5 h-2.5" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+
+                                    {(item.galleryImages?.length || 0) < 4 && (
+                                      <label className="h-16 px-3 rounded-xl border border-dashed border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center">
+                                        <Plus className="w-4 h-4" />
+                                        <span className="text-[10px] font-bold leading-tight">
+                                          + Foto / Ângulo
+                                        </span>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          onChange={(e) =>
+                                            handleGalleryPhotoUpload(item.id, e)
+                                          }
+                                          className="hidden"
+                                        />
+                                      </label>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="px-3 py-2 rounded-xl bg-slate-950/80 border border-amber-500/25 flex items-center gap-2 text-[11px] text-slate-400">
+                                    <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                    <span>
+                                      Ative o <strong className="text-amber-300">Plano PRO</strong> para adicionar até 4 fotos extras de outros ângulos em cada produto (galeria interativa).
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Stock / Quantity Control per Order */}
+                              {(() => {
+                                const currentStockMode: ProductStockMode =
+                                  item.stockMode || 'unlimited';
+                                const stockInfo = getItemStockInfo(item);
+                                const setStockMode = (nextMode: ProductStockMode) => {
+                                  if (nextMode === 'unlimited') {
+                                    handleUpdateItem(item.id, {
+                                      stockMode: 'unlimited',
+                                    });
+                                  } else if (nextMode === 'unique') {
+                                    handleUpdateItem(item.id, {
+                                      stockMode: 'unique',
+                                      stockQuantity: 1,
+                                    });
+                                  } else {
+                                    handleUpdateItem(item.id, {
+                                      stockMode: 'limited',
+                                      stockQuantity:
+                                        typeof item.stockQuantity === 'number' &&
+                                          item.stockQuantity >= 1
+                                          ? item.stockQuantity
+                                          : 5,
+                                    });
+                                  }
+                                };
+                                return (
+                                  <div className="sm:col-span-3 pt-2 mt-1 border-t border-slate-800/70">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                                        Limite / Estoque Disponível:
+                                      </label>
+                                      {stockInfo.badgeText && item.isAvailable && (
+                                        <span
+                                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${stockInfo.isUnique
+                                              ? 'bg-purple-500/15 border-purple-500/35 text-purple-300'
+                                              : stockInfo.maxQuantity <= 0
+                                                ? 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+                                                : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                                            }`}
+                                        >
+                                          {stockInfo.isUnique
+                                            ? '💎 Peça Única (máx. 1 por pedido)'
+                                            : stockInfo.maxQuantity <= 0
+                                              ? '🚫 Sem estoque (Esgotado)'
+                                              : `📦 Cliente pode pedir até ${stockInfo.maxQuantity} unid.`}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setStockMode('unlimited')}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${currentStockMode === 'unlimited'
+                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                          }`}
+                                      >
+                                        ∞ Ilimitado
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setStockMode('limited')}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${currentStockMode === 'limited'
+                                            ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                          }`}
+                                      >
+                                        📦 Limitar Qtd
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setStockMode('unique')}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${currentStockMode === 'unique'
+                                            ? 'bg-purple-500/20 border-purple-500 text-purple-300'
+                                            : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                          }`}
+                                      >
+                                        💎 Peça Única (Máx. 1)
+                                      </button>
+
+                                      {currentStockMode === 'limited' && (
+                                        <div className="flex items-center gap-1.5 ml-auto bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1">
+                                          <span className="text-[10px] font-semibold text-slate-400">
+                                            Qtd máx:
+                                          </span>
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={
+                                              typeof item.stockQuantity === 'number'
+                                                ? item.stockQuantity
+                                                : 1
+                                            }
+                                            onChange={(e) => {
+                                              const parsed = parseInt(e.target.value, 10);
+                                              handleUpdateItem(item.id, {
+                                                stockQuantity: Number.isNaN(parsed)
+                                                  ? 0
+                                                  : Math.max(0, parsed),
+                                              });
+                                            }}
+                                            className="w-14 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {item.badge === 'Sob Encomenda' && (
+                                      <div className="mt-3 pt-2.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-2.5">
+                                        <div>
+                                          <label className="text-[10px] font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                                            <span>⏱️ Prazo para ficar pronto (Sob Encomenda):</span>
+                                          </label>
+                                          <p className="text-[10px] text-slate-400 mt-0.5">
+                                            Quantos dias leva para produzir e entregar ao cliente.
+                                          </p>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          {[2, 3, 5, 7, 15].map((daysOption) => {
+                                            const selected = item.productionDays === daysOption;
+                                            return (
+                                              <button
+                                                key={daysOption}
+                                                type="button"
+                                                onClick={() =>
+                                                  handleUpdateItem(item.id, {
+                                                    productionDays: daysOption,
+                                                  })
+                                                }
+                                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition ${selected
+                                                    ? 'bg-amber-500/25 border-amber-400 text-amber-200'
+                                                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                                                  }`}
+                                              >
+                                                {daysOption}d
+                                              </button>
+                                            );
+                                          })}
+                                          <div className="flex items-center gap-1.5 bg-slate-950 border border-amber-500/40 rounded-lg px-2.5 py-1">
+                                            <input
+                                              type="number"
+                                              min={1}
+                                              max={365}
+                                              step={1}
+                                              placeholder="Ex: 5"
+                                              value={
+                                                typeof item.productionDays === 'number' &&
+                                                  item.productionDays > 0
+                                                  ? item.productionDays
+                                                  : ''
+                                              }
+                                              onChange={(e) => {
+                                                const raw = e.target.value.trim();
+                                                if (!raw) {
+                                                  handleUpdateItem(item.id, {
+                                                    productionDays: undefined,
+                                                  });
+                                                  return;
+                                                }
+                                                const parsed = parseInt(raw, 10);
+                                                handleUpdateItem(item.id, {
+                                                  productionDays: Number.isNaN(parsed)
+                                                    ? undefined
+                                                    : Math.max(1, Math.min(365, parsed)),
+                                                });
+                                              }}
+                                              className="w-12 bg-transparent text-xs font-extrabold text-amber-300 outline-none text-center"
+                                            />
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                                              {item.productionDays === 1 ? 'dia' : 'dias'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Extras / Adicionais Section for this Item */}
+                              <div className="sm:col-span-3 p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(item.allowExtras)}
+                                      onChange={(e) => {
+                                        const allow = e.target.checked;
+                                        if (allow) {
+                                          const allExtraIds = (menu.extras || []).map((ex) => ex.id);
+                                          handleUpdateItem(item.id, {
+                                            allowExtras: true,
+                                            allowedExtraIds:
+                                              item.allowedExtraIds && item.allowedExtraIds.length > 0
+                                                ? item.allowedExtraIds
+                                                : allExtraIds,
+                                          });
+                                        } else {
+                                          handleUpdateItem(item.id, { allowExtras: false });
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 focus:ring-offset-slate-900"
+                                    />
+                                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                      🍟 Permitir Itens Adicionais / Extras neste produto?
+                                    </span>
+                                  </label>
+                                  {item.allowExtras && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                      {(item.allowedExtraIds || []).length} selecionado(s)
+                                    </span>
+                                  )}
+                                </div>
+
+                                {item.allowExtras && (
+                                  <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                                    {(!menu.extras || menu.extras.length === 0) ? (
+                                      <div className="text-xs text-amber-300/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                        <span>Nenhum adicional cadastrado ainda na loja.</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveTab('extras')}
+                                          className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] whitespace-nowrap self-start sm:self-auto"
+                                        >
+                                          Cadastrar Adicionais Agora
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="text-[11px] text-slate-400">
+                                          Selecione quais adicionais podem ser incluídos pelo cliente neste item (já vêm todos marcados por padrão):
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                          {menu.extras.map((extra) => {
+                                            const isChecked = (item.allowedExtraIds || []).includes(extra.id);
+                                            return (
+                                              <label
+                                                key={extra.id}
+                                                className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition ${isChecked
+                                                    ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                                                    : 'bg-slate-900 border-slate-800 text-slate-400 opacity-60'
+                                                  }`}
+                                              >
+                                                <div className="flex items-center gap-2 truncate">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={(e) => {
+                                                      const current = item.allowedExtraIds || [];
+                                                      const next = e.target.checked
+                                                        ? [...current, extra.id]
+                                                        : current.filter((id) => id !== extra.id);
+                                                      handleUpdateItem(item.id, { allowedExtraIds: next });
+                                                    }}
+                                                    className="w-3.5 h-3.5 rounded text-emerald-500"
+                                                  />
+                                                  <span className="font-semibold truncate">{extra.name || 'Sem nome'}</span>
+                                                </div>
+                                                <span className="font-mono text-emerald-400 text-[11px] shrink-0 ml-1">
+                                                  +R$ {Number(extra.price || 0).toFixed(2).replace('.', ',')}
+                                                </span>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Multi-Flavor & Sizes Configuration (Pizzarias / Pastelarias) */}
+                              {!isCatalog && (
+                                <ItemMultiFlavorSection
+                                  item={item}
+                                  categories={menu.categories}
+                                  flavorGroups={menu.flavorGroups || []}
+                                  menuFlavors={menu.flavors || []}
+                                  onUpdateItem={(patch) =>
+                                    handleUpdateItem(item.id, patch)
+                                  }
+                                  onGoToFlavorsTab={() => setActiveTab('flavors')}
+                                />
+                              )}
+
+                              {/* Recursos PRO: Promoção Neon/Natal, Splash no Preço, Parcelas & Variações (110V/220V, Cores) */}
+                              <ItemProMerchandisingSection
                                 item={item}
-                                categories={menu.categories}
-                                flavorGroups={menu.flavorGroups || []}
-                                menuFlavors={menu.flavors || []}
+                                currency={menu.currency || 'R$'}
+                                isPro={isProShowcase}
+                                acceptsCreditCard={acceptedPayments.includes('credit_card')}
+                                mpAffiliatePointUrl={mpAffiliatePointUrl}
+                                onEnableCreditCard={() => {
+                                  if (!acceptedPayments.includes('credit_card')) {
+                                    toggleAcceptedPayment('credit_card');
+                                  }
+                                }}
                                 onUpdateItem={(patch) =>
                                   handleUpdateItem(item.id, patch)
                                 }
-                                onGoToFlavorsTab={() => setActiveTab('flavors')}
                               />
-                            )}
+                            </div>
 
-                            {/* Recursos PRO: Promoção Neon/Natal, Splash no Preço, Parcelas & Variações (110V/220V, Cores) */}
-                            <ItemProMerchandisingSection
-                              item={item}
-                              currency={menu.currency || 'R$'}
-                              isPro={isProShowcase}
-                              acceptsCreditCard={acceptedPayments.includes('credit_card')}
-                              mpAffiliatePointUrl={mpAffiliatePointUrl}
-                              onEnableCreditCard={() => {
-                                if (!acceptedPayments.includes('credit_card')) {
-                                  toggleAcceptedPayment('credit_card');
+                            {/* Availability & Delete Actions */}
+                            <div className="md:col-span-2 flex md:flex-col items-end justify-between gap-2 h-full">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateItem(item.id, {
+                                    isAvailable: !item.isAvailable,
+                                  })
                                 }
-                              }}
-                              onUpdateItem={(patch) =>
-                                handleUpdateItem(item.id, patch)
-                              }
-                            />
-                          </div>
+                                className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${item.isAvailable
+                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                    : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
+                                  }`}
+                              >
+                                {item.isAvailable ? '✅ Disponível' : '🚫 Esgotado'}
+                              </button>
 
-                          {/* Availability & Delete Actions */}
-                          <div className="md:col-span-2 flex md:flex-col items-end justify-between gap-2 h-full">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateItem(item.id, {
-                                  isAvailable: !item.isAvailable,
-                                })
-                              }
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-                                item.isAvailable
-                                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                                  : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                              }`}
-                            >
-                              {item.isAvailable ? '✅ Disponível' : '🚫 Esgotado'}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
-                              title="Excluir produto"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
+                                title="Excluir produto"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
                       );
                     })}
                   </div>
@@ -2252,11 +2432,10 @@ export default function MenuEditorModal({
                                     isAvailable: extra.isAvailable === false ? true : false,
                                   })
                                 }
-                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-                                  extra.isAvailable !== false
+                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition ${extra.isAvailable !== false
                                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                                     : 'bg-rose-500/20 border-rose-500/40 text-rose-400'
-                                }`}
+                                  }`}
                               >
                                 {extra.isAvailable !== false ? 'Ativo' : 'Pausado'}
                               </button>
@@ -2296,17 +2475,17 @@ export default function MenuEditorModal({
                     setMenu((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            items: prev.items.map((it) => ({
-                              ...it,
-                              allowedFlavorIds: (it.allowedFlavorIds || []).filter(
-                                (id) => id !== flavorId
-                              ),
-                              excludedFlavorIds: (it.excludedFlavorIds || []).filter(
-                                (id) => id !== flavorId
-                              ),
-                            })),
-                          }
+                          ...prev,
+                          items: prev.items.map((it) => ({
+                            ...it,
+                            allowedFlavorIds: (it.allowedFlavorIds || []).filter(
+                              (id) => id !== flavorId
+                            ),
+                            excludedFlavorIds: (it.excludedFlavorIds || []).filter(
+                              (id) => id !== flavorId
+                            ),
+                          })),
+                        }
                         : prev
                     )
                   }
@@ -2314,14 +2493,14 @@ export default function MenuEditorModal({
                     setMenu((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            items: prev.items.map((it) => ({
-                              ...it,
-                              flavorGroupIds: (it.flavorGroupIds || []).filter(
-                                (id) => id !== groupId
-                              ),
-                            })),
-                          }
+                          ...prev,
+                          items: prev.items.map((it) => ({
+                            ...it,
+                            flavorGroupIds: (it.flavorGroupIds || []).filter(
+                              (id) => id !== groupId
+                            ),
+                          })),
+                        }
                         : prev
                     )
                   }
@@ -2353,19 +2532,17 @@ export default function MenuEditorModal({
                   <div className="space-y-6 max-w-3xl">
                     {/* Live Theme, Color & Header Mini Preview */}
                     <div
-                      className={`rounded-2xl overflow-hidden border transition-colors ${
-                        theme.isLight
+                      className={`rounded-2xl overflow-hidden border transition-colors ${theme.isLight
                           ? 'border-slate-300 bg-slate-50'
                           : 'border-slate-800 bg-[#090d14]'
-                      }`}
+                        }`}
                     >
-                      <div className="relative h-28 sm:h-32 bg-slate-900">
+                      <div className="relative h-28 sm:h-32 bg-slate-900 overflow-hidden">
                         <img
                           src={menu.coverImage || defaultCover}
                           alt="Capa da vitrine"
-                          className={`w-full h-full object-cover ${
-                            theme.isLight ? 'opacity-80' : 'opacity-65'
-                          }`}
+                          className={`w-full h-full object-cover ${theme.isLight ? 'opacity-80' : 'opacity-65'
+                            }`}
                         />
                         <div
                           className="absolute inset-0"
@@ -2375,24 +2552,26 @@ export default function MenuEditorModal({
                               : 'linear-gradient(to top, #090d14 4%, rgba(9,13,20,0.4) 55%, transparent 100%)',
                           }}
                         />
-                        <span className="absolute top-2.5 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-200 border border-white/15">
-                          Prévia ao Vivo ({theme.isLight ? '☀️ Claro' : '🌙 Escuro'})
+                        {menu.christmasPageSkin && (
+                          <ChristmasPageSkin variant="preview" />
+                        )}
+                        <span className="absolute top-2.5 right-3 z-30 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-200 border border-white/15">
+                          Prévia ao Vivo ({theme.isLight ? '☀️ Claro' : '🌙 Escuro'}
+                          {menu.christmasPageSkin ? ' • 🎄 Natal' : ''})
                         </span>
                       </div>
 
                       <div className="px-4 pb-4 -mt-8 relative z-10 space-y-2.5">
                         <div
-                          className={`rounded-2xl p-3.5 flex items-center justify-between gap-3 border shadow-lg transition-colors ${
-                            theme.isLight
+                          className={`rounded-2xl p-3.5 flex items-center justify-between gap-3 border shadow-lg transition-colors ${theme.isLight
                               ? 'bg-white border-slate-200'
                               : 'bg-[#121929]/95 border-slate-800'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div
-                              className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center overflow-hidden shrink-0 ${
-                                theme.isLight ? 'bg-slate-100' : 'bg-slate-950'
-                              }`}
+                              className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center overflow-hidden shrink-0 ${theme.isLight ? 'bg-slate-100' : 'bg-slate-950'
+                                }`}
                               style={{ borderColor: theme.accentHex }}
                             >
                               {menu.logoImage ? (
@@ -2415,16 +2594,14 @@ export default function MenuEditorModal({
                             </div>
                             <div className="min-w-0">
                               <h4
-                                className={`text-sm font-extrabold truncate ${
-                                  theme.isLight ? 'text-slate-900' : 'text-white'
-                                }`}
+                                className={`text-sm font-extrabold truncate ${theme.isLight ? 'text-slate-900' : 'text-white'
+                                  }`}
                               >
                                 {menu.title}
                               </h4>
                               <p
-                                className={`text-[11px] line-clamp-1 ${
-                                  theme.isLight ? 'text-slate-500' : 'text-slate-400'
-                                }`}
+                                className={`text-[11px] line-clamp-1 ${theme.isLight ? 'text-slate-500' : 'text-slate-400'
+                                  }`}
                               >
                                 {menu.description}
                               </p>
@@ -2486,11 +2663,10 @@ export default function MenuEditorModal({
                           <button
                             type="button"
                             onClick={() => setMenu({ ...menu, themeMode: 'dark' })}
-                            className={`p-3 rounded-xl border text-left transition ${
-                              !theme.isLight
+                            className={`p-3 rounded-xl border text-left transition ${!theme.isLight
                                 ? 'bg-[#090d14] border-emerald-500 ring-1 ring-emerald-500/40'
                                 : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between mb-1.5">
                               <Moon className="w-4 h-4 text-sky-400" />
@@ -2509,11 +2685,10 @@ export default function MenuEditorModal({
                           <button
                             type="button"
                             onClick={() => setMenu({ ...menu, themeMode: 'light' })}
-                            className={`p-3 rounded-xl border text-left transition ${
-                              theme.isLight
+                            className={`p-3 rounded-xl border text-left transition ${theme.isLight
                                 ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/40 shadow-md'
                                 : 'bg-slate-100/95 border-slate-300/60 hover:bg-white'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center justify-between mb-1.5">
                               <Sun className="w-4 h-4 text-amber-500" />
@@ -2569,11 +2744,10 @@ export default function MenuEditorModal({
                                 }
                                 title={preset.name}
                                 aria-label={`Cor ${preset.name}`}
-                                className={`w-7 h-7 rounded-full border-2 transition flex items-center justify-center ${
-                                  isSelected
+                                className={`w-7 h-7 rounded-full border-2 transition flex items-center justify-center ${isSelected
                                     ? 'border-white scale-110 ring-2 ring-white/30'
                                     : 'border-slate-700 hover:scale-105'
-                                }`}
+                                  }`}
                                 style={{ backgroundColor: preset.hex }}
                               >
                                 {isSelected && (
@@ -2604,6 +2778,59 @@ export default function MenuEditorModal({
                       </div>
                     </div>
 
+                    {/* Skin Natalina em Toda a Página (Liberada Grátis para Free e PRO) */}
+                    <div
+                      className={`rounded-2xl border p-4 transition ${
+                        menu.christmasPageSkin
+                          ? 'bg-emerald-950/35 border-emerald-500/45 shadow-sm'
+                          : 'bg-slate-900/80 border-slate-800'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                              <span>🎄 Tema / Skin Natalina em Toda a Página</span>
+                            </h4>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/40 text-emerald-300">
+                              <Sparkles className="w-2.5 h-2.5" />
+                              <span>Exceção de Natal: Liberado p/ Free e PRO</span>
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-300 leading-relaxed">
+                            Enfeita o topo, os cantos diagonais superiores e todas as laterais da sua página com pisca-pisca, sinos e guirlanda natalina.{' '}
+                            <span className="text-slate-400">
+                              (A borda natalina individual ao redor dos quadrados dos produtos continua exclusiva do Plano PRO.)
+                            </span>
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMenu({
+                                ...menu,
+                                christmasPageSkin: !menu.christmasPageSkin,
+                              })
+                            }
+                            className={`px-3.5 py-2 rounded-xl border text-xs font-extrabold transition flex items-center gap-1.5 ${
+                              menu.christmasPageSkin
+                                ? 'bg-emerald-500 hover:bg-emerald-400 border-emerald-400 text-slate-950 shadow-sm'
+                                : 'bg-slate-950 hover:bg-slate-800 border-slate-700 text-slate-200'
+                            }`}
+                          >
+                            <span>{menu.christmasPageSkin ? '✅' : '🎄'}</span>
+                            <span>
+                              {menu.christmasPageSkin
+                                ? 'Skin Natalina Ativada (Clique p/ Desativar)'
+                                : 'Ativar Skin Natalina'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* PRO Tipografia e Tamanho dos Preços */}
                     <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2617,11 +2844,10 @@ export default function MenuEditorModal({
                           </p>
                         </div>
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
-                            isProShowcase
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${isProShowcase
                               ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                               : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                          }`}
+                            }`}
                         >
                           {isProShowcase ? (
                             <>
@@ -2653,11 +2879,10 @@ export default function MenuEditorModal({
                                       priceFontStyle: fontOpt.id,
                                     })
                                   }
-                                  className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 ${
-                                    isSelected
+                                  className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-2 ${isSelected
                                       ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40'
                                       : 'bg-slate-950/80 border-slate-800 hover:border-slate-600'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="text-[11px] font-bold text-white">
@@ -2698,11 +2923,10 @@ export default function MenuEditorModal({
                                       priceScale: scaleOpt.id,
                                     })
                                   }
-                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${
-                                    isSelected
+                                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition ${isSelected
                                       ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                                       : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                                  }`}
+                                    }`}
                                 >
                                   {scaleOpt.label}
                                 </button>
@@ -2738,11 +2962,10 @@ export default function MenuEditorModal({
                           </p>
                         </div>
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
-                            isProShowcase
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${isProShowcase
                               ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                               : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                          }`}
+                            }`}
                         >
                           {isProShowcase ? (
                             <>
@@ -2773,11 +2996,10 @@ export default function MenuEditorModal({
                                     catalogLayoutMode: opt.id,
                                   })
                                 }
-                                className={`p-3 rounded-xl border text-left transition space-y-1.5 ${
-                                  isSelected
+                                className={`p-3 rounded-xl border text-left transition space-y-1.5 ${isSelected
                                     ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40'
                                     : 'bg-slate-950/80 border-slate-800 hover:border-slate-600'
-                                }`}
+                                  }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <span className="text-xs font-extrabold text-white">
@@ -3022,11 +3244,10 @@ export default function MenuEditorModal({
                                 </p>
                               </div>
                               <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
-                                  isProShowcase
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${isProShowcase
                                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
                                     : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                                }`}
+                                  }`}
                               >
                                 {isProShowcase ? (
                                   <>
@@ -3075,11 +3296,10 @@ export default function MenuEditorModal({
                                 )}
 
                                 <label
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition shadow-sm ${
-                                    uploadingVideo
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold transition shadow-sm ${uploadingVideo
                                       ? 'bg-violet-500/30 text-violet-200 cursor-wait'
                                       : 'bg-violet-500 hover:bg-violet-400 text-white cursor-pointer'
-                                  }`}
+                                    }`}
                                 >
                                   {uploadingVideo ? (
                                     <>
@@ -3114,7 +3334,7 @@ export default function MenuEditorModal({
                                       const active =
                                         menu.coverVideo === preset.url ||
                                         menu.coverVideo?.replace(/\.webm$/i, '.mp4') ===
-                                          preset.url;
+                                        preset.url;
                                       return (
                                         <button
                                           key={preset.url}
@@ -3129,11 +3349,10 @@ export default function MenuEditorModal({
                                                 : preset.poster,
                                             });
                                           }}
-                                          className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition ${
-                                            active
+                                          className={`px-2 py-1 rounded-lg border text-[10px] font-semibold transition ${active
                                               ? 'bg-violet-500/25 border-violet-400 text-violet-100 shadow-sm'
                                               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
-                                          }`}
+                                            }`}
                                         >
                                           {preset.label}
                                         </button>
@@ -3295,22 +3514,20 @@ export default function MenuEditorModal({
                       <button
                         type="button"
                         onClick={() => setMenu({ ...menu, mode: 'menu' })}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                          !isCatalog
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${!isCatalog
                             ? 'bg-emerald-500 text-white'
                             : 'bg-slate-800 text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         🍔 Cardápio
                       </button>
                       <button
                         type="button"
                         onClick={() => setMenu({ ...menu, mode: 'catalog' })}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                          isCatalog
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${isCatalog
                             ? 'bg-emerald-500 text-white'
                             : 'bg-slate-800 text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         🛍️ Catálogo / Loja
                       </button>
@@ -3381,7 +3598,7 @@ export default function MenuEditorModal({
                       </div>
                     ) : originalPixKey &&
                       originalPixKey.toLowerCase() !==
-                        (menu.pixKey || '').trim().toLowerCase() ? (
+                      (menu.pixKey || '').trim().toLowerCase() ? (
                       <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 space-y-1.5">
                         <label className="text-[11px] font-bold text-amber-300 block">
                           🔐 Confirme a senha da sua conta para autorizar a troca da Chave PIX *
@@ -3460,11 +3677,10 @@ export default function MenuEditorModal({
                           onClick={() =>
                             setMenu({ ...menu, productImagePosition: 'left' })
                           }
-                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${
-                            imagePos === 'left'
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${imagePos === 'left'
                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
+                            }`}
                         >
                           ◧ Lado Esquerdo
                         </button>
@@ -3473,11 +3689,10 @@ export default function MenuEditorModal({
                           onClick={() =>
                             setMenu({ ...menu, productImagePosition: 'right' })
                           }
-                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${
-                            imagePos === 'right'
+                          className={`py-2 px-3 rounded-xl border text-xs font-bold transition ${imagePos === 'right'
                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                               : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                          }`}
+                            }`}
                         >
                           ◨ Lado Direito
                         </button>
@@ -3578,29 +3793,34 @@ export default function MenuEditorModal({
                             <strong>Chave PIX</strong> acima para gerar automaticamente o QR Code PIX no valor exato quando o cliente fechar o pedido no carrinho.
                           </p>
                         )}
+                      {acceptsAnyCard && (
+                        <div className="mt-2.5">
+                          <CardFeePassThroughControl
+                            passCardFee={Boolean(menu.passCardFeeToBuyer)}
+                            noticeText={menu.cardFeeNoticeText || ''}
+                            onToggle={(enabled) =>
+                              setMenu({
+                                ...menu,
+                                passCardFeeToBuyer: enabled,
+                              })
+                            }
+                            onChangeText={(text) =>
+                              setMenu({
+                                ...menu,
+                                cardFeeNoticeText: text,
+                              })
+                            }
+                          />
+                        </div>
+                      )}
                       {!acceptedPayments.includes('credit_card') && (
-                        <div className="mt-2.5 p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 space-y-1.5">
-                          <p className="text-[11px] text-sky-200 leading-relaxed">
-                            💳 <strong>Regra de Parcelamento:</strong> No Brasil, vendas parceladas nos anúncios (ex.: 2x, 6x, 12x) só são liberadas quando <strong>Cartão de Crédito</strong> está marcado acima. Lojas que aceitam apenas PIX ou Dinheiro exibem somente pagamento à vista.
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                            <button
-                              type="button"
-                              onClick={() => toggleAcceptedPayment('credit_card')}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[10.5px] font-bold transition"
-                            >
-                              ✓ Ativar Cartão de Crédito Agora
-                            </button>
-                            <a
-                              href={mpAffiliatePointUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-200 text-[10.5px] font-bold transition"
-                            >
-                              <span>🔗 Não tem maquininha? Abrir Mercado Pago (Opcional)</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
+                        <div className="mt-2.5">
+                          <CreditCardInstallmentNotice
+                            mpAffiliatePointUrl={mpAffiliatePointUrl}
+                            onEnableCreditCard={() =>
+                              toggleAcceptedPayment('credit_card')
+                            }
+                          />
                         </div>
                       )}
                     </div>
@@ -3625,9 +3845,8 @@ export default function MenuEditorModal({
                           deliveryFee: val === '' ? 0 : parseFloat(val) || 0,
                         });
                       }}
-                      className={`w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white ${
-                        !allowDelivery ? 'opacity-40 cursor-not-allowed' : ''
-                      }`}
+                      className={`w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white ${!allowDelivery ? 'opacity-40 cursor-not-allowed' : ''
+                        }`}
                     />
                     {!allowDelivery && (
                       <span className="text-[10px] text-slate-500 mt-1 block">
@@ -3652,11 +3871,10 @@ export default function MenuEditorModal({
                       onClick={() =>
                         setMenu({ ...menu, isOpen: menu.isOpen === false ? true : false })
                       }
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        menu.isOpen !== false
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${menu.isOpen !== false
                           ? 'bg-emerald-500 text-white'
                           : 'bg-rose-500 text-white'
-                      }`}
+                        }`}
                     >
                       {menu.isOpen !== false ? '🟢 Aberto' : '🔴 Fechado'}
                     </button>
@@ -3664,9 +3882,8 @@ export default function MenuEditorModal({
 
                   {/* Botão Chamar Garçom na Mesa (Switch Estilo iPhone / iOS) */}
                   <div
-                    className={`flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 gap-4 ${
-                      !isCatalog && !allowOnSite ? 'opacity-55' : ''
-                    }`}
+                    className={`flex items-center justify-between bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 gap-4 ${!isCatalog && !allowOnSite ? 'opacity-55' : ''
+                      }`}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -3677,25 +3894,24 @@ export default function MenuEditorModal({
                             : 'Botão "Chamar Garçom na Mesa"'}
                         </span>
                         <span
-                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${
-                            (isCatalog || allowOnSite) && allowCallWaiter
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0 ${(isCatalog || allowOnSite) && allowCallWaiter
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                               : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}
+                            }`}
                         >
                           {!isCatalog && !allowOnSite
                             ? 'Sem Mesa'
                             : allowCallWaiter
-                            ? 'Ativado'
-                            : 'Desativado'}
+                              ? 'Ativado'
+                              : 'Desativado'}
                         </span>
                       </div>
                       <span className="text-[11px] text-slate-400 block mt-1 leading-relaxed">
                         {isCatalog
                           ? 'Exibe o botão de contato direto no WhatsApp para tirar dúvidas sobre produtos.'
                           : !allowOnSite
-                          ? 'Ative "Pedidos na Mesa" acima caso seu estabelecimento possua atendimento em mesas.'
-                          : 'Quando ativado, o botão SÓ aparece quando o cliente lê o QR Code da mesa (?mesa=X), para o garçom saber exatamente a mesa de onde veio o chamado.'}
+                            ? 'Ative "Pedidos na Mesa" acima caso seu estabelecimento possua atendimento em mesas.'
+                            : 'Quando ativado, o botão SÓ aparece quando o cliente lê o QR Code da mesa (?mesa=X), para o garçom saber exatamente a mesa de onde veio o chamado.'}
                       </span>
                     </div>
 
@@ -3715,24 +3931,22 @@ export default function MenuEditorModal({
                         !isCatalog && !allowOnSite
                           ? 'Disponível apenas quando Pedidos na Mesa estiver ativo'
                           : allowCallWaiter
-                          ? 'Clique para desativar a chamada de garçom'
-                          : 'Clique para ativar a chamada de garçom'
+                            ? 'Clique para desativar a chamada de garçom'
+                            : 'Clique para ativar a chamada de garçom'
                       }
-                      className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner ${
-                        !isCatalog && !allowOnSite
+                      className={`relative inline-flex h-7 w-12 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-inner ${!isCatalog && !allowOnSite
                           ? 'bg-slate-800 cursor-not-allowed'
                           : allowCallWaiter
-                          ? 'bg-emerald-500 cursor-pointer'
-                          : 'bg-slate-700 cursor-pointer'
-                      }`}
+                            ? 'bg-emerald-500 cursor-pointer'
+                            : 'bg-slate-700 cursor-pointer'
+                        }`}
                     >
                       <span
                         aria-hidden="true"
-                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          (isCatalog || allowOnSite) && allowCallWaiter
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${(isCatalog || allowOnSite) && allowCallWaiter
                             ? 'translate-x-5'
                             : 'translate-x-0'
-                        }`}
+                          }`}
                       />
                     </button>
                   </div>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-const LED_PALETTE = [
+export const LED_PALETTE = [
   { fill: '#ef4444', glow: 'rgba(239, 68, 68, 0.95)' },   // Vermelho
   { fill: '#facc15', glow: 'rgba(250, 204, 21, 0.95)' },  // Amarelo Ouro
   { fill: '#22c55e', glow: 'rgba(34, 197, 94, 0.95)' },   // Verde
@@ -10,7 +10,7 @@ const LED_PALETTE = [
   { fill: '#fb923c', glow: 'rgba(251, 146, 60, 0.95)' },  // Laranja Quente
 ];
 
-function LedBulb({
+export function LedBulb({
   idx,
   edge,
 }: {

@@ -61,6 +61,7 @@ import { isProStillValid } from '@/lib/pro-status';
 import {
   getAcceptedPaymentOptions,
   getAcceptedPaymentsList,
+  resolveCardFeeNotice,
 } from '@/lib/payments';
 import { resolveShowcaseTheme } from '@/lib/theme';
 import { generatePixPayload } from '@/lib/pix-brcode';
@@ -70,6 +71,7 @@ import AdBanner from '@/components/AdBanner';
 import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
 import TableQrScannerModal from '@/components/TableQrScannerModal';
 import { ChristmasCardDecor } from '@/components/ChristmasCardDecor';
+import { ChristmasPageSkin } from '@/components/ChristmasPageSkin';
 import { RetailPriceTag } from '@/components/RetailPriceTag';
 import { ShowcaseBuyBox } from '@/components/ShowcaseBuyBox';
 import ShowcaseCustomizeModal, {
@@ -430,12 +432,15 @@ export default function DigitalShowcasePage({
   );
   const acceptsPix = acceptedPaymentIds.includes('pix');
   const acceptsCreditCard = acceptedPaymentIds.includes('credit_card');
+  const cardFeeNotice = resolveCardFeeNotice(menu);
   const hasPixKey = Boolean(menu?.pixKey?.trim());
   const selectedPaymentOption =
     acceptedPaymentOptions.find((opt) => opt.whatsappLabel === paymentMethod) ||
     null;
   const isPixSelected = selectedPaymentOption?.id === 'pix';
   const isCreditCardSelected = selectedPaymentOption?.id === 'credit_card';
+  const isDebitCardSelected = selectedPaymentOption?.id === 'debit_card';
+  const isAnyCardSelected = isCreditCardSelected || isDebitCardSelected;
   const isCashSelected = selectedPaymentOption?.id === 'cash';
   const isDeliveryOrPickup =
     enabledModes.length > 0 &&
@@ -1082,6 +1087,10 @@ export default function DigitalShowcasePage({
       message += `\n*TOTAL: R$ ${totalPrice.toFixed(2)}*\n`;
     }
 
+    if (cardFeeNotice && isAnyCardSelected) {
+      message += `\n*Obs. Pagamento no Cartão:* ${cardFeeNotice}\n`;
+    }
+
     if (includePixSummary && isPixSelected) {
       message += `\n*Pagamento via PIX:* Gerado no valor exato de *R$ ${totalPrice.toFixed(2)}* (vou enviar o comprovante abaixo).\n`;
     }
@@ -1585,6 +1594,22 @@ export default function DigitalShowcasePage({
   };
 
   const renderPaymentSelector = () => {
+    const cardFeeBanner =
+      cardFeeNotice && isAnyCardSelected ? (
+        <div
+          className={`mt-2 px-3 py-2 rounded-xl border flex items-start gap-2 text-[11px] font-bold ${
+            isLight
+              ? 'bg-amber-50 border-amber-300 text-amber-900'
+              : 'bg-amber-500/12 border-amber-500/35 text-amber-200'
+          }`}
+        >
+          <CreditCard className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+          <span className="leading-snug">
+            Aviso da loja no cartão: {cardFeeNotice}
+          </span>
+        </div>
+      ) : null;
+
     if (acceptedPaymentOptions.length === 0) {
       return (
         <div
@@ -1610,22 +1635,25 @@ export default function DigitalShowcasePage({
     if (acceptedPaymentOptions.length === 1) {
       const onlyOpt = acceptedPaymentOptions[0];
       return (
-        <div
-          style={{
-            backgroundColor: theme.accentSoftBg,
-            borderColor: theme.accentBorder,
-          }}
-          className="border rounded-xl px-3 py-2.5 text-xs flex items-center justify-between gap-2"
-        >
-          <span className={`font-semibold ${labelTextClass}`}>
-            Pagamento aceito pela loja:
-          </span>
-          <span
-            className="font-extrabold"
-            style={{ color: theme.readableAccentText }}
+        <div>
+          <div
+            style={{
+              backgroundColor: theme.accentSoftBg,
+              borderColor: theme.accentBorder,
+            }}
+            className="border rounded-xl px-3 py-2.5 text-xs flex items-center justify-between gap-2"
           >
-            {onlyOpt.icon} {onlyOpt.label}
-          </span>
+            <span className={`font-semibold ${labelTextClass}`}>
+              Pagamento aceito pela loja:
+            </span>
+            <span
+              className="font-extrabold"
+              style={{ color: theme.readableAccentText }}
+            >
+              {onlyOpt.icon} {onlyOpt.label}
+            </span>
+          </div>
+          {cardFeeBanner}
         </div>
       );
     }
@@ -1666,12 +1694,18 @@ export default function DigitalShowcasePage({
             );
           })}
         </div>
+        {cardFeeBanner}
       </div>
     );
   };
 
   return (
-    <div className={`min-h-screen pb-28 transition-colors ${pageBgClass}`}>
+    <div
+      className={`relative min-h-screen overflow-x-clip pb-28 transition-colors ${pageBgClass}`}
+    >
+      {/* Skin Natalina em toda a página (Topo, Diagonais dos Cantos e Laterais) — Liberada para Free e PRO */}
+      {Boolean(menu.christmasPageSkin) && <ChristmasPageSkin variant="page" />}
+
       {/* Cover Banner (PRO animated video when enabled & valid, or static image fallback) */}
       <div className="relative w-full h-44 sm:h-56 bg-slate-900 overflow-hidden">
         {isPro && menu.coverVideo && !videoCoverFailed ? (
@@ -1705,7 +1739,11 @@ export default function DigitalShowcasePage({
         {!isPro && (
           <Link
             href="/"
-            className="absolute top-4 left-4 px-3 py-2 bg-black/55 backdrop-blur-md rounded-xl text-slate-100 hover:text-white border border-white/15 flex items-center gap-1.5 text-xs font-semibold"
+            className={`absolute z-30 px-3 py-2 bg-black/60 backdrop-blur-md rounded-xl text-slate-100 hover:text-white border border-white/15 flex items-center gap-1.5 text-xs font-semibold ${
+              menu.christmasPageSkin
+                ? 'top-6 left-6 sm:top-8 sm:left-8'
+                : 'top-4 left-4'
+            }`}
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Criador de QR</span>
@@ -1719,7 +1757,11 @@ export default function DigitalShowcasePage({
               backgroundColor: theme.accentHex,
               color: theme.accentTextOnSolid,
             }}
-            className="absolute top-4 right-4 px-3.5 py-1.5 rounded-full text-xs font-extrabold shadow-lg flex items-center gap-1.5"
+            className={`absolute z-30 px-3.5 py-1.5 rounded-full text-xs font-extrabold shadow-lg flex items-center gap-1.5 ${
+              menu.christmasPageSkin
+                ? 'top-6 right-6 sm:top-8 sm:right-8'
+                : 'top-4 right-4'
+            }`}
           >
             <span>📍 {tableNumber}</span>
           </div>
@@ -2469,6 +2511,7 @@ export default function DigitalShowcasePage({
                                 prodDays={prodDays}
                                 pixDiscountInfo={pixDiscountInfo}
                                 acceptedPaymentSummary={acceptedPaymentSummaryStr}
+                                cardFeeNotice={cardFeeNotice}
                                 effectivePriceFormatted={effectivePriceFormattedStr}
                                 storeOpen={menu.isOpen !== false}
                                 whatsappNumber={menu.whatsappNumber}
@@ -2596,6 +2639,7 @@ export default function DigitalShowcasePage({
                                   prodDays={prodDays}
                                   pixDiscountInfo={pixDiscountInfo}
                                   acceptedPaymentSummary={acceptedPaymentSummaryStr}
+                                  cardFeeNotice={cardFeeNotice}
                                   effectivePriceFormatted={effectivePriceFormattedStr}
                                   storeOpen={menu.isOpen !== false}
                                   whatsappNumber={menu.whatsappNumber}
@@ -2978,7 +3022,7 @@ export default function DigitalShowcasePage({
                   {isCatalog ? 'Ver Carrinho / Pedido' : 'Ver Comanda / Sacola'}
                 </span>
                 <span className="text-sm font-extrabold">
-                  {cartInstallmentSummary && !isPixSelected
+                  {cartInstallmentSummary
                     ? cartInstallmentSummary.shortLabel
                     : `R$ ${totalPrice.toFixed(2)}`}
                 </span>
@@ -4021,6 +4065,19 @@ export default function DigitalShowcasePage({
                   </strong>
                   .
                 </p>
+              )}
+
+              {cardFeeNotice && isAnyCardSelected && (
+                <div
+                  className={`px-3 py-2 rounded-xl border flex items-start gap-2 text-[11px] font-bold ${
+                    isLight
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-amber-500/12 border-amber-500/35 text-amber-200'
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span className="leading-snug">{cardFeeNotice}</span>
+                </div>
               )}
 
               {isPixSelected && !hasPixKey && (
