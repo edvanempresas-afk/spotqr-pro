@@ -5,24 +5,93 @@ import { LED_PALETTE, LedBulb } from './ChristmasCardDecor';
 
 interface ChristmasPageSkinProps {
   /**
-   * 'page': aplica em toda a página pública (topo, guirlandas diagonais nos cantos e laterais fixas completas).
+   * 'page': aplica em toda a página pública (topo, guirlandas curvas nos cantos e laterais fixas completas).
    * 'preview': versão reduzida para a caixa de prévia ao vivo dentro do Editor Visual.
    */
   variant?: 'page' | 'preview';
 }
 
-const DIAGONAL_BULB_COORDS = [
-  { x: 26, y: 122, idx: 0 },
-  { x: 64, y: 98, idx: 1 },
-  { x: 102, y: 74, idx: 2 },
-  { x: 142, y: 48, idx: 3 },
-  { x: 184, y: 22, idx: 4 },
-];
+type Point2D = [number, number];
+
+const LEFT_P0: Point2D = [2, 118];
+const LEFT_P1: Point2D = [134, 120];
+const LEFT_P2: Point2D = [214, 4];
+
+const RIGHT_P0: Point2D = [218, 118];
+const RIGHT_P1: Point2D = [86, 120];
+const RIGHT_P2: Point2D = [6, 4];
+
+const BULB_T_STOPS = [0.16, 0.34, 0.52, 0.7, 0.86];
+
+function evalQuad(t: number, p0: Point2D, p1: Point2D, p2: Point2D) {
+  const u = 1 - t;
+  return {
+    x: u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+    y: u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1],
+  };
+}
+
+function buildCurvedRibbonPath(p0: Point2D, p1: Point2D, p2: Point2D): string {
+  const steps = 16;
+  const parts: string[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const pt = evalQuad(t, p0, p1, p2);
+    const wave = i === 0 || i === steps ? 0 : i % 2 === 1 ? -4.5 : 4.5;
+    const cmd = i === 0 ? 'M' : 'L';
+    parts.push(`${cmd} ${pt.x.toFixed(1)} ${(pt.y + wave).toFixed(1)}`);
+  }
+  return parts.join(' ');
+}
+
+const LEFT_RIBBON_PATH = buildCurvedRibbonPath(LEFT_P0, LEFT_P1, LEFT_P2);
+const RIGHT_RIBBON_PATH = buildCurvedRibbonPath(RIGHT_P0, RIGHT_P1, RIGHT_P2);
+
+/** Lâmpada pendurada sempre na vertical (seguindo a gravidade) a partir do ponto exato do fio curvo. */
+function GravityCornerBulb({
+  x,
+  y,
+  paletteIdx,
+  keyPrefix,
+}: {
+  x: number;
+  y: number;
+  paletteIdx: number;
+  keyPrefix: string;
+}) {
+  const color = LED_PALETTE[paletteIdx % LED_PALETTE.length];
+  const animClass = paletteIdx % 2 === 0 ? 'natal-led-odd' : 'natal-led-even';
+
+  return (
+    <g key={keyPrefix} transform={`translate(${x.toFixed(1)}, ${y.toFixed(1)})`}>
+      {/* Soquete preso diretamente no fio da guirlanda */}
+      <rect
+        x="-3"
+        y="-1"
+        width="6"
+        height="5"
+        rx="1.2"
+        fill="#064e3b"
+        stroke="#10b981"
+        strokeWidth="0.9"
+      />
+      {/* Bulbo vertical apontado para baixo pela gravidade */}
+      <g className={animClass}>
+        <circle cx="0" cy="11" r="9.5" fill={color.glow} opacity="0.34" />
+        <path
+          d="M-3.6 4.2 C-3.8 11.5 -2.2 16 0 16 C2.2 16 3.8 11.5 3.6 4.2 Z"
+          fill={color.fill}
+        />
+        <ellipse cx="-1.1" cy="8.5" rx="0.9" ry="2.2" fill="#ffffff" opacity="0.45" />
+      </g>
+    </g>
+  );
+}
 
 /**
  * Skin Natalina para toda a página da loja (Free e PRO):
- * Fio e pisca-pisca horizontal no topo, guirlandas diagonais com sinos/meia nos dois cantos superiores
- * e bordas luminosas verticais percorrendo as duas laterais da página.
+ * Fio e pisca-pisca horizontal no topo, guirlandas curvas pela gravidade nos dois cantos superiores
+ * (com lâmpadas verticais penduradas para baixo) e laterais luminosas completas.
  */
 export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) {
   const isPreview = variant === 'preview';
@@ -33,9 +102,12 @@ export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) 
     ? 'absolute top-0 bottom-0'
     : 'fixed top-0 bottom-0';
 
+  const leftBellAnchor = evalQuad(0.43, LEFT_P0, LEFT_P1, LEFT_P2);
+  const rightStockingAnchor = evalQuad(0.43, RIGHT_P0, RIGHT_P1, RIGHT_P2);
+
   return (
     <>
-      {/* TOPO HORIZONTAL + DIAGONAIS DOS CANTOS SUPERIORES */}
+      {/* TOPO HORIZONTAL + GUIRLANDAS CURVAS PELA GRAVIDADE NOS CANTOS SUPERIORES */}
       <div
         aria-hidden="true"
         className={`pointer-events-none select-none top-0 inset-x-0 overflow-hidden ${
@@ -61,131 +133,192 @@ export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) 
           {Array.from({ length: topBulbCount }).map((_, idx) => (
             <div
               key={`page-top-${idx}`}
-              className={
-                !isPreview && idx % 3 === 1 ? 'hidden sm:flex' : 'flex'
-              }
+              className={!isPreview && idx % 3 === 1 ? 'hidden sm:flex' : 'flex'}
             >
               <LedBulb idx={idx} edge="top" />
             </div>
           ))}
         </div>
 
-        {/* Canto Diagonal Superior Esquerdo (Guirlanda + Sinos Dourados + LEDs) */}
+        {/* Canto Superior Esquerdo: Guirlanda curva pela gravidade + Lâmpadas verticais + Sinos */}
         <svg
-          viewBox="0 0 220 150"
+          viewBox="0 0 220 160"
           className={`absolute top-0 left-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.65)] ${
             isPreview
-              ? 'w-24 h-16'
-              : 'w-28 h-20 sm:w-44 sm:h-28 md:w-56 md:h-36'
+              ? 'w-24 h-[70px]'
+              : 'w-28 h-[82px] sm:w-44 sm:h-32 md:w-56 md:h-40'
           }`}
         >
-          {/* Ramo de pinheiro diagonal principal */}
+          {/* Fio e ramo de pinheiro curvo com caimento natural (catenária) */}
           <path
-            d="M4 136 Q 112 72 208 4"
+            d={`M ${LEFT_P0[0]} ${LEFT_P0[1]} Q ${LEFT_P1[0]} ${LEFT_P1[1]} ${LEFT_P2[0]} ${LEFT_P2[1]}`}
             stroke="#14532d"
-            strokeWidth="12"
+            strokeWidth="10"
             strokeLinecap="round"
             fill="none"
           />
           <path
-            d="M4 136 Q 112 72 208 4"
+            d={`M ${LEFT_P0[0]} ${LEFT_P0[1]} Q ${LEFT_P1[0]} ${LEFT_P1[1]} ${LEFT_P2[0]} ${LEFT_P2[1]}`}
             stroke="#16a34a"
-            strokeWidth="6"
+            strokeWidth="5"
             strokeDasharray="6 6"
             strokeLinecap="round"
             fill="none"
           />
-          {/* Fita vermelha enrolada na guirlanda */}
+          {/* Fita vermelha acompanhando a mesma curva */}
           <path
-            d="M12 130 Q 34 106 54 104 Q 78 100 94 78 Q 116 56 144 48 Q 168 42 196 10"
+            d={LEFT_RIBBON_PATH}
             stroke="#dc2626"
-            strokeWidth="2.8"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
             fill="none"
-            opacity="0.9"
+            opacity="0.92"
           />
-          {/* LEDs piscantes ao longo da diagonal */}
-          {DIAGONAL_BULB_COORDS.map((pt) => {
-            const color = LED_PALETTE[pt.idx % LED_PALETTE.length];
-            const animClass = pt.idx % 2 === 0 ? 'natal-led-odd' : 'natal-led-even';
+          {/* LEDs pendurados na vertical (gravidade) ao longo do fio curvo */}
+          {BULB_T_STOPS.map((t, idx) => {
+            const pt = evalQuad(t, LEFT_P0, LEFT_P1, LEFT_P2);
             return (
-              <g key={`diag-l-${pt.idx}`} className={animClass}>
-                <circle cx={pt.x} cy={pt.y} r="7.5" fill={color.glow} opacity="0.32" />
-                <circle cx={pt.x} cy={pt.y} r="4.3" fill={color.fill} />
-              </g>
+              <GravityCornerBulb
+                key={`gl-${idx}`}
+                x={pt.x}
+                y={pt.y}
+                paletteIdx={idx}
+                keyPrefix={`gl-${idx}`}
+              />
             );
           })}
-          {/* Sinos Dourados + Laço Vermelho no encontro superior esquerdo */}
-          <g transform="translate(26, 18) scale(0.92)" className="natal-ornament-sway">
-            <g transform="rotate(-18 22 24)">
-              <path d="M14 20 C14 14 26 14 26 20 L29 35 L11 35 Z" fill="#facc15" stroke="#ca8a04" strokeWidth="1.5" />
+          {/* Sinos Dourados + Laço pendurados diretamente no meio da curva */}
+          <g
+            transform={`translate(${(leftBellAnchor.x - 24).toFixed(1)}, ${(
+              leftBellAnchor.y - 8
+            ).toFixed(1)}) scale(0.82)`}
+            className="natal-ornament-sway"
+          >
+            <g transform="rotate(-14 22 24)">
+              <path
+                d="M14 20 C14 14 26 14 26 20 L29 35 L11 35 Z"
+                fill="#facc15"
+                stroke="#ca8a04"
+                strokeWidth="1.5"
+              />
               <circle cx="20" cy="37" r="3" fill="#dc2626" />
             </g>
-            <g transform="rotate(18 40 24)">
-              <path d="M34 20 C34 14 46 14 46 20 L49 35 L31 35 Z" fill="#fde047" stroke="#ca8a04" strokeWidth="1.5" />
+            <g transform="rotate(14 40 24)">
+              <path
+                d="M34 20 C34 14 46 14 46 20 L49 35 L31 35 Z"
+                fill="#fde047"
+                stroke="#ca8a04"
+                strokeWidth="1.5"
+              />
               <circle cx="40" cy="37" r="3" fill="#dc2626" />
             </g>
-            <ellipse cx="22" cy="14" rx="7" ry="4" transform="rotate(-20 22 14)" fill="#ef4444" stroke="#991b1b" strokeWidth="1.2" />
-            <ellipse cx="38" cy="14" rx="7" ry="4" transform="rotate(20 38 14)" fill="#ef4444" stroke="#991b1b" strokeWidth="1.2" />
-            <circle cx="30" cy="14" r="3.8" fill="#dc2626" stroke="#991b1b" strokeWidth="1.2" />
+            <ellipse
+              cx="22"
+              cy="14"
+              rx="7"
+              ry="4"
+              transform="rotate(-20 22 14)"
+              fill="#ef4444"
+              stroke="#991b1b"
+              strokeWidth="1.2"
+            />
+            <ellipse
+              cx="38"
+              cy="14"
+              rx="7"
+              ry="4"
+              transform="rotate(20 38 14)"
+              fill="#ef4444"
+              stroke="#991b1b"
+              strokeWidth="1.2"
+            />
+            <circle
+              cx="30"
+              cy="14"
+              r="3.8"
+              fill="#dc2626"
+              stroke="#991b1b"
+              strokeWidth="1.2"
+            />
           </g>
         </svg>
 
-        {/* Canto Diagonal Superior Direito (Guirlanda + Meia/Bolinhas + LEDs) */}
+        {/* Canto Superior Direito: Guirlanda curva pela gravidade + Lâmpadas verticais + Meia */}
         <svg
-          viewBox="0 0 220 150"
+          viewBox="0 0 220 160"
           className={`absolute top-0 right-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.65)] ${
             isPreview
-              ? 'w-24 h-16'
-              : 'w-28 h-20 sm:w-44 sm:h-28 md:w-56 md:h-36'
+              ? 'w-24 h-[70px]'
+              : 'w-28 h-[82px] sm:w-44 sm:h-32 md:w-56 md:h-40'
           }`}
         >
-          {/* Ramo de pinheiro diagonal principal */}
+          {/* Fio e ramo de pinheiro curvo com caimento natural (catenária) */}
           <path
-            d="M216 136 Q 108 72 12 4"
+            d={`M ${RIGHT_P0[0]} ${RIGHT_P0[1]} Q ${RIGHT_P1[0]} ${RIGHT_P1[1]} ${RIGHT_P2[0]} ${RIGHT_P2[1]}`}
             stroke="#14532d"
-            strokeWidth="12"
+            strokeWidth="10"
             strokeLinecap="round"
             fill="none"
           />
           <path
-            d="M216 136 Q 108 72 12 4"
+            d={`M ${RIGHT_P0[0]} ${RIGHT_P0[1]} Q ${RIGHT_P1[0]} ${RIGHT_P1[1]} ${RIGHT_P2[0]} ${RIGHT_P2[1]}`}
             stroke="#16a34a"
-            strokeWidth="6"
+            strokeWidth="5"
             strokeDasharray="6 6"
             strokeLinecap="round"
             fill="none"
           />
-          {/* Fita dourada/vermelha enrolada na guirlanda */}
+          {/* Fita dourada acompanhando a mesma curva */}
           <path
-            d="M208 130 Q 186 106 166 104 Q 142 100 126 78 Q 104 56 76 48 Q 52 42 24 10"
+            d={RIGHT_RIBBON_PATH}
             stroke="#facc15"
-            strokeWidth="2.4"
+            strokeWidth="2.3"
+            strokeLinejoin="round"
             fill="none"
-            opacity="0.88"
+            opacity="0.9"
           />
-          {/* LEDs piscantes ao longo da diagonal direita */}
-          {DIAGONAL_BULB_COORDS.map((pt) => {
-            const mirroredX = 220 - pt.x;
-            const color = LED_PALETTE[(pt.idx + 2) % LED_PALETTE.length];
-            const animClass = pt.idx % 2 === 0 ? 'natal-led-even' : 'natal-led-odd';
+          {/* LEDs pendurados na vertical (gravidade) ao longo da curva direita */}
+          {BULB_T_STOPS.map((t, idx) => {
+            const pt = evalQuad(t, RIGHT_P0, RIGHT_P1, RIGHT_P2);
             return (
-              <g key={`diag-r-${pt.idx}`} className={animClass}>
-                <circle cx={mirroredX} cy={pt.y} r="7.5" fill={color.glow} opacity="0.32" />
-                <circle cx={mirroredX} cy={pt.y} r="4.3" fill={color.fill} />
-              </g>
+              <GravityCornerBulb
+                key={`gr-${idx}`}
+                x={pt.x}
+                y={pt.y}
+                paletteIdx={idx + 2}
+                keyPrefix={`gr-${idx}`}
+              />
             );
           })}
-          {/* Meia Natalina + Bolinha no canto superior direito */}
-          <g transform="translate(132, 16) scale(0.9)" className="natal-ornament-sway">
+          {/* Meia Natalina pendurada diretamente no fio curvo */}
+          <g
+            transform={`translate(${(rightStockingAnchor.x - 28).toFixed(1)}, ${(
+              rightStockingAnchor.y - 6
+            ).toFixed(1)}) scale(0.8)`}
+            className="natal-ornament-sway"
+          >
+            <circle cx="35" cy="6" r="3.2" fill="none" stroke="#facc15" strokeWidth="2.2" />
             <path
               d="M24 14 L42 14 L42 35 C42 40 46 43 50 45 C54 47 54 55 46 56 L29 56 C22 56 20 50 23 44 L24 38 Z"
               fill="#dc2626"
               stroke="#7f1d1d"
               strokeWidth="1.6"
             />
-            <path d="M46 44 C53 46 53 54 45 55 L42 55 C42 50 43 47 46 44 Z" fill="#facc15" />
+            <path
+              d="M46 44 C53 46 53 54 45 55 L42 55 C42 50 43 47 46 44 Z"
+              fill="#facc15"
+            />
             <rect x="24" y="25" width="18" height="4" fill="#16a34a" />
-            <rect x="21" y="10" width="24" height="8" rx="4" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.2" />
+            <rect
+              x="21"
+              y="10"
+              width="24"
+              height="8"
+              rx="4"
+              fill="#f8fafc"
+              stroke="#cbd5e1"
+              strokeWidth="1.2"
+            />
           </g>
         </svg>
       </div>
