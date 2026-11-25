@@ -1443,7 +1443,7 @@ export default function DigitalShowcasePage({
       sizeMode === 'grid_hero'
         ? 'w-full h-52 sm:h-56'
         : sizeMode === 'pro_list'
-        ? 'w-24 h-24 sm:w-32 sm:h-32'
+        ? 'w-full h-52 sm:w-44 sm:h-44 md:w-48 md:h-48'
         : 'w-20 h-20 sm:w-24 sm:h-24';
 
     return (
@@ -2268,6 +2268,13 @@ export default function DigitalShowcasePage({
                       );
                     };
 
+                    const acceptedPaymentSummaryStr = acceptedPaymentOptions
+                      .map((o) => `${o.icon} ${o.shortLabel}`)
+                      .join(' • ');
+                    const effectivePriceFormattedStr = formatMoneyBR(
+                      effectivePrice,
+                      menu.currency || 'R$'
+                    );
                     const openCurrentZoom = () => {
                       const idx = Math.max(0, itemPhotos.indexOf(activePhotoUrl || ''));
                       openPhotoZoom(item, idx);
@@ -2347,6 +2354,9 @@ export default function DigitalShowcasePage({
                                 stockMaxQuantity={stock.maxQuantity}
                                 prodDays={prodDays}
                                 pixDiscountInfo={pixDiscountInfo}
+                                acceptedPaymentSummary={acceptedPaymentSummaryStr}
+                                effectivePriceFormatted={effectivePriceFormattedStr}
+                                storeOpen={menu.isOpen !== false}
                                 whatsappNumber={menu.whatsappNumber}
                                 storeTitle={menu.title}
                                 selectedVariantLabel={selectedVariant?.label}
@@ -2362,7 +2372,7 @@ export default function DigitalShowcasePage({
                           <div
                             className={`border rounded-2xl p-4 sm:p-5 flex ${
                               isPro ? 'flex-col md:flex-row' : 'flex-row'
-                            } gap-4 items-stretch justify-between transition shadow-sm ${
+                            } gap-4 sm:gap-5 items-stretch justify-between transition shadow-sm ${
                               promoEffect === 'christmas' ? 'my-3 overflow-visible' : ''
                             } ${
                               isLight
@@ -2380,16 +2390,23 @@ export default function DigitalShowcasePage({
 
                             {isPro ? (
                               <>
-                                {/* Coluna Principal: Foto (se à esquerda) + Dados, Miniaturas, Destaques, Variações & Preço */}
-                                <div className="flex-1 min-w-0 flex gap-3.5 sm:gap-4 items-start">
+                                {/* Galeria Ampliada + Miolo Central Equilibrado */}
+                                <div className="flex-1 min-w-0 flex flex-col sm:flex-row gap-4 sm:gap-5 items-stretch sm:items-start">
                                   {imageOnLeft && itemPhotos.length > 0 && (
-                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center sm:items-start gap-2 shrink-0">
                                       {renderProductThumbnail(item, '', 'pro_list')}
+                                      {itemPhotos.length > 1 ? (
+                                        renderMiniThumbnailsStrip()
+                                      ) : (
+                                        <span className={`text-[10px] font-medium ${mutedTextClass}`}>
+                                          🔍 Toque na foto p/ ampliar
+                                        </span>
+                                      )}
                                     </div>
                                   )}
 
-                                  <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
-                                    <div className="space-y-1.5">
+                                  <div className="flex-1 min-w-0 flex flex-col justify-between gap-2.5 h-full">
+                                    <div className="space-y-2">
                                       {renderCardBadgesRow()}
                                       {item.description && (
                                         <p
@@ -2399,7 +2416,6 @@ export default function DigitalShowcasePage({
                                         </p>
                                       )}
                                       {renderHighlightsRow()}
-                                      {renderMiniThumbnailsStrip()}
                                       {stock.canOrder && prodDays > 0 && (
                                         <p
                                           className={`text-[11px] font-semibold flex items-center gap-1.5 ${
@@ -2416,7 +2432,7 @@ export default function DigitalShowcasePage({
                                       {renderVariantSelector()}
                                     </div>
 
-                                    <div className="pt-1">
+                                    <div className="pt-1 space-y-2">
                                       <RetailPriceTag
                                         formattedPrice={formatItemStartingPriceLabel(item)}
                                         originalPrice={item.originalPrice}
@@ -2430,12 +2446,24 @@ export default function DigitalShowcasePage({
                                         isLight={isLight}
                                         mutedTextClass={mutedTextClass}
                                       />
+                                      {acceptedPaymentSummaryStr && (
+                                        <p className={`text-[10px] font-semibold ${mutedTextClass}`}>
+                                          Aceita: {acceptedPaymentSummaryStr}
+                                        </p>
+                                      )}
                                     </div>
                                   </div>
 
                                   {!imageOnLeft && itemPhotos.length > 0 && (
-                                    <div className="flex flex-col items-end gap-2 shrink-0">
+                                    <div className="w-full sm:w-44 md:w-48 flex flex-col items-center sm:items-end gap-2 shrink-0">
                                       {renderProductThumbnail(item, '', 'pro_list')}
+                                      {itemPhotos.length > 1 ? (
+                                        renderMiniThumbnailsStrip()
+                                      ) : (
+                                        <span className={`text-[10px] font-medium ${mutedTextClass}`}>
+                                          🔍 Toque na foto p/ ampliar
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                 </div>
@@ -2453,6 +2481,9 @@ export default function DigitalShowcasePage({
                                   stockMaxQuantity={stock.maxQuantity}
                                   prodDays={prodDays}
                                   pixDiscountInfo={pixDiscountInfo}
+                                  acceptedPaymentSummary={acceptedPaymentSummaryStr}
+                                  effectivePriceFormatted={effectivePriceFormattedStr}
+                                  storeOpen={menu.isOpen !== false}
                                   whatsappNumber={menu.whatsappNumber}
                                   storeTitle={menu.title}
                                   selectedVariantLabel={selectedVariant?.label}
