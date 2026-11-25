@@ -1342,6 +1342,27 @@ export default function DeveloperAdminDashboard() {
                       />
                     </div>
 
+                    <div className="sm:col-span-2 lg:col-span-3">
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Seu Link Mercado Pago (Indicação / Maquininha para Lojistas sem Cartão)
+                      </label>
+                      <input
+                        type="url"
+                        value={settings.mpAffiliatePointUrl || ''}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            mpAffiliatePointUrl: e.target.value,
+                          })
+                        }
+                        placeholder="https://mpago.li/... ou https://www.mercadopago.com.br/point"
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3.5 py-2 text-xs text-emerald-300 font-mono"
+                      />
+                      <span className="text-[10px] text-slate-500 mt-1 block">
+                        Exibido automaticamente como opção para lojistas que tentarem ativar parcelamento sem aceitar Cartão de Crédito.
+                      </span>
+                    </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-1">
                         Valor da Assinatura PRO (R$)

@@ -201,6 +201,9 @@ export default function MenuEditorModal({
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [isOrdersModalOpen, setIsOrdersModalOpen] = useState(false);
+  const [mpAffiliatePointUrl, setMpAffiliatePointUrl] = useState<string>(
+    'https://www.mercadopago.com.br/point'
+  );
   const [activeTab, setActiveTab] = useState<
     'info' | 'categories' | 'items' | 'branding' | 'extras' | 'flavors'
   >('items');
@@ -263,6 +266,14 @@ export default function MenuEditorModal({
         } else {
           setIsPixLocked(false);
           setPixLockedUntil(null);
+        }
+      })
+      .catch(() => {});
+    fetch('/api/pro-price', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((pData) => {
+        if (typeof pData?.mpAffiliatePointUrl === 'string' && pData.mpAffiliatePointUrl.trim()) {
+          setMpAffiliatePointUrl(pData.mpAffiliatePointUrl.trim());
         }
       })
       .catch(() => {});
@@ -2062,6 +2073,13 @@ export default function MenuEditorModal({
                               item={item}
                               currency={menu.currency || 'R$'}
                               isPro={isProShowcase}
+                              acceptsCreditCard={acceptedPayments.includes('credit_card')}
+                              mpAffiliatePointUrl={mpAffiliatePointUrl}
+                              onEnableCreditCard={() => {
+                                if (!acceptedPayments.includes('credit_card')) {
+                                  toggleAcceptedPayment('credit_card');
+                                }
+                              }}
                               onUpdateItem={(patch) =>
                                 handleUpdateItem(item.id, patch)
                               }
@@ -3560,6 +3578,31 @@ export default function MenuEditorModal({
                             <strong>Chave PIX</strong> acima para gerar automaticamente o QR Code PIX no valor exato quando o cliente fechar o pedido no carrinho.
                           </p>
                         )}
+                      {!acceptedPayments.includes('credit_card') && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 space-y-1.5">
+                          <p className="text-[11px] text-sky-200 leading-relaxed">
+                            💳 <strong>Regra de Parcelamento:</strong> No Brasil, vendas parceladas nos anúncios (ex.: 2x, 6x, 12x) só são liberadas quando <strong>Cartão de Crédito</strong> está marcado acima. Lojas que aceitam apenas PIX ou Dinheiro exibem somente pagamento à vista.
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleAcceptedPayment('credit_card')}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[10.5px] font-bold transition"
+                            >
+                              ✓ Ativar Cartão de Crédito Agora
+                            </button>
+                            <a
+                              href={mpAffiliatePointUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-200 text-[10.5px] font-bold transition"
+                            >
+                              <span>🔗 Não tem maquininha? Abrir Mercado Pago (Opcional)</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

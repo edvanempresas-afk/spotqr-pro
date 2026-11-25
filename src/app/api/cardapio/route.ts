@@ -22,6 +22,7 @@ import { isTimestampActiveFuture, normalizePixKeyForCompare } from '@/lib/securi
 import { RestaurantMenu, DynamicQRRecord } from '@/lib/types';
 import { getAuthenticatedClientUser } from '@/lib/client-auth';
 import { isAdminRequestAuthenticated } from '@/lib/admin-auth';
+import { getAcceptedPaymentsList } from '@/lib/payments';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,9 +64,21 @@ export async function GET(request: NextRequest) {
       effectiveSlug === 'demo-catalogo'
   );
 
+  const storeAcceptsCreditCard =
+    getAcceptedPaymentsList(menu).includes('credit_card');
+  const canShowInstallments = isPaid && storeAcceptsCreditCard;
+
   const sanitizedItems = (menu.items || []).map((it) =>
     isPaid
-      ? it
+      ? canShowInstallments
+        ? it
+        : {
+            ...it,
+            maxInstallments: undefined,
+            installmentsHasInterest: undefined,
+            installmentsInterestMode: undefined,
+            customInstallmentAmount: undefined,
+          }
       : {
           ...it,
           galleryImages: undefined,
@@ -283,6 +296,11 @@ export async function POST(request: NextRequest) {
     const isCatalog = body.mode === 'catalog';
     const { pixPasswordConfirmation: _ignoredConfirm, ...cleanMenuBody } = body;
     void _ignoredConfirm;
+    const saveAcceptsCreditCard = getAcceptedPaymentsList({
+      acceptedPayments: cleanMenuBody.acceptedPayments,
+      slug: cleanSlug,
+    }).includes('credit_card');
+    const canSaveInstallments = isEffectivePro && saveAcceptsCreditCard;
 
     const existingItemsById = new Map(
       (existingMenu?.items || []).map((it) => [it.id, it])
@@ -379,20 +397,20 @@ export async function POST(request: NextRequest) {
         showPriceSplash: isEffectivePro
           ? Boolean(item.showPriceSplash)
           : existingItem?.showPriceSplash,
-        maxInstallments: isEffectivePro
+        maxInstallments: canSaveInstallments
           ? cleanMaxInstallments
-          : existingItem?.maxInstallments,
-        installmentsHasInterest: isEffectivePro
+          : undefined,
+        installmentsHasInterest: canSaveInstallments
           ? cleanInterestMode
             ? cleanInterestMode === 'with_interest'
             : Boolean(item.installmentsHasInterest)
-          : existingItem?.installmentsHasInterest,
-        installmentsInterestMode: isEffectivePro
+          : undefined,
+        installmentsInterestMode: canSaveInstallments
           ? cleanInterestMode
-          : existingItem?.installmentsInterestMode,
-        customInstallmentAmount: isEffectivePro
+          : undefined,
+        customInstallmentAmount: canSaveInstallments
           ? cleanCustomInstallmentAmount
-          : existingItem?.customInstallmentAmount,
+          : undefined,
         pixDiscountPercent: isEffectivePro
           ? cleanPixDiscountPercent
           : existingItem?.pixDiscountPercent,

@@ -461,6 +461,7 @@ const initialData: DatabaseSchema = {
     mpPublicKey: 'APP_USR-8b245dbb-b6c0-4335-b46a-ae016ea5071d',
     mpAccessToken:
       'APP_USR-4000171423020297-110821-0d5a69a11b676b64931811de85b054a0-244576316',
+    mpAffiliatePointUrl: 'https://www.mercadopago.com.br/point',
     proPriceReais: 25.9,
     ntfyTopic: 'spotqr-edvan-alertas-1982',
   },

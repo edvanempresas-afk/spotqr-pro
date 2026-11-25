@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { syncDbFromCloud, findUserByReferralCode } from '@/lib/db';
+import { syncDbFromCloud, findUserByReferralCode, getDeveloperSettings } from '@/lib/db';
 import { getActiveMercadoPagoConfig } from '@/lib/mercadopago';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   await syncDbFromCloud();
   const { priceReais, publicKey } = getActiveMercadoPagoConfig();
+  const devSettings = getDeveloperSettings();
+  const mpAffiliatePointUrl =
+    (devSettings?.mpAffiliatePointUrl || '').trim() ||
+    'https://www.mercadopago.com.br/point';
   const proPriceReais = Number.isFinite(priceReais) && priceReais > 0 ? priceReais : 25.9;
 
   const url = new URL(req.url);
@@ -28,6 +32,7 @@ export async function GET(req: NextRequest) {
       referralPriceReais: 25.5,
       hasValidReferral,
       mpPublicKey: publicKey,
+      mpAffiliatePointUrl,
     },
     {
       headers: {

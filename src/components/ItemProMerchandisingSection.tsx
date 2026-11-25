@@ -17,6 +17,7 @@ import {
   X,
   Truck,
   ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 import '../app/merchandising.css';
 import {
@@ -46,6 +47,9 @@ interface ItemProMerchandisingSectionProps {
   item: MenuItem;
   currency?: string;
   isPro: boolean;
+  acceptsCreditCard?: boolean;
+  mpAffiliatePointUrl?: string;
+  onEnableCreditCard?: () => void;
   onUpdateItem: (patch: Partial<MenuItem>) => void;
 }
 
@@ -53,6 +57,9 @@ export function ItemProMerchandisingSection({
   item,
   currency = 'R$',
   isPro,
+  acceptsCreditCard = true,
+  mpAffiliatePointUrl = 'https://www.mercadopago.com.br/point',
+  onEnableCreditCard,
   onUpdateItem,
 }: ItemProMerchandisingSectionProps) {
   const hasAnyActiveProMerchandising = Boolean(
@@ -81,22 +88,27 @@ export function ItemProMerchandisingSection({
     item.installmentsInterestMode,
     item.installmentsHasInterest
   );
-  const installmentInfo = resolveInstallmentInfo(
-    effectiveSamplePrice,
-    item.maxInstallments,
-    item.installmentsHasInterest,
-    item.customInstallmentAmount,
-    currency,
-    resolvedInterestMode
-  );
-  const installmentPreview = formatInstallmentLabel(
-    effectiveSamplePrice,
-    item.maxInstallments,
-    currency,
-    item.installmentsHasInterest,
-    item.customInstallmentAmount,
-    resolvedInterestMode
-  );
+  const isCardAccepted = Boolean(acceptsCreditCard);
+  const installmentInfo = isCardAccepted
+    ? resolveInstallmentInfo(
+        effectiveSamplePrice,
+        item.maxInstallments,
+        item.installmentsHasInterest,
+        item.customInstallmentAmount,
+        currency,
+        resolvedInterestMode
+      )
+    : null;
+  const installmentPreview = isCardAccepted
+    ? formatInstallmentLabel(
+        effectiveSamplePrice,
+        item.maxInstallments,
+        currency,
+        item.installmentsHasInterest,
+        item.customInstallmentAmount,
+        resolvedInterestMode
+      )
+    : null;
   const pixDiscountPreview = calculatePixDiscountInfo(
     effectiveSamplePrice,
     item.pixDiscountPercent,
@@ -419,12 +431,12 @@ export function ItemProMerchandisingSection({
             </div>
           </div>
 
-          {/* 2. PARCELAMENTO (COM OU SEM JUROS) */}
+          {/* 2. PARCELAMENTO (OBRIGATORIO ACEITAR CARTAO DE CREDITO) */}
           <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h5 className="text-[11px] font-extrabold text-white flex items-center gap-1.5">
                 <CreditCard className="w-3.5 h-3.5 text-sky-400" />
-                <span>Parcelamento em Destaque (Itens de Maior Valor)</span>
+                <span>Parcelamento no Cartão de Crédito (Itens de Maior Valor)</span>
               </h5>
               {installmentPreview && (
                 <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/35 text-sky-300">
@@ -433,7 +445,47 @@ export function ItemProMerchandisingSection({
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
+            {!isCardAccepted ? (
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/35 space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="text-xs font-extrabold text-amber-200 block">
+                      Parcelamento exclusivo para quem aceita Cartão de Crédito
+                    </span>
+                    <p className="text-[10.5px] text-slate-300 leading-relaxed">
+                      No Brasil, vendas parceladas são permitidas apenas via{' '}
+                      <strong className="text-white">Cartão de Crédito</strong>. Lojas que aceitam somente PIX ou Dinheiro não podem parcelar na vitrine.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  {onEnableCreditCard && (
+                    <button
+                      type="button"
+                      onClick={onEnableCreditCard}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] font-extrabold transition shadow-sm"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Aceitar Cartão de Crédito e Liberar</span>
+                    </button>
+                  )}
+
+                  <a
+                    href={mpAffiliatePointUrl || 'https://www.mercadopago.com.br/point'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/45 text-sky-200 text-[11px] font-bold transition"
+                  >
+                    <span>💳 Não aceita cartão? Pedir Mercado Pago (Opcional)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-1.5">
               {[0, 2, 3, 6, 10, 12].map((parc) => {
                 const currentParc = item.maxInstallments || 0;
                 const isSelected =
@@ -588,6 +640,8 @@ export function ItemProMerchandisingSection({
                   </div>
                 )}
             </div>
+              </>
+            )}
           </div>
 
           {/* 3. VARIACOES NO MESMO ANUNCIO COM FOTO ATRELADA */}

@@ -509,6 +509,7 @@ export interface DeveloperSettings {
   mpPublicKey?: string;
   mpPixKey?: string;
   mpSubscriptionUrl?: string;
+  mpAffiliatePointUrl?: string;
   proPriceReais?: number;
   ntfyTopic?: string;
 }
