@@ -247,19 +247,30 @@ export default function DigitalShowcasePage({
   const [isNearBottom, setIsNearBottom] = useState(false);
 
   useEffect(() => {
+    if (loading || !menu) {
+      setIsNearBottom(false);
+      return;
+    }
+
     const handleScroll = () => {
       if (typeof window === 'undefined') return;
       const scrollY = window.scrollY;
       const windowHeight = window.innerHeight;
       const docHeight = document.documentElement.scrollHeight;
-      const nearBottom = scrollY + windowHeight >= docHeight - 380;
+      const nearBottom =
+        scrollY > 180 && scrollY + windowHeight >= docHeight - 380;
       setIsNearBottom(nearBottom);
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    window.addEventListener('resize', handleScroll, { passive: true });
+    const rafId = window.requestAnimationFrame(handleScroll);
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [loading, menu, activeCategory, searchQuery]);
 
   const scrollToProducts = (catId?: string) => {
     if (catId !== undefined) {
