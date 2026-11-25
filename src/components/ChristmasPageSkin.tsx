@@ -13,15 +13,20 @@ interface ChristmasPageSkinProps {
 
 type Point2D = [number, number];
 
-const LEFT_P0: Point2D = [2, 118];
-const LEFT_P1: Point2D = [134, 120];
-const LEFT_P2: Point2D = [214, 4];
+// Guirlanda do canto superior ESQUERDO:
+// Sai do canto esq. do topo (0,0), cai em arco pela gravidade (catenária), termina
+// na borda sup. direita do SVG (220,0). Ponto de controle bem abaixo = queda real.
+const LEFT_P0: Point2D = [0, 2];
+const LEFT_P1: Point2D = [110, 148];
+const LEFT_P2: Point2D = [220, 2];
 
-const RIGHT_P0: Point2D = [218, 118];
-const RIGHT_P1: Point2D = [86, 120];
-const RIGHT_P2: Point2D = [6, 4];
+// Guirlanda do canto superior DIREITO (espelho):
+// Sai do canto dir. do topo (220,0), cai em arco, termina na borda sup. esq. (0,0).
+const RIGHT_P0: Point2D = [220, 2];
+const RIGHT_P1: Point2D = [110, 148];
+const RIGHT_P2: Point2D = [0, 2];
 
-const BULB_T_STOPS = [0.16, 0.34, 0.52, 0.7, 0.86];
+const BULB_T_STOPS = [0.14, 0.28, 0.42, 0.57, 0.72, 0.86];
 
 interface SnowFlakeSpec {
   leftPct: number;
@@ -132,16 +137,17 @@ export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) 
     ? 'absolute top-0 bottom-0'
     : 'fixed top-0 bottom-0';
 
-  const leftBellAnchor = evalQuad(0.43, LEFT_P0, LEFT_P1, LEFT_P2);
-  const rightStockingAnchor = evalQuad(0.43, RIGHT_P0, RIGHT_P1, RIGHT_P2);
+  // Ornamentos ficam no ponto mais baixo da curva (t=0.5 = centro do arco/gravidade)
+  const leftBellAnchor = evalQuad(0.5, LEFT_P0, LEFT_P1, LEFT_P2);
+  const rightStockingAnchor = evalQuad(0.5, RIGHT_P0, RIGHT_P1, RIGHT_P2);
 
   return (
     <>
       {/* TOPO HORIZONTAL + GUIRLANDAS CURVAS PELA GRAVIDADE NOS CANTOS SUPERIORES */}
       <div
         aria-hidden="true"
-        className={`pointer-events-none select-none top-0 inset-x-0 overflow-hidden ${
-          isPreview ? 'absolute z-20 h-full' : 'absolute z-[16] h-44 sm:h-56'
+        className={`pointer-events-none select-none top-0 inset-x-0 ${
+          isPreview ? 'absolute z-20 h-full overflow-hidden' : 'absolute z-[16] h-44 sm:h-56 overflow-visible'
         }`}
       >
         {/* Neve suave caindo apenas no topo da página */}
@@ -214,11 +220,11 @@ export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) 
 
         {/* Canto Superior Esquerdo: Guirlanda curva pela gravidade + Lâmpadas verticais + Sinos */}
         <svg
-          viewBox="0 0 220 160"
+          viewBox="0 0 220 165"
           className={`absolute top-0 left-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.65)] ${
             isPreview
-              ? 'w-24 h-[70px]'
-              : 'w-28 h-[82px] sm:w-44 sm:h-32 md:w-56 md:h-40'
+              ? 'w-28 h-[75px]'
+              : 'w-36 h-[96px] sm:w-56 sm:h-36 md:w-72 md:h-48'
           }`}
         >
           {/* Fio e ramo de pinheiro curvo com caimento natural (catenária) */}
@@ -317,11 +323,11 @@ export function ChristmasPageSkin({ variant = 'page' }: ChristmasPageSkinProps) 
 
         {/* Canto Superior Direito: Guirlanda curva pela gravidade + Lâmpadas verticais + Meia */}
         <svg
-          viewBox="0 0 220 160"
+          viewBox="0 0 220 165"
           className={`absolute top-0 right-0 drop-shadow-[0_4px_8px_rgba(0,0,0,0.65)] ${
             isPreview
-              ? 'w-24 h-[70px]'
-              : 'w-28 h-[82px] sm:w-44 sm:h-32 md:w-56 md:h-40'
+              ? 'w-28 h-[75px]'
+              : 'w-36 h-[96px] sm:w-56 sm:h-36 md:w-72 md:h-48'
           }`}
         >
           {/* Fio e ramo de pinheiro curvo com caimento natural (catenária) */}
