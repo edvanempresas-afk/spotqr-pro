@@ -12,6 +12,9 @@ import {
   Plus,
   Trash2,
   Flame,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import '../app/merchandising.css';
 import {
@@ -24,8 +27,13 @@ import {
   buildVariantPreset,
   calculateDiscountPercent,
   formatInstallmentLabel,
+  formatMoneyBR,
+  resolvePriceFontOption,
   resolveVariantEffectivePrice,
 } from '../lib/merchandising';
+import { compressImageFileToDataUrl } from '../lib/image-upload';
+import { ChristmasCardDecor } from './ChristmasCardDecor';
+import { RetailPriceTag } from './RetailPriceTag';
 
 interface ItemProMerchandisingSectionProps {
   item: MenuItem;
@@ -49,6 +57,7 @@ export function ItemProMerchandisingSection({
   );
 
   const [expanded, setExpanded] = useState<boolean>(false);
+  const [uploadingVariantId, setUploadingVariantId] = useState<string | null>(null);
 
   const variants = item.variants || [];
   const activeEffect: PromoVisualEffect = item.promoEffect || 'none';
@@ -60,6 +69,15 @@ export function ItemProMerchandisingSection({
     resolveVariantEffectivePrice(item, variants[0]),
     item.maxInstallments,
     currency
+  );
+
+  // Deduplicated photos configured on this product (main + galleryImages) so owner can bind to variations
+  const itemCandidatePhotos = Array.from(
+    new Set(
+      [item.imageUrl, ...(item.galleryImages || [])]
+        .map((u) => (typeof u === 'string' ? u.trim() : ''))
+        .filter(Boolean)
+    )
   );
 
   const handleAddVariant = () => {
@@ -102,6 +120,24 @@ export function ItemProMerchandisingSection({
     });
   };
 
+  const handleVariantPhotoUpload = async (
+    variantId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploadingVariantId(variantId);
+    try {
+      const compressed = await compressImageFileToDataUrl(file, 'product');
+      handleUpdateVariant(variantId, { imageUrl: compressed });
+    } catch {
+      // Ignore invalid upload file silently
+    } finally {
+      setUploadingVariantId(null);
+    }
+  };
+
   if (!isPro) {
     return (
       <div className="sm:col-span-3 p-3 rounded-2xl bg-slate-950/60 border border-amber-500/25 space-y-2">
@@ -118,26 +154,26 @@ export function ItemProMerchandisingSection({
         <p className="text-[11px] text-slate-400 leading-relaxed">
           No <strong className="text-amber-300">Plano PRO</strong> você ativa bordas{' '}
           <span className="text-emerald-300 font-semibold">Neon Pulsante</span>,{' '}
-          <span className="text-rose-300 font-semibold">🎄 Pisca-Pisca Natalino</span>,{' '}
-          <span className="text-orange-300 font-semibold">💥 Splash de Desconto</span>,{' '}
+          <span className="text-rose-300 font-semibold">🎄 Pisca-Pisca Natalino com LEDs e Sinos</span>,{' '}
+          <span className="text-orange-300 font-semibold">💥 Splash de Gôndola</span>,{' '}
           <span className="text-sky-300 font-semibold">Parcelamento sem juros</span> e vende{' '}
-          <span className="text-white font-semibold">110V / 220V, Cores e Tamanhos</span> no mesmo anúncio!
+          <span className="text-white font-semibold">110V / 220V e Cores com Foto Própria</span> no mesmo anúncio!
         </p>
       </div>
     );
   }
 
   return (
-    <div className="sm:col-span-3 rounded-2xl bg-slate-950/75 border border-emerald-500/25 overflow-hidden">
+    <div className="sm:col-span-3 rounded-2xl bg-slate-950/75 border border-emerald-500/25 overflow-visible">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="w-full px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-left hover:bg-slate-900/60 transition"
+        className="w-full px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-left hover:bg-slate-900/60 transition rounded-2xl"
       >
         <div className="flex items-center gap-2 flex-wrap">
           <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-extrabold text-white">
-            Destaques PRO: Promoção, Parcelas &amp; Variações (110V/220V, Cores)
+            Destaques PRO: Promoção, Parcelas &amp; Variações (110V/220V, Cores com Foto)
           </span>
           <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-300">
             PRO Ativo
@@ -155,6 +191,11 @@ export function ItemProMerchandisingSection({
               {discountPct && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/35 text-rose-200">
                   -{discountPct}%
+                </span>
+              )}
+              {item.showPriceSplash && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/35 text-amber-200">
+                  💥 Splash Gôndola
                 </span>
               )}
               {item.maxInstallments && item.maxInstallments >= 2 && (
@@ -182,31 +223,26 @@ export function ItemProMerchandisingSection({
 
       {expanded && (
         <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-800/80 space-y-4">
-          {/* 1. DESTAQUE PROMOCIONAL, PRECO "DE / POR", SPLASH E BORDAS SAZONAIS */}
+          {/* 1. DESTAQUE PROMOCIONAL, PRECO "DE / POR", SPLASH DE GONDOLA E BORDAS */}
           <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h5 className="text-[11px] font-extrabold text-white flex items-center gap-1.5">
                 <Flame className="w-3.5 h-3.5 text-orange-400" />
-                <span>Destaque Promocional, Splash no Preço &amp; Borda Animada</span>
+                <span>Destaque Promocional, Splash de Gôndola &amp; Borda Natalina/Neon</span>
               </h5>
-              {discountPct && (
-                <span className="price-splash-badge text-[10px]">
-                  -{discountPct}% OFF
-                </span>
-              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Preço Anterior &quot;De:&quot; ({currency}) — Opcional:
-                </label>
-                <div className="relative">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+              <div className="space-y-2.5">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    Preço Anterior &quot;De:&quot; ({currency}) — Opcional:
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
-                    placeholder="Ex: 199,90 (mostra preço riscado e %)"
+                    placeholder="Ex: 150,00 (gera desconto % automático)"
                     value={
                       typeof item.originalPrice === 'number' &&
                       item.originalPrice > 0
@@ -220,22 +256,24 @@ export function ItemProMerchandisingSection({
                         return;
                       }
                       const parsed = parseFloat(raw);
+                      const valid = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+                      const becameDiscount =
+                        Boolean(valid && valid > (Number(item.price) || 0)) &&
+                        !item.originalPrice;
                       onUpdateItem({
-                        originalPrice:
-                          Number.isFinite(parsed) && parsed > 0 ? parsed : undefined,
+                        originalPrice: valid,
+                        ...(becameDiscount ? { showPriceSplash: true } : {}),
                       });
                     }}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-200 focus:border-orange-400 outline-none"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    {discountPct
+                      ? `Economia automática de ${discountPct}% calculada sobre o valor anterior.`
+                      : 'Preencha um valor maior que o preço atual para ativar o -XX% OFF.'}
+                  </p>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {discountPct
-                    ? `Exibirá "De ${currency} ${Number(item.originalPrice).toFixed(2).replace('.', ',')}" riscado e economia de ${discountPct}%.`
-                    : 'Preencha um valor maior que o preço atual para gerar o % OFF automático.'}
-                </p>
-              </div>
 
-              <div className="flex flex-col justify-between gap-2">
                 <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 hover:border-orange-500/40 cursor-pointer select-none transition">
                   <input
                     type="checkbox"
@@ -247,28 +285,50 @@ export function ItemProMerchandisingSection({
                   />
                   <div>
                     <span className="text-xs font-extrabold text-orange-200 block">
-                      💥 Colocar Splash Chamativo no Preço
+                      💥 Etiqueta Splash de Gôndola encima do Preço
                     </span>
                     <span className="text-[10px] text-slate-400 leading-tight block">
-                      Adiciona selo explosivo animado (&quot;OFERTA&quot; ou &quot;-XX% OFF&quot;) colado no valor.
+                      Coloca etiqueta amarela estilizada com explosão vermelha (&quot;-17% OFF&quot; / &quot;OFERTA&quot;) direto sobre o preço!
                     </span>
                   </div>
                 </label>
               </div>
+
+              {/* Prévia Ao Vivo da Etiqueta / Splash encima do Preço */}
+              <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 flex flex-col items-start justify-center gap-1.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">
+                  Prévia do Preço na Vitrine:
+                </span>
+                <RetailPriceTag
+                  formattedPrice={formatMoneyBR(
+                    resolveVariantEffectivePrice(item, variants[0]),
+                    currency
+                  )}
+                  originalPrice={item.originalPrice}
+                  discountPct={discountPct}
+                  showSplash={Boolean(item.showPriceSplash)}
+                  currency={currency}
+                  priceScaleClass="text-xl leading-none"
+                  priceFont={resolvePriceFontOption('modern')}
+                  accentTextColor="#34d399"
+                  isLight={false}
+                  mutedTextClass="text-slate-400"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1.5">
+              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">
                 Borda Especial ao Redor do Quadrado do Item:
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
                 {PROMO_EFFECT_OPTIONS.map((opt) => {
                   const isSelected = activeEffect === opt.id;
                   const previewFrameClass =
                     opt.id === 'neon' && isSelected
                       ? 'promo-card-neon bg-emerald-950/40 border-emerald-400'
                       : opt.id === 'christmas' && isSelected
-                      ? 'promo-card-christmas bg-rose-950/35 border-red-500'
+                      ? 'promo-card-christmas bg-emerald-950/35 border-emerald-500'
                       : opt.id === 'flash_gold' && isSelected
                       ? 'promo-card-flash-gold bg-amber-950/35 border-amber-400'
                       : isSelected
@@ -280,12 +340,15 @@ export function ItemProMerchandisingSection({
                       key={opt.id}
                       type="button"
                       onClick={() => onUpdateItem({ promoEffect: opt.id })}
-                      className={`p-2.5 rounded-xl border text-left transition ${previewFrameClass}`}
+                      className={`relative overflow-visible p-3 rounded-xl border text-left transition ${previewFrameClass}`}
                     >
-                      <span className="text-[11px] font-extrabold text-white block">
+                      {opt.id === 'christmas' && isSelected && (
+                        <ChristmasCardDecor compact />
+                      )}
+                      <span className="text-[11px] font-extrabold text-white block relative z-20">
                         {opt.badgeText}
                       </span>
-                      <span className="text-[9.5px] text-slate-400 leading-tight block mt-0.5">
+                      <span className="text-[9.5px] text-slate-400 leading-tight block mt-0.5 relative z-20">
                         {opt.description}
                       </span>
                     </button>
@@ -368,16 +431,16 @@ export function ItemProMerchandisingSection({
             </div>
           </div>
 
-          {/* 3. MULTIPLAS VARIACOES NO MESMO ANUNCIO (VOLTAGEM, CORES, TAMANHOS) */}
+          {/* 3. VARIACOES NO MESMO ANUNCIO COM FOTO ATRELADA */}
           <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h5 className="text-[11px] font-extrabold text-white flex items-center gap-1.5">
                   <Layers className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Variações no Mesmo Quadrado de Anúncio</span>
+                  <span>Variações no Mesmo Anúncio + Foto por Cor/Opção</span>
                 </h5>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Ideal para eletrônicos (110V / 220V), roupas (Cores / Tamanhos) ou capacidades. O cliente escolhe antes de colocar no carrinho!
+                  Venda Voltagem (110V/220V), Cores ou Tamanhos no mesmo card e vincule uma foto própria para trocar a imagem quando o cliente clicar na opção!
                 </p>
               </div>
               <button
@@ -390,7 +453,6 @@ export function ItemProMerchandisingSection({
               </button>
             </div>
 
-            {/* Atalhos rápidos brasileiros */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] font-bold text-slate-400 mr-1">
                 Atalhos prontos:
@@ -438,114 +500,207 @@ export function ItemProMerchandisingSection({
                     onChange={(e) =>
                       onUpdateItem({ variantGroupTitle: e.target.value })
                     }
-                    placeholder="Ex: Voltagem (110V ou 220V)"
+                    placeholder="Ex: Voltagem ou Cor"
                     className="w-full sm:w-72 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-white focus:border-emerald-400 outline-none"
                   />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {variants.map((variant) => (
                     <div
                       key={variant.id}
-                      className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 rounded-xl bg-slate-950/90 border border-slate-800"
+                      className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 space-y-2"
                     >
-                      <input
-                        type="color"
-                        value={variant.colorHex || '#10b981'}
-                        onChange={(e) =>
-                          handleUpdateVariant(variant.id, {
-                            colorHex: e.target.value,
-                          })
-                        }
-                        title="Cor opcional da bolinha desta opção"
-                        className="w-7 h-7 rounded-lg bg-transparent border border-slate-700 p-0.5 cursor-pointer shrink-0"
-                      />
-                      {variant.colorHex && (
+                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                        <input
+                          type="color"
+                          value={variant.colorHex || '#10b981'}
+                          onChange={(e) =>
+                            handleUpdateVariant(variant.id, {
+                              colorHex: e.target.value,
+                            })
+                          }
+                          title="Cor da bolinha desta opção"
+                          className="w-7 h-7 rounded-lg bg-transparent border border-slate-700 p-0.5 cursor-pointer shrink-0"
+                        />
+                        {variant.colorHex && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateVariant(variant.id, {
+                                colorHex: undefined,
+                              })
+                            }
+                            title="Remover bolinha de cor"
+                            className="text-[9px] font-bold text-slate-500 hover:text-slate-300 px-1"
+                          >
+                            sem cor
+                          </button>
+                        )}
+
+                        <input
+                          type="text"
+                          value={variant.label}
+                          onChange={(e) =>
+                            handleUpdateVariant(variant.id, {
+                              label: e.target.value,
+                            })
+                          }
+                          placeholder="Ex: 220V ou Preto Fosco"
+                          className="flex-1 min-w-[120px] bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:border-emerald-400 outline-none"
+                        />
+
+                        <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shrink-0">
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {currency}:
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="Igual base"
+                            value={
+                              typeof variant.price === 'number' && variant.price > 0
+                                ? variant.price
+                                : ''
+                            }
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(',', '.').trim();
+                              if (!raw) {
+                                handleUpdateVariant(variant.id, {
+                                  price: undefined,
+                                });
+                                return;
+                              }
+                              const parsed = parseFloat(raw);
+                              handleUpdateVariant(variant.id, {
+                                price:
+                                  Number.isFinite(parsed) && parsed > 0
+                                    ? parsed
+                                    : undefined,
+                              });
+                            }}
+                            title="Deixe vazio para manter o mesmo preço do produto principal"
+                            className="w-20 bg-transparent text-xs font-bold text-emerald-300 outline-none"
+                          />
+                        </div>
+
                         <button
                           type="button"
                           onClick={() =>
                             handleUpdateVariant(variant.id, {
-                              colorHex: undefined,
+                              isAvailable: variant.isAvailable === false,
                             })
                           }
-                          title="Remover bolinha de cor"
-                          className="text-[9px] font-bold text-slate-500 hover:text-slate-300 px-1"
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                            variant.isAvailable !== false
+                              ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                              : 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+                          }`}
                         >
-                          sem cor
+                          {variant.isAvailable !== false ? 'Ativo' : 'Indisp.'}
                         </button>
-                      )}
 
-                      <input
-                        type="text"
-                        value={variant.label}
-                        onChange={(e) =>
-                          handleUpdateVariant(variant.id, {
-                            label: e.target.value,
-                          })
-                        }
-                        placeholder="Ex: 220V ou Preto Fosco"
-                        className="flex-1 min-w-[120px] bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-bold text-white focus:border-emerald-400 outline-none"
-                      />
-
-                      <div className="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 shrink-0">
-                        <span className="text-[10px] font-semibold text-slate-400">
-                          {currency}:
-                        </span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Igual base"
-                          value={
-                            typeof variant.price === 'number' && variant.price > 0
-                              ? variant.price
-                              : ''
-                          }
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(',', '.').trim();
-                            if (!raw) {
-                              handleUpdateVariant(variant.id, {
-                                price: undefined,
-                              });
-                              return;
-                            }
-                            const parsed = parseFloat(raw);
-                            handleUpdateVariant(variant.id, {
-                              price:
-                                Number.isFinite(parsed) && parsed > 0
-                                  ? parsed
-                                  : undefined,
-                            });
-                          }}
-                          title="Deixe vazio para manter o mesmo preço do produto principal"
-                          className="w-20 bg-transparent text-xs font-bold text-emerald-300 outline-none"
-                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(variant.id)}
+                          className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition shrink-0"
+                          title="Excluir variação"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateVariant(variant.id, {
-                            isAvailable: variant.isAvailable === false,
-                          })
-                        }
-                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition shrink-0 ${
-                          variant.isAvailable !== false
-                            ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
-                            : 'bg-rose-500/15 border-rose-500/35 text-rose-300'
-                        }`}
-                      >
-                        {variant.isAvailable !== false ? 'Ativo' : 'Indisp.'}
-                      </button>
+                      {/* Foto vinculada a esta variação (upload direto ou atrelada às fotos adicionais) */}
+                      <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-800/70">
+                        <div className="w-9 h-9 rounded-lg border border-slate-700 bg-slate-900 overflow-hidden flex items-center justify-center shrink-0">
+                          {variant.imageUrl ? (
+                            <img
+                              src={variant.imageUrl}
+                              alt={variant.label || 'Variação'}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <ImageIcon className="w-4 h-4 text-slate-600" />
+                          )}
+                        </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVariant(variant.id)}
-                        className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg transition shrink-0"
-                        title="Excluir variação"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                        <label className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-bold text-emerald-300 cursor-pointer transition shrink-0">
+                          <Upload className="w-3 h-3" />
+                          <span>
+                            {uploadingVariantId === variant.id
+                              ? 'Enviando...'
+                              : variant.imageUrl
+                              ? 'Trocar Foto'
+                              : 'Foto da Opção'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) =>
+                              handleVariantPhotoUpload(variant.id, e)
+                            }
+                            className="hidden"
+                          />
+                        </label>
+
+                        {variant.imageUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateVariant(variant.id, {
+                                imageUrl: undefined,
+                              })
+                            }
+                            className="inline-flex items-center gap-0.5 px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-[10px] font-bold text-rose-300 transition shrink-0"
+                            title="Remover foto desta variação"
+                          >
+                            <X className="w-3 h-3" />
+                            <span>Desvincular</span>
+                          </button>
+                        )}
+
+                        {itemCandidatePhotos.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+                            <span className="text-[9.5px] font-semibold text-slate-400">
+                              Ou atrele às fotos já cadastradas:
+                            </span>
+                            {itemCandidatePhotos.map((photoUrl, pIdx) => {
+                              const isLinked = variant.imageUrl === photoUrl;
+                              return (
+                                <button
+                                  key={`${variant.id}-cand-${pIdx}`}
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateVariant(variant.id, {
+                                      imageUrl: isLinked ? undefined : photoUrl,
+                                    })
+                                  }
+                                  title={
+                                    isLinked
+                                      ? 'Foto vinculada a esta opção (clique para desvincular)'
+                                      : `Vincular Foto ${pIdx === 0 ? 'Principal' : `#${pIdx + 1}`}`
+                                  }
+                                  className={`relative w-8 h-8 rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                                    isLinked
+                                      ? 'border-emerald-400 ring-2 ring-emerald-400/40 scale-105'
+                                      : 'border-slate-700 opacity-75 hover:opacity-100 hover:border-slate-500'
+                                  }`}
+                                >
+                                  <img
+                                    src={photoUrl}
+                                    alt={`Foto ${pIdx + 1}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <span className="absolute bottom-0 right-0 px-0.5 bg-black/75 text-[7px] font-black text-white">
+                                    {pIdx === 0 ? '1ª' : `#${pIdx + 1}`}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

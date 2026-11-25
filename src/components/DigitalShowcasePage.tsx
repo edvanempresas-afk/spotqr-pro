@@ -67,23 +67,39 @@ import Link from 'next/link';
 import AdBanner from '@/components/AdBanner';
 import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
 import TableQrScannerModal from '@/components/TableQrScannerModal';
+import { ChristmasCardDecor } from '@/components/ChristmasCardDecor';
+import { RetailPriceTag } from '@/components/RetailPriceTag';
 import ShowcaseCustomizeModal, {
   CustomizedSelectionPayload,
 } from '@/components/ShowcaseCustomizeModal';
 
 function extractItemPhotos(
   targetItem: MenuItem | null | undefined,
-  allowExtra: boolean
+  allowExtra: boolean,
+  preferredVariant?: MenuItemVariant | null
 ): string[] {
   if (!targetItem) return [];
   const photos: string[] = [];
-  if (typeof targetItem.imageUrl === 'string' && targetItem.imageUrl.trim()) {
-    photos.push(targetItem.imageUrl.trim());
+  const pushUnique = (raw?: string | null) => {
+    if (typeof raw === 'string' && raw.trim() && !photos.includes(raw.trim())) {
+      photos.push(raw.trim());
+    }
+  };
+
+  if (allowExtra && preferredVariant?.imageUrl) {
+    pushUnique(preferredVariant.imageUrl);
   }
+  pushUnique(targetItem.imageUrl);
+
   if (allowExtra && Array.isArray(targetItem.galleryImages)) {
     for (const url of targetItem.galleryImages) {
-      if (typeof url === 'string' && url.trim() && !photos.includes(url.trim())) {
-        photos.push(url.trim());
+      pushUnique(url);
+    }
+  }
+  if (allowExtra && Array.isArray(targetItem.variants)) {
+    for (const v of targetItem.variants) {
+      if (v && v.isAvailable !== false && v.imageUrl) {
+        pushUnique(v.imageUrl);
       }
     }
   }
@@ -192,7 +208,21 @@ export default function DigitalShowcasePage({
 
   useEffect(() => {
     if (!zoomedItem) return;
-    const total = extractItemPhotos(zoomedItem, Boolean(menu?.isPaid)).length;
+    const isZoomPro = Boolean(
+      isProStillValid({
+        slug,
+        isPaid: menu?.isPaid,
+        proExpiresAt: menu?.proExpiresAt,
+      })
+    );
+    const chosenId = selectedVariants[zoomedItem.id];
+    const zoomVar =
+      isZoomPro && Array.isArray(zoomedItem.variants)
+        ? zoomedItem.variants.find((v) => v.id === chosenId) ||
+          zoomedItem.variants.find((v) => v.isAvailable !== false) ||
+          null
+        : null;
+    const total = extractItemPhotos(zoomedItem, isZoomPro, zoomVar).length;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         closePhotoZoom();
@@ -206,7 +236,7 @@ export default function DigitalShowcasePage({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomedItem, menu?.isPaid]);
+  }, [zoomedItem, menu?.isPaid, menu?.proExpiresAt, slug, selectedVariants]);
 
   // Read ?mesa=XX from URL if customer scanned a numbered table plaque
   const [isNearBottom, setIsNearBottom] = useState(false);
@@ -1373,7 +1403,8 @@ export default function DigitalShowcasePage({
   };
 
   const renderProductThumbnail = (targetItem: MenuItem, extraClass = '') => {
-    const photos = extractItemPhotos(targetItem, isPro);
+    const activeVariant = resolveSelectedVariant(targetItem);
+    const photos = extractItemPhotos(targetItem, isPro, activeVariant);
     if (photos.length === 0) return null;
     const hasMultiple = photos.length > 1;
     return (
@@ -1942,6 +1973,8 @@ export default function DigitalShowcasePage({
                   <React.Fragment key={item.id}>
                     <div
                       className={`border rounded-2xl p-4 sm:p-5 flex gap-3.5 sm:gap-4 items-stretch justify-between transition shadow-sm ${
+                        promoEffect === 'christmas' ? 'my-3 overflow-visible' : ''
+                      } ${
                         isLight
                           ? 'bg-white border-slate-200/90'
                           : 'bg-[#121929]/75 border-slate-800/80'
@@ -1953,6 +1986,7 @@ export default function DigitalShowcasePage({
                           : 'opacity-60 grayscale-[40%]'
                       } ${promoFrameClass}`}
                     >
+                      {promoEffect === 'christmas' && <ChristmasCardDecor />}
                       {imageOnLeft &&
                         renderProductThumbnail(item, 'self-start sm:self-center')}
 
@@ -2138,59 +2172,28 @@ export default function DigitalShowcasePage({
                         </div>
 
                         <div className="pt-1.5 flex flex-wrap items-end justify-between gap-2.5">
-                          <div className="space-y-0.5 min-w-0">
-                            {discountPct && typeof item.originalPrice === 'number' && (
-                              <span
-                                className={`text-xs line-through font-semibold block ${mutedTextClass}`}
-                              >
-                                De {formatMoneyBR(item.originalPrice, menu.currency || 'R$')}
-                              </span>
-                            )}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`${activePriceScaleClass} ${activePriceFont.className}`}
-                                style={{
-                                  color: theme.readableAccentText,
-                                  fontFamily: activePriceFont.fontFamily,
-                                }}
-                              >
-                                {formatItemStartingPriceLabel(item)}
-                              </span>
-                              {isPro && item.showPriceSplash && (
-                                <span className="price-splash-badge text-[10px]">
-                                  {discountPct ? `💥 -${discountPct}% OFF` : '🔥 OFERTA!'}
-                                </span>
-                              )}
-                              {isPro && !item.showPriceSplash && discountPct && (
-                                <span
-                                  className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
-                                    isLight
-                                      ? 'bg-rose-50 border-rose-200 text-rose-700'
-                                      : 'bg-rose-500/15 border-rose-500/35 text-rose-300'
-                                  }`}
-                                >
-                                  -{discountPct}% OFF
-                                </span>
-                              )}
-                            </div>
-                            {installmentLabel && (
-                              <p
-                                className={`text-[11px] font-bold flex items-center gap-1 ${
-                                  isLight ? 'text-emerald-700' : 'text-emerald-300'
-                                }`}
-                              >
-                                <CreditCard className="w-3 h-3 shrink-0 opacity-85" />
-                                <span>{installmentLabel}</span>
-                              </p>
-                            )}
-                          </div>
-                          {(imageOnLeft || extractItemPhotos(item, isPro).length === 0) && (
+                          <RetailPriceTag
+                            formattedPrice={formatItemStartingPriceLabel(item)}
+                            originalPrice={isPro ? item.originalPrice : undefined}
+                            discountPct={discountPct}
+                            showSplash={Boolean(isPro && item.showPriceSplash)}
+                            installmentLabel={installmentLabel}
+                            currency={menu.currency || 'R$'}
+                            priceScaleClass={activePriceScaleClass}
+                            priceFont={activePriceFont}
+                            accentTextColor={theme.readableAccentText}
+                            isLight={isLight}
+                            mutedTextClass={mutedTextClass}
+                          />
+                          {(imageOnLeft ||
+                            extractItemPhotos(item, isPro, selectedVariant).length === 0) && (
                             <div className="ml-auto">{cartActionControl}</div>
                           )}
                         </div>
                       </div>
 
-                      {!imageOnLeft && extractItemPhotos(item, isPro).length > 0 && (
+                      {!imageOnLeft &&
+                        extractItemPhotos(item, isPro, selectedVariant).length > 0 && (
                         <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
                           {renderProductThumbnail(item)}
                           {cartActionControl}
@@ -3560,11 +3563,34 @@ export default function DigitalShowcasePage({
       {/* Product Photo Gallery & Zoom Modal */}
       {zoomedItem &&
         (() => {
-          const zoomedPhotos = extractItemPhotos(zoomedItem, isPro);
+          const zoomedVariants = getActiveItemVariants(zoomedItem, isPro);
+          const zoomedSelectedVar = resolveSelectedVariant(zoomedItem);
+          const zoomedPhotos = extractItemPhotos(
+            zoomedItem,
+            isPro,
+            zoomedSelectedVar
+          );
           if (zoomedPhotos.length === 0) return null;
           const safeIndex = Math.min(activePhotoIndex, zoomedPhotos.length - 1);
           const currentZoomedPhoto = zoomedPhotos[safeIndex];
           const hasGallery = zoomedPhotos.length > 1;
+          const zoomedEffectivePrice = resolveVariantEffectivePrice(
+            zoomedItem,
+            zoomedSelectedVar
+          );
+          const zoomedDiscountPct = isPro
+            ? calculateDiscountPercent(
+                zoomedEffectivePrice,
+                zoomedItem.originalPrice
+              )
+            : null;
+          const zoomedInstallmentLabel = isPro
+            ? formatInstallmentLabel(
+                zoomedEffectivePrice,
+                zoomedItem.maxInstallments,
+                menu.currency || 'R$'
+              )
+            : null;
 
           return (
             <div
@@ -3821,47 +3847,79 @@ export default function DigitalShowcasePage({
                       {zoomedItem.description}
                     </p>
                   )}
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                  {isPro && zoomedVariants.length > 0 && (
+                    <div className="space-y-1">
                       <span
-                        className={`text-[10px] uppercase tracking-wider font-semibold block ${mutedTextClass}`}
+                        className={`text-[10px] font-bold uppercase tracking-wider block ${mutedTextClass}`}
                       >
-                        Preço
+                        {zoomedItem.variantGroupTitle || 'Opção'}:{' '}
+                        <strong className={headingTextClass}>
+                          {zoomedSelectedVar?.label || 'Indisponível'}
+                        </strong>
                       </span>
-                      <span
-                        className={`${activePriceScaleClass} ${activePriceFont.className}`}
-                        style={{
-                          color: theme.readableAccentText,
-                          fontFamily: activePriceFont.fontFamily,
-                        }}
-                      >
-                        {formatItemStartingPriceLabel(zoomedItem)}
-                      </span>
-                      {isPro &&
-                        formatInstallmentLabel(
-                          resolveVariantEffectivePrice(
-                            zoomedItem,
-                            resolveSelectedVariant(zoomedItem)
-                          ),
-                          zoomedItem.maxInstallments,
-                          menu.currency || 'R$'
-                        ) && (
-                          <p
-                            className={`text-[11px] font-bold mt-0.5 ${
-                              isLight ? 'text-emerald-700' : 'text-emerald-300'
-                            }`}
-                          >
-                            {formatInstallmentLabel(
-                              resolveVariantEffectivePrice(
-                                zoomedItem,
-                                resolveSelectedVariant(zoomedItem)
-                              ),
-                              zoomedItem.maxInstallments,
-                              menu.currency || 'R$'
-                            )}
-                          </p>
-                        )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {zoomedVariants.map((variant) => {
+                          const isSelectedVar = zoomedSelectedVar?.id === variant.id;
+                          const isVarAvailable = variant.isAvailable !== false;
+                          return (
+                            <button
+                              key={variant.id}
+                              type="button"
+                              disabled={!isVarAvailable}
+                              onClick={() => {
+                                setSelectedVariants((prev) => ({
+                                  ...prev,
+                                  [zoomedItem.id]: variant.id,
+                                }));
+                                setActivePhotoIndex(0);
+                                setPhotoZoomScale(1);
+                              }}
+                              style={
+                                isSelectedVar
+                                  ? {
+                                      backgroundColor: theme.accentHex,
+                                      color: theme.accentTextOnSolid,
+                                      borderColor: theme.accentHex,
+                                    }
+                                  : undefined
+                              }
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                                !isVarAvailable
+                                  ? 'opacity-40 line-through cursor-not-allowed border-slate-700 text-slate-500'
+                                  : isSelectedVar
+                                  ? 'shadow-sm'
+                                  : isLight
+                                  ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400'
+                                  : 'bg-slate-900/80 border-slate-700 text-slate-200 hover:border-slate-500'
+                              }`}
+                            >
+                              {variant.colorHex && (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
+                                  style={{ backgroundColor: variant.colorHex }}
+                                />
+                              )}
+                              <span>{variant.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                  )}
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <RetailPriceTag
+                      formattedPrice={formatItemStartingPriceLabel(zoomedItem)}
+                      originalPrice={isPro ? zoomedItem.originalPrice : undefined}
+                      discountPct={zoomedDiscountPct}
+                      showSplash={Boolean(isPro && zoomedItem.showPriceSplash)}
+                      installmentLabel={zoomedInstallmentLabel}
+                      currency={menu.currency || 'R$'}
+                      priceScaleClass={activePriceScaleClass}
+                      priceFont={activePriceFont}
+                      accentTextColor={theme.readableAccentText}
+                      isLight={isLight}
+                      mutedTextClass={mutedTextClass}
+                    />
                     {renderCartActionControl(zoomedItem)}
                   </div>
                 </div>

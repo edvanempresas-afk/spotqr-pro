@@ -8,6 +8,7 @@ import {
   expireDueQRsIfAny,
   reconcileCloudSlugMigrations,
   consumeUserProCreditIfActive,
+  resolveAccountProEntitlement,
   syncDbFromCloud,
   syncMenuFromCloud,
   persistMenuToCloud,
@@ -51,8 +52,13 @@ export async function GET(request: NextRequest) {
   }
 
   const qr = getDynamicQRBySlug(effectiveSlug);
+  const accountPro = resolveAccountProEntitlement(
+    qr?.ownerId || menu.ownerId,
+    qr?.ownerEmail || menu.ownerEmail
+  );
   const isPaid = Boolean(
     isProStillValid(qr) ||
+      accountPro.isPaid ||
       effectiveSlug === 'demo-restaurante' ||
       effectiveSlug === 'demo-catalogo'
   );
@@ -63,17 +69,38 @@ export async function GET(request: NextRequest) {
       : {
           ...it,
           galleryImages: undefined,
+          originalPrice: undefined,
+          promoEffect: undefined,
+          showPriceSplash: undefined,
+          maxInstallments: undefined,
+          variantGroupTitle: undefined,
+          variants: undefined,
         }
   );
+
+  const effectiveGrantType =
+    qr && isProStillValid(qr)
+      ? qr.proGrantType || null
+      : accountPro.isPaid
+      ? accountPro.proGrantType || null
+      : null;
+  const effectiveExpiresAt =
+    qr && isProStillValid(qr)
+      ? qr.proExpiresAt || null
+      : accountPro.isPaid
+      ? accountPro.proExpiresAt || null
+      : null;
 
   return NextResponse.json(
     {
       ...menu,
       items: sanitizedItems,
       coverVideo: isPaid ? menu.coverVideo : undefined,
+      priceFontStyle: isPaid ? menu.priceFontStyle : undefined,
+      priceScale: isPaid ? menu.priceScale : undefined,
       isPaid,
-      proGrantType: isPaid ? qr?.proGrantType || null : null,
-      proExpiresAt: isPaid ? qr?.proExpiresAt || null : null,
+      proGrantType: isPaid ? effectiveGrantType : null,
+      proExpiresAt: isPaid ? effectiveExpiresAt : null,
       autoRenewSummary: qr?.autoRenew
         ? {
             enabled: qr.autoRenew.enabled,
@@ -213,8 +240,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const resolvedSaveOwnerId =
+      clientUser?.id || existingQRBeforeSave?.ownerId || body.ownerId;
+    const resolvedSaveOwnerEmail =
+      clientUser?.email || existingQRBeforeSave?.ownerEmail || body.ownerEmail;
+    const accountPro = resolveAccountProEntitlement(
+      resolvedSaveOwnerId,
+      resolvedSaveOwnerEmail
+    );
+
     const isEffectivePro = Boolean(
       (existingQRBeforeSave && isProStillValid(existingQRBeforeSave)) ||
+        accountPro.isPaid ||
         cleanSlug === 'demo-restaurante' ||
         cleanSlug === 'demo-catalogo'
     );
@@ -290,6 +327,10 @@ export async function POST(request: NextRequest) {
               colorHex:
                 typeof v.colorHex === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v.colorHex.trim())
                   ? v.colorHex.trim()
+                  : undefined,
+              imageUrl:
+                typeof v.imageUrl === 'string' && v.imageUrl.trim()
+                  ? v.imageUrl.trim()
                   : undefined,
               isAvailable: v.isAvailable !== false,
             }))
@@ -372,9 +413,15 @@ export async function POST(request: NextRequest) {
     // Ensure a corresponding DynamicQRRecord exists and is linked to this client!
     expireDueQRsIfAny();
     const existingQR = getDynamicQRBySlug(cleanSlug);
-    const credit = !existingQR && clientUser
-      ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
-      : { isPaid: false };
+    const credit =
+      !accountPro.isPaid && !existingQR && clientUser
+        ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
+        : { isPaid: false };
+    const resolvedQrIsPaid = Boolean(
+      (existingQR && isProStillValid(existingQR)) ||
+        accountPro.isPaid ||
+        credit.isPaid
+    );
     const qrType = isCatalog ? 'catalog' : 'menu';
     const routePrefix = isCatalog ? '/catalogo/' : '/cardapio/';
     const baseQrConfig = existingQR?.qrConfig || {
@@ -402,10 +449,23 @@ export async function POST(request: NextRequest) {
       createdAt: existingQR?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       scansCount: existingQR?.scansCount || 0,
-      isPaid: existingQR ? isProStillValid(existingQR) : credit.isPaid,
-      proGrantType: existingQR?.proGrantType || credit.proGrantType,
-      proExpiresAt: existingQR?.proExpiresAt ?? credit.proExpiresAt ?? null,
-      proVoucherCode: existingQR?.proVoucherCode || credit.proVoucherCode,
+      isPaid: resolvedQrIsPaid,
+      proGrantType:
+        existingQR?.proGrantType ||
+        accountPro.proGrantType ||
+        credit.proGrantType,
+      proExpiresAt:
+        existingQR && isProStillValid(existingQR)
+          ? existingQR.proExpiresAt ?? null
+          : accountPro.isPaid
+          ? accountPro.proExpiresAt ?? null
+          : credit.proExpiresAt ?? null,
+      proGrantedAt: existingQR?.proGrantedAt || accountPro.proGrantedAt,
+      proGrantedHours: existingQR?.proGrantedHours || accountPro.proGrantedHours,
+      proVoucherCode:
+        existingQR?.proVoucherCode ||
+        accountPro.proVoucherCode ||
+        credit.proVoucherCode,
       linkedMenuId: cleanSlug,
       ownerId: clientUser?.id || existingQR?.ownerId,
       ownerEmail: clientUser?.email || existingQR?.ownerEmail,

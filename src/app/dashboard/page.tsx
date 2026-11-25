@@ -725,6 +725,20 @@ export default function DashboardPage() {
                   <span>+ Novo Catálogo / Loja</span>
                 </button>
 
+                {qrs.some((q) => isProStillValid(q, nowMs)) && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-bold ${
+                      isLight
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    }`}
+                    title="Sua conta já possui Plano PRO ativo. Novos cardápios e catálogos herdam o PRO automaticamente!"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>PRO já incluso nas novas lojas</span>
+                  </span>
+                )}
+
                 <Link
                   href="/#gerador"
                   className={`flex items-center gap-2 px-4 py-2.5 border rounded-xl text-xs font-bold transition ${

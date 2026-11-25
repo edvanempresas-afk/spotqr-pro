@@ -1304,7 +1304,146 @@ export function updateFriendlySlugForQR(
 }
 
 /**
+ * Finds all non-demo dynamic QRs belonging to a client account (by ownerId or ownerEmail).
+ */
+function findOwnerStoresInDb(
+  db: DatabaseSchema,
+  ownerId?: string,
+  ownerEmail?: string
+): DynamicQRRecord[] {
+  const normEmail = (ownerEmail || '').trim().toLowerCase();
+  const cleanOwnerId = (ownerId || '').trim();
+  const useId = cleanOwnerId && cleanOwnerId !== 'admin';
+  if (!useId && !normEmail) return [];
+
+  return Object.values(db.dynamicQRs || {}).filter((qr) => {
+    if (!qr || qr.slug === 'demo-restaurante' || qr.slug === 'demo-catalogo') {
+      return false;
+    }
+    const matchId = Boolean(useId && qr.ownerId && qr.ownerId === cleanOwnerId);
+    const matchEmail = Boolean(
+      normEmail && qr.ownerEmail && qr.ownerEmail.toLowerCase() === normEmail
+    );
+    return matchId || matchEmail;
+  });
+}
+
+export interface AccountProEntitlement {
+  isPaid: boolean;
+  proGrantType?: DynamicQRRecord['proGrantType'];
+  proExpiresAt?: string | null;
+  proGrantedAt?: string;
+  proGrantedHours?: number;
+  proVoucherCode?: string;
+}
+
+function pickStrongestProEntitlementInDb(
+  db: DatabaseSchema,
+  ownerId?: string,
+  ownerEmail?: string,
+  nowMs: number = Date.now()
+): AccountProEntitlement {
+  const stores = findOwnerStoresInDb(db, ownerId, ownerEmail);
+  let best: DynamicQRRecord | null = null;
+  let bestScore = -1;
+
+  for (const s of stores) {
+    if (!isProStillValid(s, nowMs)) continue;
+    const expMs = s.proExpiresAt
+      ? new Date(s.proExpiresAt).getTime()
+      : Number.POSITIVE_INFINITY;
+    const score = Number.isFinite(expMs) ? expMs : Number.POSITIVE_INFINITY;
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+
+  if (best) {
+    return {
+      isPaid: true,
+      proGrantType: best.proGrantType,
+      proExpiresAt: best.proExpiresAt ?? null,
+      proGrantedAt: best.proGrantedAt,
+      proGrantedHours: best.proGrantedHours,
+      proVoucherCode: best.proVoucherCode,
+    };
+  }
+
+  const normEmail = (ownerEmail || '').trim().toLowerCase();
+  const user =
+    (ownerId && ownerId !== 'admin' && db.users?.[ownerId]) ||
+    (normEmail
+      ? Object.values(db.users || {}).find(
+          (u) => u.email.toLowerCase() === normEmail
+        )
+      : undefined);
+  if (user?.proCreditExpiresAt) {
+    const expMs = new Date(user.proCreditExpiresAt).getTime();
+    if (Number.isFinite(expMs) && nowMs < expMs) {
+      return {
+        isPaid: true,
+        proGrantType: 'voucher',
+        proExpiresAt: user.proCreditExpiresAt,
+        proVoucherCode: user.proCreditVoucherCode,
+      };
+    }
+  }
+
+  return { isPaid: false };
+}
+
+export function syncAccountProForOwnerInDb(
+  db: DatabaseSchema,
+  ownerId?: string,
+  ownerEmail?: string,
+  nowMs: number = Date.now()
+): boolean {
+  const entitlement = pickStrongestProEntitlementInDb(
+    db,
+    ownerId,
+    ownerEmail,
+    nowMs
+  );
+  if (!entitlement.isPaid) return false;
+
+  let changed = false;
+  const siblings = findOwnerStoresInDb(db, ownerId, ownerEmail);
+  const nowIso = new Date(nowMs).toISOString();
+
+  for (const qr of siblings) {
+    const needsUpgrade =
+      !isProStillValid(qr, nowMs) ||
+      (entitlement.proExpiresAt === null && qr.proExpiresAt !== null);
+    if (needsUpgrade) {
+      qr.isPaid = true;
+      qr.hadProExpired = false;
+      qr.proGrantType = entitlement.proGrantType;
+      qr.proExpiresAt = entitlement.proExpiresAt ?? null;
+      if (entitlement.proGrantedAt) qr.proGrantedAt = entitlement.proGrantedAt;
+      qr.proGrantedHours = entitlement.proGrantedHours;
+      if (entitlement.proVoucherCode) {
+        qr.proVoucherCode = entitlement.proVoucherCode;
+      }
+      qr.updatedAt = qr.updatedAt || nowIso;
+      db.dynamicQRs[qr.slug] = qr;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+export function resolveAccountProEntitlement(
+  ownerId?: string,
+  ownerEmail?: string
+): AccountProEntitlement {
+  const db = ensureDb();
+  return pickStrongestProEntitlementInDb(db, ownerId, ownerEmail, Date.now());
+}
+
+/**
  * Checks all non-demo QRs and automatically reverts expired temporary/voucher PRO plans back to Free.
+ * Also ensures any client with an active PRO subscription has that PRO inherited across all of their stores.
  * Returns true if any record changed so callers can persist updated QR state to cloud.
  */
 export function expireDueQRsIfAny(nowMs: number = Date.now()): boolean {
@@ -1341,6 +1480,16 @@ export function expireDueQRsIfAny(nowMs: number = Date.now()): boolean {
     }
   }
 
+  // Ensure every owner with an active PRO plan inherits PRO on all of their created catalogs/menus
+  for (const qr of Object.values(db.dynamicQRs || {})) {
+    if (!qr || qr.slug === 'demo-restaurante' || qr.slug === 'demo-catalogo') continue;
+    if (isProStillValid(qr, nowMs) && (qr.ownerId || qr.ownerEmail)) {
+      if (syncAccountProForOwnerInDb(db, qr.ownerId, qr.ownerEmail, nowMs)) {
+        changed = true;
+      }
+    }
+  }
+
   if (changed) {
     saveDb(db);
   }
@@ -1362,6 +1511,30 @@ export function saveDynamicQR(record: DynamicQRRecord): void {
   const db = ensureDb();
   if (!record.storeCode && record.slug !== 'demo-restaurante' && record.slug !== 'demo-catalogo') {
     record.storeCode = assignUniqueStoreCode(db, record);
+  }
+  if (
+    record.slug !== 'demo-restaurante' &&
+    record.slug !== 'demo-catalogo' &&
+    !isProStillValid(record) &&
+    (record.ownerId || record.ownerEmail)
+  ) {
+    const accountPro = pickStrongestProEntitlementInDb(
+      db,
+      record.ownerId,
+      record.ownerEmail,
+      Date.now()
+    );
+    if (accountPro.isPaid) {
+      record.isPaid = true;
+      record.hadProExpired = false;
+      record.proGrantType = accountPro.proGrantType;
+      record.proExpiresAt = accountPro.proExpiresAt ?? null;
+      if (accountPro.proGrantedAt) record.proGrantedAt = accountPro.proGrantedAt;
+      record.proGrantedHours = accountPro.proGrantedHours;
+      if (accountPro.proVoucherCode) {
+        record.proVoucherCode = accountPro.proVoucherCode;
+      }
+    }
   }
   db.dynamicQRs[record.slug] = record;
 
@@ -1618,6 +1791,12 @@ export function recordPayment(
         lastError: null,
       };
     }
+    syncAccountProForOwnerInDb(
+      db,
+      qr.ownerId,
+      qr.ownerEmail || resolvedClientEmail,
+      nowMs
+    );
   }
 
   // Check for affiliate referral commission (One-time CPA bounty on 1st paid PRO)
@@ -2049,6 +2228,7 @@ export function getDynamicQRsByOwner(
   ownerEmail?: string
 ): DynamicQRRecord[] {
   const db = ensureDb();
+  syncAccountProForOwnerInDb(db, ownerId, ownerEmail, Date.now());
   const all = Object.values(db.dynamicQRs || {});
   return all.filter(
     (qr) =>
@@ -2146,8 +2326,9 @@ export function grantProToQR(input: {
   }
 
   db.dynamicQRs[input.slug] = qr;
+  syncAccountProForOwnerInDb(db, qr.ownerId, qr.ownerEmail, nowMs);
   saveDb(db);
-  return qr;
+  return db.dynamicQRs[input.slug] || qr;
 }
 
 export function revokeProFromQR(slug: string): DynamicQRRecord | null {
@@ -2155,7 +2336,32 @@ export function revokeProFromQR(slug: string): DynamicQRRecord | null {
   const qr = db.dynamicQRs[slug];
   if (!qr) return null;
 
-  const updated = applyFreeDowngradeInDb(db, qr, Date.now(), false);
+  const nowMs = Date.now();
+  const ownerId = qr.ownerId;
+  const ownerEmail = qr.ownerEmail;
+  const updated = applyFreeDowngradeInDb(db, qr, nowMs, false);
+
+  const siblings = findOwnerStoresInDb(db, ownerId, ownerEmail);
+  for (const s of siblings) {
+    if (s.slug !== slug && s.isPaid) {
+      applyFreeDowngradeInDb(db, s, nowMs, false);
+    }
+  }
+
+  const normEmail = (ownerEmail || '').trim().toLowerCase();
+  const user =
+    (ownerId && ownerId !== 'admin' && db.users?.[ownerId]) ||
+    (normEmail
+      ? Object.values(db.users || {}).find(
+          (u) => u.email.toLowerCase() === normEmail
+        )
+      : undefined);
+  if (user) {
+    user.proCreditExpiresAt = null;
+    user.proCreditVoucherCode = undefined;
+    user.proCreditDays = undefined;
+  }
+
   saveDb(db);
   return updated;
 }
@@ -2394,6 +2600,7 @@ export function redeemProVoucher(input: {
   voucher.proExpiresAt = expiresIso;
   db.vouchers[voucher.id] = voucher;
 
+  syncAccountProForOwnerInDb(db, input.userId, input.userEmail, nowMs);
   saveDb(db);
 
   createDeveloperNotification({

@@ -118,6 +118,7 @@ export interface MenuItemVariant {
   groupLabel?: string;
   price?: number;
   colorHex?: string;
+  imageUrl?: string;
   isAvailable?: boolean;
 }
 

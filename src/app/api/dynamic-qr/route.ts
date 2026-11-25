@@ -8,6 +8,7 @@ import {
   expireDueQRsIfAny,
   reconcileCloudSlugMigrations,
   consumeUserProCreditIfActive,
+  resolveAccountProEntitlement,
   syncDbFromCloud,
   persistSliceToCloud,
   persistMenuToCloud,
@@ -90,9 +91,19 @@ export async function POST(request: NextRequest) {
 
     expireDueQRsIfAny();
     const existing = getDynamicQRBySlug(cleanSlug);
-    const credit = !existing && clientUser
-      ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
-      : { isPaid: false };
+    const resolvedOwnerId = clientUser?.id || existing?.ownerId || 'admin';
+    const resolvedOwnerEmail = clientUser?.email || existing?.ownerEmail || '';
+    const accountPro = resolveAccountProEntitlement(
+      resolvedOwnerId,
+      resolvedOwnerEmail
+    );
+    const credit =
+      !accountPro.isPaid && !existing && clientUser
+        ? consumeUserProCreditIfActive(clientUser.id, clientUser.email)
+        : { isPaid: false };
+    const effectiveIsPaid = Boolean(
+      (existing && isProStillValid(existing)) || accountPro.isPaid || credit.isPaid
+    );
     const record: DynamicQRRecord = {
       ...(existing || {}),
       id: existing?.id || `qr_${Date.now()}`,
@@ -108,14 +119,27 @@ export async function POST(request: NextRequest) {
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       scansCount: existing?.scansCount || 0,
-      isPaid: existing ? isProStillValid(existing) : credit.isPaid,
-      proGrantType: existing?.proGrantType || credit.proGrantType,
-      proExpiresAt: existing?.proExpiresAt ?? credit.proExpiresAt ?? null,
-      proVoucherCode: existing?.proVoucherCode || credit.proVoucherCode,
+      isPaid: effectiveIsPaid,
+      proGrantType:
+        existing?.proGrantType ||
+        accountPro.proGrantType ||
+        credit.proGrantType,
+      proExpiresAt:
+        existing?.isPaid && isProStillValid(existing)
+          ? existing.proExpiresAt ?? null
+          : accountPro.isPaid
+          ? accountPro.proExpiresAt ?? null
+          : credit.proExpiresAt ?? null,
+      proGrantedAt: existing?.proGrantedAt || accountPro.proGrantedAt,
+      proGrantedHours: existing?.proGrantedHours || accountPro.proGrantedHours,
+      proVoucherCode:
+        existing?.proVoucherCode ||
+        accountPro.proVoucherCode ||
+        credit.proVoucherCode,
       qrConfig: qrConfig || existing?.qrConfig || {},
       linkedMenuId: cleanSlug,
-      ownerId: clientUser?.id || existing?.ownerId || 'admin',
-      ownerEmail: clientUser?.email || existing?.ownerEmail || '',
+      ownerId: resolvedOwnerId,
+      ownerEmail: resolvedOwnerEmail,
     };
 
     saveDynamicQR(record);
