@@ -126,3 +126,61 @@
 .price-gondola-splash-star {
   animation: splashPricePop 2.1s ease-in-out infinite;
 }
+
+@keyframes natalSnowFall {
+  0% {
+    transform: translate3d(0, -14px, 0) scale(0.85);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.92;
+  }
+  50% {
+    transform: translate3d(10px, 85px, 0) scale(1);
+    opacity: 0.85;
+  }
+  82% {
+    opacity: 0.72;
+  }
+  100% {
+    transform: translate3d(-6px, 195px, 0) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes natalStarTwinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes santaFlightBob {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(3px, -5px, 0);
+  }
+}
+
+.natal-snow-flake {
+  animation-name: natalSnowFall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+}
+
+.natal-star-twinkle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: natalStarTwinkle 2.4s ease-in-out infinite;
+}
+
+.natal-santa-flight {
+  animation: santaFlightBob 3.2s ease-in-out infinite;
+}

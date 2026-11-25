@@ -2885,7 +2885,7 @@ export default function MenuEditorModal({
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-300 leading-relaxed">
-                            Enfeita o topo, os cantos diagonais superiores e todas as laterais da sua página com pisca-pisca, sinos e guirlanda natalina.{' '}
+                            Enfeita o topo com neve suave caindo, cantos em arco, todas as laterais iluminadas e cenário natalino completo no rodapé (Presépio com Reis Magos, Árvore de Natal e Papai Noel levantando voo).{' '}
                             <span className="text-slate-400">
                               (A borda natalina individual ao redor dos quadrados dos produtos continua exclusiva do Plano PRO.)
                             </span>

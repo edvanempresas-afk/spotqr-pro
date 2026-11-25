@@ -71,7 +71,10 @@ import AdBanner from '@/components/AdBanner';
 import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
 import TableQrScannerModal from '@/components/TableQrScannerModal';
 import { ChristmasCardDecor } from '@/components/ChristmasCardDecor';
-import { ChristmasPageSkin } from '@/components/ChristmasPageSkin';
+import {
+  ChristmasPageSkin,
+  ChristmasFooterScene,
+} from '@/components/ChristmasPageSkin';
 import { RetailPriceTag } from '@/components/RetailPriceTag';
 import { ShowcaseBuyBox } from '@/components/ShowcaseBuyBox';
 import ShowcaseCustomizeModal, {
@@ -2960,6 +2963,13 @@ export default function DigitalShowcasePage({
           </div>
         )}
       </div>
+
+      {/* Cenário Natalino de Rodapé (Presépio à esquerda, Árvore ao centro, Papai Noel decolando à direita) — Free e PRO */}
+      {Boolean(menu.christmasPageSkin) && (
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 mt-8 relative z-20">
+          <ChristmasFooterScene />
+        </div>
+      )}
 
       {/* Floating Bottom Cart / Category Navigation Bar */}
       {totalItems > 0 && !isNearBottom ? (
