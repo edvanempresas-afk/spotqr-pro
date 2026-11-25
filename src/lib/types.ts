@@ -111,6 +111,8 @@ export interface MenuSizeOption {
 export type PriceFontStyle = 'modern' | 'impact' | 'classic' | 'digital';
 export type PriceScale = 'normal' | 'large' | 'xlarge';
 export type PromoVisualEffect = 'none' | 'neon' | 'christmas' | 'flash_gold';
+export type CatalogLayoutMode = 'list' | 'grid_2col';
+export type InstallmentsInterestMode = 'no_interest' | 'with_interest' | 'hide';
 
 export interface MenuItemVariant {
   id: string;
@@ -151,8 +153,12 @@ export interface MenuItem {
   promoEffect?: PromoVisualEffect; // Destaque visual no card (Neon, Pisca-Pisca Natalino, Oferta Ouro)
   showPriceSplash?: boolean;      // Etiqueta Splash / Explosão de oferta junto ao preço
   maxInstallments?: number;       // Parcelamento máximo (ex: 12 => "12x sem juros")
-  installmentsHasInterest?: boolean; // false/undefined = sem juros; true = com juros
+  installmentsHasInterest?: boolean; // Compatibilidade: false = sem juros; true = com juros
+  installmentsInterestMode?: InstallmentsInterestMode; // 'no_interest' | 'with_interest' | 'hide'
   customInstallmentAmount?: number;  // Opcional: valor da parcela quando "com juros"
+  pixDiscountPercent?: number;       // Desconto exclusivo à vista no PIX (ex: 5 => 5% OFF no PIX)
+  freeShipping?: boolean;            // Selo de Frete Grátis na Buy Box
+  trustHighlights?: string[];        // Até 4 benefícios/destaques curtos (ex: "100% Algodão", "Troca fácil")
   variantGroupTitle?: string;     // Rótulo das variações no anúncio (ex: "Voltagem", "Cor")
   variants?: MenuItemVariant[];   // Variações no mesmo anúncio (110V/220V, cores, modelos)
 }
@@ -197,6 +203,7 @@ export interface RestaurantMenu {
   productImagePosition?: 'left' | 'right';
   priceFontStyle?: PriceFontStyle; // Recurso PRO: estilo de fonte dos preços
   priceScale?: PriceScale;         // Recurso PRO: tamanho dos preços na vitrine
+  catalogLayoutMode?: CatalogLayoutMode; // Recurso PRO: 'list' (com Buy Box) ou 'grid_2col' (2 colunas)
   ownerId?: string;
   ownerEmail?: string;
   updatedAt: string;

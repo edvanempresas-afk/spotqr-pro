@@ -74,7 +74,11 @@ export async function GET(request: NextRequest) {
           showPriceSplash: undefined,
           maxInstallments: undefined,
           installmentsHasInterest: undefined,
+          installmentsInterestMode: undefined,
           customInstallmentAmount: undefined,
+          pixDiscountPercent: undefined,
+          freeShipping: undefined,
+          trustHighlights: undefined,
           variantGroupTitle: undefined,
           variants: undefined,
         }
@@ -100,6 +104,7 @@ export async function GET(request: NextRequest) {
       coverVideo: isPaid ? menu.coverVideo : undefined,
       priceFontStyle: isPaid ? menu.priceFontStyle : undefined,
       priceScale: isPaid ? menu.priceScale : undefined,
+      catalogLayoutMode: isPaid ? menu.catalogLayoutMode : undefined,
       isPaid,
       proGrantType: isPaid ? effectiveGrantType : null,
       proExpiresAt: isPaid ? effectiveExpiresAt : null,
@@ -311,12 +316,30 @@ export async function POST(request: NextRequest) {
         item.maxInstallments >= 2
           ? Math.min(24, Math.floor(item.maxInstallments))
           : undefined;
+      const cleanInterestMode =
+        item.installmentsInterestMode === 'no_interest' ||
+        item.installmentsInterestMode === 'with_interest' ||
+        item.installmentsInterestMode === 'hide'
+          ? item.installmentsInterestMode
+          : undefined;
       const cleanCustomInstallmentAmount =
         typeof item.customInstallmentAmount === 'number' &&
         Number.isFinite(item.customInstallmentAmount) &&
         item.customInstallmentAmount > 0
           ? Number(item.customInstallmentAmount.toFixed(2))
           : undefined;
+      const cleanPixDiscountPercent =
+        typeof item.pixDiscountPercent === 'number' &&
+        Number.isFinite(item.pixDiscountPercent) &&
+        item.pixDiscountPercent >= 1
+          ? Math.min(70, Math.round(item.pixDiscountPercent))
+          : undefined;
+      const cleanTrustHighlights = Array.isArray(item.trustHighlights)
+        ? item.trustHighlights
+            .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+            .map((t) => t.trim().slice(0, 42))
+            .slice(0, 4)
+        : undefined;
       const cleanVariants = Array.isArray(item.variants)
         ? item.variants
             .filter((v) => v && typeof v.label === 'string' && v.label.trim().length > 0)
@@ -360,11 +383,27 @@ export async function POST(request: NextRequest) {
           ? cleanMaxInstallments
           : existingItem?.maxInstallments,
         installmentsHasInterest: isEffectivePro
-          ? Boolean(item.installmentsHasInterest)
+          ? cleanInterestMode
+            ? cleanInterestMode === 'with_interest'
+            : Boolean(item.installmentsHasInterest)
           : existingItem?.installmentsHasInterest,
+        installmentsInterestMode: isEffectivePro
+          ? cleanInterestMode
+          : existingItem?.installmentsInterestMode,
         customInstallmentAmount: isEffectivePro
           ? cleanCustomInstallmentAmount
           : existingItem?.customInstallmentAmount,
+        pixDiscountPercent: isEffectivePro
+          ? cleanPixDiscountPercent
+          : existingItem?.pixDiscountPercent,
+        freeShipping: isEffectivePro
+          ? Boolean(item.freeShipping)
+          : existingItem?.freeShipping,
+        trustHighlights: isEffectivePro
+          ? cleanTrustHighlights && cleanTrustHighlights.length > 0
+            ? cleanTrustHighlights
+            : undefined
+          : existingItem?.trustHighlights,
         variantGroupTitle: isEffectivePro
           ? typeof item.variantGroupTitle === 'string' && item.variantGroupTitle.trim()
             ? item.variantGroupTitle.trim().slice(0, 30)
@@ -391,6 +430,11 @@ export async function POST(request: NextRequest) {
       cleanMenuBody.priceScale === 'xlarge'
         ? cleanMenuBody.priceScale
         : undefined;
+    const cleanCatalogLayoutMode =
+      cleanMenuBody.catalogLayoutMode === 'grid_2col' ||
+      cleanMenuBody.catalogLayoutMode === 'list'
+        ? cleanMenuBody.catalogLayoutMode
+        : undefined;
 
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
@@ -402,6 +446,9 @@ export async function POST(request: NextRequest) {
         ? cleanPriceFontStyle
         : existingMenu?.priceFontStyle,
       priceScale: isEffectivePro ? cleanPriceScale : existingMenu?.priceScale,
+      catalogLayoutMode: isEffectivePro
+        ? cleanCatalogLayoutMode
+        : existingMenu?.catalogLayoutMode,
       mode: isCatalog ? 'catalog' : 'menu',
       slug: cleanSlug,
       ownerId: clientUser?.id || body.ownerId,

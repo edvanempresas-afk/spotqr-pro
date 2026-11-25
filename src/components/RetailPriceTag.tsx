@@ -97,15 +97,17 @@ export function RetailPriceTag({
                   {installmentInfo.perInstallmentFormatted}
                 </span>
               </div>
-              <span
-                className={`mt-1 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded leading-none ${
-                  installmentInfo.hasInterest
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-emerald-700 text-white'
-                }`}
-              >
-                {installmentInfo.interestSuffix}
-              </span>
+              {installmentInfo.interestSuffix && (
+                <span
+                  className={`mt-1 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded leading-none ${
+                    installmentInfo.hasInterest
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-emerald-700 text-white'
+                  }`}
+                >
+                  {installmentInfo.interestSuffix}
+                </span>
+              )}
             </>
           ) : (
             <span
@@ -163,19 +165,21 @@ export function RetailPriceTag({
                 {installmentInfo.perInstallmentFormatted}
               </span>
             </div>
-            <span
-              className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded leading-none border ${
-                installmentInfo.hasInterest
-                  ? isLight
-                    ? 'bg-amber-50 border-amber-300 text-amber-800'
-                    : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
-                  : isLight
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
-              }`}
-            >
-              {installmentInfo.interestSuffix}
-            </span>
+            {installmentInfo.interestSuffix && (
+              <span
+                className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded leading-none border ${
+                  installmentInfo.hasInterest
+                    ? isLight
+                      ? 'bg-amber-50 border-amber-300 text-amber-800'
+                      : 'bg-amber-500/15 border-amber-500/35 text-amber-300'
+                    : isLight
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-emerald-500/15 border-emerald-500/35 text-emerald-300'
+                }`}
+              >
+                {installmentInfo.interestSuffix}
+              </span>
+            )}
           </div>
         ) : (
           <span

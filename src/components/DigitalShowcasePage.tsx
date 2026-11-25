@@ -48,6 +48,7 @@ import { getItemStockInfo } from '@/lib/stock';
 import { resolveItemAvailableFlavors } from '@/lib/flavors';
 import {
   calculateDiscountPercent,
+  calculatePixDiscountInfo,
   formatMoneyBR,
   getActiveItemVariants,
   resolveInstallmentInfo,
@@ -69,6 +70,7 @@ import AutoPlayLoopVideo from '@/components/AutoPlayLoopVideo';
 import TableQrScannerModal from '@/components/TableQrScannerModal';
 import { ChristmasCardDecor } from '@/components/ChristmasCardDecor';
 import { RetailPriceTag } from '@/components/RetailPriceTag';
+import { ShowcaseBuyBox } from '@/components/ShowcaseBuyBox';
 import ShowcaseCustomizeModal, {
   CustomizedSelectionPayload,
 } from '@/components/ShowcaseCustomizeModal';
@@ -151,6 +153,9 @@ export default function DigitalShowcasePage({
     null
   );
   const [selectedVariants, setSelectedVariants] = useState<
+    Record<string, string>
+  >({});
+  const [previewPhotoOverrides, setPreviewPhotoOverrides] = useState<
     Record<string, string>
   >({});
 
@@ -744,12 +749,23 @@ export default function DigitalShowcasePage({
     });
   };
 
+  const getEffectiveCartUnitPrice = (c: CartItem): number => {
+    const raw = typeof c.unitPrice === 'number' ? c.unitPrice : c.item.price;
+    if (
+      isPro &&
+      isPixSelected &&
+      typeof c.item.pixDiscountPercent === 'number' &&
+      c.item.pixDiscountPercent >= 1
+    ) {
+      const pct = Math.min(70, Math.round(c.item.pixDiscountPercent));
+      return Number((raw * (1 - pct / 100)).toFixed(2));
+    }
+    return raw;
+  };
+
   const totalItems = Object.values(cart).reduce((acc, c) => acc + c.quantity, 0);
   const subtotalPrice = Object.values(cart).reduce(
-    (acc, c) =>
-      acc +
-      c.quantity *
-        (typeof c.unitPrice === 'number' ? c.unitPrice : c.item.price),
+    (acc, c) => acc + c.quantity * getEffectiveCartUnitPrice(c),
     0
   );
   const deliveryFee =
@@ -859,11 +875,17 @@ export default function DigitalShowcasePage({
           prodDays > 0
             ? ` (Sob encomenda • ${formatProductionDaysLabel(prodDays).toLowerCase()})`
             : '';
-        const lineTotal = (
-          c.quantity * (c.unitPrice ?? c.item.price)
-        ).toFixed(2);
+        const effUnit = getEffectiveCartUnitPrice(c);
+        const lineTotal = (c.quantity * effUnit).toFixed(2);
+        const pixTag =
+          isPro &&
+          isPixSelected &&
+          typeof c.item.pixDiscountPercent === 'number' &&
+          c.item.pixDiscountPercent >= 1
+            ? ` (c/ -${Math.round(c.item.pixDiscountPercent)}% PIX)`
+            : '';
         const sizeLabel = c.selectedSize ? ` [${c.selectedSize.name}]` : '';
-        let line = `• ${c.quantity}x ${c.item.name}${sizeLabel}${prodDaysInfo} — R$ ${lineTotal}`;
+        let line = `• ${c.quantity}x ${c.item.name}${sizeLabel}${prodDaysInfo}${pixTag} — R$ ${lineTotal}`;
         if (c.selectedVariant) {
           line += `\n   ↳ *${c.selectedVariant.groupLabel || 'Opção'}:* ${c.selectedVariant.label}`;
         }
@@ -1402,15 +1424,32 @@ export default function DigitalShowcasePage({
     );
   };
 
-  const renderProductThumbnail = (targetItem: MenuItem, extraClass = '') => {
+  const renderProductThumbnail = (
+    targetItem: MenuItem,
+    extraClass = '',
+    sizeMode: 'standard' | 'pro_list' | 'grid_hero' = 'standard'
+  ) => {
     const activeVariant = resolveSelectedVariant(targetItem);
     const photos = extractItemPhotos(targetItem, isPro, activeVariant);
     if (photos.length === 0) return null;
     const hasMultiple = photos.length > 1;
+    const overrideUrl = isPro ? previewPhotoOverrides[targetItem.id] : undefined;
+    const overrideIdx =
+      overrideUrl && photos.includes(overrideUrl)
+        ? photos.indexOf(overrideUrl)
+        : 0;
+    const displayPhoto = photos[overrideIdx] || photos[0];
+    const dimClass =
+      sizeMode === 'grid_hero'
+        ? 'w-full h-52 sm:h-56'
+        : sizeMode === 'pro_list'
+        ? 'w-24 h-24 sm:w-32 sm:h-32'
+        : 'w-20 h-20 sm:w-24 sm:h-24';
+
     return (
       <button
         type="button"
-        onClick={() => openPhotoZoom(targetItem, 0)}
+        onClick={() => openPhotoZoom(targetItem, overrideIdx)}
         aria-label={
           hasMultiple
             ? `Ver ${photos.length} fotos de ${targetItem.name}`
@@ -1421,19 +1460,19 @@ export default function DigitalShowcasePage({
             ? `Clique para ver todos os ${photos.length} ângulos / fotos`
             : 'Clique para ampliar e ver a foto em detalhes'
         }
-        className={`group/img relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden border shadow-md shrink-0 cursor-zoom-in transition focus:outline-none ${
+        className={`group/img relative ${dimClass} rounded-xl overflow-hidden border shadow-md shrink-0 cursor-zoom-in transition focus:outline-none ${
           isLight
             ? 'border-slate-200 hover:border-slate-400'
             : 'border-slate-700/60 hover:border-slate-500'
         } ${extraClass}`}
       >
         <img
-          src={photos[0]}
+          src={displayPhoto}
           alt={targetItem.name}
           className="w-full h-full object-cover transition-transform duration-200 group-hover/img:scale-105"
         />
         {hasMultiple && (
-          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-sm border border-white/20 text-[9px] font-extrabold text-white shadow">
+          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-sm border border-white/20 text-[9px] font-extrabold text-white shadow">
             📷 {photos.length}
           </span>
         )}
@@ -1923,303 +1962,585 @@ export default function DigitalShowcasePage({
           </div>
 
           {/* Product Grid */}
-          <div className="space-y-3.5">
-            {filteredItems.length === 0 ? (
+          {(() => {
+            const activeLayoutMode: 'list' | 'grid_2col' =
+              isPro && menu.catalogLayoutMode === 'grid_2col' ? 'grid_2col' : 'list';
+            return (
               <div
-                className={`text-center py-12 rounded-2xl border ${
-                  isLight
-                    ? 'bg-white border-slate-200 shadow-sm'
-                    : 'bg-[#121929]/40 border-slate-800/60'
-                }`}
+                className={
+                  activeLayoutMode === 'grid_2col'
+                    ? 'grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch'
+                    : 'space-y-4'
+                }
               >
-                <p className={`text-sm ${mutedTextClass}`}>
-                  {menu.items.length === 0
-                    ? isCatalog
-                      ? 'Em breve! Este catálogo está sendo preparado com novos produtos.'
-                      : 'Em breve! Este cardápio está sendo preparado com novos itens.'
-                    : 'Nenhum item encontrado para sua busca.'}
-                </p>
-              </div>
-            ) : (
-              filteredItems.map((item, index) => {
-                const stock = getItemStockInfo(item);
-                const prodDays = getItemProductionDays(item);
-                const activeVariants = getActiveItemVariants(item, isPro);
-                const selectedVariant = resolveSelectedVariant(item);
-                const effectivePrice = resolveVariantEffectivePrice(item, selectedVariant);
-                const discountPct = isPro
-                  ? calculateDiscountPercent(effectivePrice, item.originalPrice)
-                  : null;
-                const installmentInfo = isPro
-                  ? resolveInstallmentInfo(
-                      effectivePrice,
-                      item.maxInstallments,
-                      item.installmentsHasInterest,
-                      item.customInstallmentAmount,
-                      menu.currency || 'R$'
-                    )
-                  : null;
-                const promoEffect =
-                  isPro && stock.canOrder ? item.promoEffect || 'none' : 'none';
-                const promoFrameClass =
-                  promoEffect === 'neon'
-                    ? 'promo-card-neon'
-                    : promoEffect === 'christmas'
-                    ? 'promo-card-christmas'
-                    : promoEffect === 'flash_gold'
-                    ? 'promo-card-flash-gold'
-                    : '';
-                const cartActionControl = renderCartActionControl(item);
+                {filteredItems.length === 0 ? (
+                  <div
+                    className={`${
+                      activeLayoutMode === 'grid_2col' ? 'md:col-span-2' : ''
+                    } text-center py-12 rounded-2xl border ${
+                      isLight
+                        ? 'bg-white border-slate-200 shadow-sm'
+                        : 'bg-[#121929]/40 border-slate-800/60'
+                    }`}
+                  >
+                    <p className={`text-sm ${mutedTextClass}`}>
+                      {menu.items.length === 0
+                        ? isCatalog
+                          ? 'Em breve! Este catálogo está sendo preparado com novos produtos.'
+                          : 'Em breve! Este cardápio está sendo preparado com novos itens.'
+                        : 'Nenhum item encontrado para sua busca.'}
+                    </p>
+                  </div>
+                ) : (
+                  filteredItems.map((item, index) => {
+                    const stock = getItemStockInfo(item);
+                    const prodDays = getItemProductionDays(item);
+                    const activeVariants = getActiveItemVariants(item, isPro);
+                    const selectedVariant = resolveSelectedVariant(item);
+                    const itemPhotos = extractItemPhotos(item, isPro, selectedVariant);
+                    const effectivePrice = resolveVariantEffectivePrice(item, selectedVariant);
+                    const discountPct = isPro
+                      ? calculateDiscountPercent(effectivePrice, item.originalPrice)
+                      : null;
+                    const installmentInfo = isPro
+                      ? resolveInstallmentInfo(
+                          effectivePrice,
+                          item.maxInstallments,
+                          item.installmentsHasInterest,
+                          item.customInstallmentAmount,
+                          menu.currency || 'R$',
+                          item.installmentsInterestMode
+                        )
+                      : null;
+                    const pixDiscountInfo = isPro
+                      ? calculatePixDiscountInfo(
+                          effectivePrice,
+                          item.pixDiscountPercent,
+                          menu.currency || 'R$'
+                        )
+                      : null;
+                    const activeHighlights =
+                      isPro && Array.isArray(item.trustHighlights)
+                        ? item.trustHighlights.filter(Boolean).slice(0, 4)
+                        : [];
+                    const promoEffect =
+                      isPro && stock.canOrder ? item.promoEffect || 'none' : 'none';
+                    const promoFrameClass =
+                      promoEffect === 'neon'
+                        ? 'promo-card-neon'
+                        : promoEffect === 'christmas'
+                        ? 'promo-card-christmas'
+                        : promoEffect === 'flash_gold'
+                        ? 'promo-card-flash-gold'
+                        : '';
+                    const cartActionControl = renderCartActionControl(item);
 
-                return (
-                  <React.Fragment key={item.id}>
-                    <div
-                      className={`border rounded-2xl p-4 sm:p-5 flex gap-3.5 sm:gap-4 items-stretch justify-between transition shadow-sm ${
-                        promoEffect === 'christmas' ? 'my-3 overflow-visible' : ''
-                      } ${
-                        isLight
-                          ? 'bg-white border-slate-200/90'
-                          : 'bg-[#121929]/75 border-slate-800/80'
-                      } ${
-                        stock.canOrder
-                          ? isLight
-                            ? 'hover:border-slate-300 hover:shadow-md'
-                            : 'hover:border-slate-700'
-                          : 'opacity-60 grayscale-[40%]'
-                      } ${promoFrameClass}`}
-                    >
-                      {promoEffect === 'christmas' && <ChristmasCardDecor />}
-                      {imageOnLeft &&
-                        renderProductThumbnail(item, 'self-start sm:self-center')}
+                    const activePhotoUrl =
+                      (isPro ? previewPhotoOverrides[item.id] : undefined) ||
+                      itemPhotos[0];
 
-                      <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
-                        <div className="space-y-1.5">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3
-                              className={`text-sm sm:text-base font-bold ${headingTextClass}`}
+                    const renderMiniThumbnailsStrip = () => {
+                      if (!isPro || itemPhotos.length <= 1) return null;
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          {itemPhotos.slice(0, 5).map((pUrl, pIdx) => {
+                            const isCurrentThumb = activePhotoUrl === pUrl;
+                            return (
+                              <button
+                                key={`${item.id}-mini-${pIdx}`}
+                                type="button"
+                                onClick={() =>
+                                  setPreviewPhotoOverrides((prev) => ({
+                                    ...prev,
+                                    [item.id]: pUrl,
+                                  }))
+                                }
+                                title={`Ver ângulo/foto ${pIdx + 1}`}
+                                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg overflow-hidden border-2 transition shrink-0 ${
+                                  isCurrentThumb
+                                    ? 'border-emerald-400 ring-1 ring-emerald-400/50 scale-105'
+                                    : isLight
+                                    ? 'border-slate-200 opacity-75 hover:opacity-100'
+                                    : 'border-slate-700 opacity-75 hover:opacity-100'
+                                }`}
+                              >
+                                <img
+                                  src={pUrl}
+                                  alt={`${item.name} foto ${pIdx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    };
+
+                    const renderCardBadgesRow = () => (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3
+                          className={`text-sm sm:text-base font-bold ${headingTextClass}`}
+                        >
+                          {item.name}
+                        </h3>
+                        {(() => {
+                          const catName =
+                            menu.categories.find(
+                              (c) =>
+                                c.id === item.category ||
+                                c.name === item.category
+                            )?.name || item.category;
+                          return catName ? (
+                            <span
+                              className={`border text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                isLight
+                                  ? 'bg-slate-100 border-slate-200 text-slate-700'
+                                  : 'bg-slate-800/80 border-slate-700 text-slate-300'
+                              }`}
+                              title={`Categoria: ${catName}`}
                             >
-                              {item.name}
-                            </h3>
-                            {(() => {
-                              const catName =
-                                menu.categories.find(
-                                  (c) =>
-                                    c.id === item.category ||
-                                    c.name === item.category
-                                )?.name || item.category;
-                              return catName ? (
-                                <span
-                                  className={`border text-[10px] font-semibold px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
-                                    isLight
-                                      ? 'bg-slate-100 border-slate-200 text-slate-700'
-                                      : 'bg-slate-800/80 border-slate-700 text-slate-300'
-                                  }`}
-                                  title={`Categoria: ${catName}`}
-                                >
-                                  <Layers className="w-2.5 h-2.5 opacity-70" />
-                                  <span>{catName}</span>
-                                </span>
-                              ) : null;
-                            })()}
-                            {promoEffect === 'christmas' && (
-                              <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 border-rose-500/35 text-rose-400">
-                                🎄 Especial Natal
-                              </span>
-                            )}
-                            {promoEffect === 'neon' && (
-                              <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 border-cyan-500/35 text-cyan-300">
-                                ⚡ Destaque
-                              </span>
-                            )}
-                            {item.badge && stock.canOrder && (
-                              <span
-                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isLight
-                                    ? 'bg-amber-50 border-amber-200 text-amber-700'
-                                    : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                                }`}
-                              >
-                                {item.badge}
-                              </span>
-                            )}
-                            {stock.canOrder && prodDays > 0 && (
-                              <span
-                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isLight
-                                    ? 'bg-orange-50 border-orange-200 text-orange-700'
-                                    : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
-                                }`}
-                              >
-                                ⏱️ {formatProductionDaysLabel(prodDays)}
-                              </span>
-                            )}
-                            {stock.canOrder && stock.isUnique && (
-                              <span
-                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isLight
-                                    ? 'bg-purple-50 border-purple-200 text-purple-700'
-                                    : 'bg-purple-500/15 border-purple-500/35 text-purple-300'
-                                }`}
-                              >
-                                💎 Peça Única
-                              </span>
-                            )}
-                            {stock.canOrder && stock.isLimited && stock.badgeText && (
-                              <span
-                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                  isLight
-                                    ? 'bg-sky-50 border-sky-200 text-sky-700'
-                                    : 'bg-sky-500/15 border-sky-500/35 text-sky-300'
-                                }`}
-                              >
-                                📦 {stock.badgeText}
-                              </span>
-                            )}
-                            {!stock.canOrder && (
-                              <span
-                                className={`border text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                                  isLight
-                                    ? 'bg-rose-50 border-rose-200 text-rose-700'
-                                    : 'bg-rose-500/20 border-rose-500/30 text-rose-400'
-                                }`}
-                              >
-                                Esgotado
-                              </span>
-                            )}
-                          </div>
-                          <p
-                            className={`text-xs line-clamp-2 leading-relaxed ${mutedTextClass}`}
+                              <Layers className="w-2.5 h-2.5 opacity-70" />
+                              <span>{catName}</span>
+                            </span>
+                          ) : null;
+                        })()}
+                        {promoEffect === 'christmas' && (
+                          <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/15 border-rose-500/35 text-rose-400">
+                            🎄 Especial Natal
+                          </span>
+                        )}
+                        {promoEffect === 'neon' && (
+                          <span className="border text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 border-cyan-500/35 text-cyan-300">
+                            ⚡ Destaque
+                          </span>
+                        )}
+                        {item.badge && stock.canOrder && (
+                          <span
+                            className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isLight
+                                ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                            }`}
                           >
-                            {item.description}
-                          </p>
-                          {stock.canOrder && prodDays > 0 && (
-                            <p
-                              className={`text-[11px] font-semibold flex items-center gap-1.5 ${
-                                isLight ? 'text-orange-700' : 'text-orange-300'
+                            {item.badge}
+                          </span>
+                        )}
+                        {stock.canOrder && prodDays > 0 && (
+                          <span
+                            className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isLight
+                                ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                : 'bg-orange-500/15 border-orange-500/35 text-orange-300'
+                            }`}
+                          >
+                            ⏱️ {formatProductionDaysLabel(prodDays)}
+                          </span>
+                        )}
+                        {stock.canOrder && stock.isUnique && (
+                          <span
+                            className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isLight
+                                ? 'bg-purple-50 border-purple-200 text-purple-700'
+                                : 'bg-purple-500/15 border-purple-500/35 text-purple-300'
+                            }`}
+                          >
+                            💎 Peça Única
+                          </span>
+                        )}
+                        {stock.canOrder && stock.isLimited && stock.badgeText && (
+                          <span
+                            className={`border text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isLight
+                                ? 'bg-sky-50 border-sky-200 text-sky-700'
+                                : 'bg-sky-500/15 border-sky-500/35 text-sky-300'
+                            }`}
+                          >
+                            📦 {stock.badgeText}
+                          </span>
+                        )}
+                        {!stock.canOrder && (
+                          <span
+                            className={`border text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              isLight
+                                ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                : 'bg-rose-500/20 border-rose-500/30 text-rose-400'
+                            }`}
+                          >
+                            Esgotado
+                          </span>
+                        )}
+                      </div>
+                    );
+
+                    const renderVariantSelector = () => {
+                      if (!isPro || activeVariants.length === 0 || !stock.canOrder) {
+                        return null;
+                      }
+                      return (
+                        <div className="pt-1 space-y-1">
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider block ${mutedTextClass}`}
+                          >
+                            {item.variantGroupTitle || 'Opção'}:{' '}
+                            <strong className={headingTextClass}>
+                              {selectedVariant?.label || 'Indisponível'}
+                            </strong>
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activeVariants.map((variant) => {
+                              const isSelectedVar = selectedVariant?.id === variant.id;
+                              const isVarAvailable = variant.isAvailable !== false;
+                              return (
+                                <button
+                                  key={variant.id}
+                                  type="button"
+                                  disabled={!isVarAvailable}
+                                  onClick={() => {
+                                    setSelectedVariants((prev) => ({
+                                      ...prev,
+                                      [item.id]: variant.id,
+                                    }));
+                                    setPreviewPhotoOverrides((prev) => {
+                                      if (!prev[item.id]) return prev;
+                                      const next = { ...prev };
+                                      delete next[item.id];
+                                      return next;
+                                    });
+                                  }}
+                                  style={
+                                    isSelectedVar
+                                      ? {
+                                          backgroundColor: theme.accentHex,
+                                          color: theme.accentTextOnSolid,
+                                          borderColor: theme.accentHex,
+                                        }
+                                      : undefined
+                                  }
+                                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                                    !isVarAvailable
+                                      ? 'opacity-40 line-through cursor-not-allowed border-slate-700 text-slate-500'
+                                      : isSelectedVar
+                                      ? 'shadow-sm'
+                                      : isLight
+                                      ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400'
+                                      : 'bg-slate-900/80 border-slate-700 text-slate-200 hover:border-slate-500'
+                                  }`}
+                                >
+                                  {variant.colorHex && (
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
+                                      style={{ backgroundColor: variant.colorHex }}
+                                    />
+                                  )}
+                                  <span>{variant.label}</span>
+                                  {typeof variant.price === 'number' &&
+                                    variant.price > 0 &&
+                                    variant.price !== item.price && (
+                                      <span className="opacity-80 text-[10px]">
+                                        ({formatMoneyBR(variant.price, menu.currency || 'R$')})
+                                      </span>
+                                    )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    const renderHighlightsRow = () => {
+                      if (activeHighlights.length === 0 || !stock.canOrder) return null;
+                      return (
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {activeHighlights.map((hl) => (
+                            <span
+                              key={hl}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                isLight
+                                  ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-800'
+                                  : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
                               }`}
                             >
-                              <span>⏱️</span>
-                              <span>
-                                Prazo de produção: fica pronto em {prodDays}{' '}
-                                {prodDays === 1 ? 'dia' : 'dias'}
-                              </span>
-                            </p>
-                          )}
-                          {isPro && activeVariants.length > 0 && stock.canOrder && (
-                            <div className="pt-1 space-y-1">
-                              <span
-                                className={`text-[10px] font-bold uppercase tracking-wider block ${mutedTextClass}`}
-                              >
-                                {item.variantGroupTitle || 'Opção'}:{' '}
-                                <strong className={headingTextClass}>
-                                  {selectedVariant?.label || 'Indisponível'}
-                                </strong>
-                              </span>
-                              <div className="flex flex-wrap gap-1.5">
-                                {activeVariants.map((variant) => {
-                                  const isSelectedVar =
-                                    selectedVariant?.id === variant.id;
-                                  const isVarAvailable =
-                                    variant.isAvailable !== false;
-                                  return (
-                                    <button
-                                      key={variant.id}
-                                      type="button"
-                                      disabled={!isVarAvailable}
-                                      onClick={() =>
-                                        setSelectedVariants((prev) => ({
-                                          ...prev,
-                                          [item.id]: variant.id,
-                                        }))
-                                      }
-                                      style={
-                                        isSelectedVar
-                                          ? {
-                                              backgroundColor: theme.accentHex,
-                                              color: theme.accentTextOnSolid,
-                                              borderColor: theme.accentHex,
-                                            }
-                                          : undefined
-                                      }
-                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
-                                        !isVarAvailable
-                                          ? 'opacity-40 line-through cursor-not-allowed border-slate-700 text-slate-500'
-                                          : isSelectedVar
-                                          ? 'shadow-sm'
-                                          : isLight
-                                          ? 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400'
-                                          : 'bg-slate-900/80 border-slate-700 text-slate-200 hover:border-slate-500'
-                                      }`}
-                                    >
-                                      {variant.colorHex && (
-                                        <span
-                                          className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
-                                          style={{ backgroundColor: variant.colorHex }}
-                                        />
-                                      )}
-                                      <span>{variant.label}</span>
-                                      {typeof variant.price === 'number' &&
-                                        variant.price > 0 &&
-                                        variant.price !== item.price && (
-                                          <span className="opacity-80 text-[10px]">
-                                            ({formatMoneyBR(variant.price, menu.currency || 'R$')})
-                                          </span>
-                                        )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                              ✓ {hl}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    };
+
+                    const openCurrentZoom = () => {
+                      const idx = Math.max(0, itemPhotos.indexOf(activePhotoUrl || ''));
+                      openPhotoZoom(item, idx);
+                    };
+
+                    return (
+                      <React.Fragment key={item.id}>
+                        {activeLayoutMode === 'grid_2col' ? (
+                          <div
+                            className={`border rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3 h-full transition shadow-sm ${
+                              promoEffect === 'christmas' ? 'mt-2 mb-1 overflow-visible' : ''
+                            } ${
+                              isLight
+                                ? 'bg-white border-slate-200/90'
+                                : 'bg-[#121929]/75 border-slate-800/80'
+                            } ${
+                              stock.canOrder
+                                ? isLight
+                                  ? 'hover:border-slate-300 hover:shadow-md'
+                                  : 'hover:border-slate-700'
+                                : 'opacity-60 grayscale-[40%]'
+                            } ${promoFrameClass}`}
+                          >
+                            {promoEffect === 'christmas' && <ChristmasCardDecor />}
+                            <div className="space-y-2.5">
+                              {itemPhotos.length > 0 && (
+                                <div className="space-y-2">
+                                  {renderProductThumbnail(item, '', 'grid_hero')}
+                                  {renderMiniThumbnailsStrip()}
+                                </div>
+                              )}
+                              {renderCardBadgesRow()}
+                              {item.description && (
+                                <p className={`text-xs line-clamp-3 leading-relaxed ${mutedTextClass}`}>
+                                  {item.description}
+                                </p>
+                              )}
+                              {renderHighlightsRow()}
+                              {stock.canOrder && prodDays > 0 && (
+                                <p
+                                  className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                                    isLight ? 'text-orange-700' : 'text-orange-300'
+                                  }`}
+                                >
+                                  <span>⏱️</span>
+                                  <span>
+                                    Prazo de produção: {prodDays} {prodDays === 1 ? 'dia' : 'dias'}
+                                  </span>
+                                </p>
+                              )}
+                              {renderVariantSelector()}
                             </div>
+
+                            <div className="space-y-2.5 pt-1">
+                              <RetailPriceTag
+                                formattedPrice={formatItemStartingPriceLabel(item)}
+                                originalPrice={isPro ? item.originalPrice : undefined}
+                                discountPct={discountPct}
+                                showSplash={Boolean(isPro && item.showPriceSplash)}
+                                installmentInfo={installmentInfo}
+                                currency={menu.currency || 'R$'}
+                                priceScaleClass={activePriceScaleClass}
+                                priceFont={activePriceFont}
+                                accentTextColor={theme.readableAccentText}
+                                isLight={isLight}
+                                mutedTextClass={mutedTextClass}
+                              />
+                              <ShowcaseBuyBox
+                                item={item}
+                                isPro={isPro}
+                                isCatalog={isCatalog}
+                                allowDelivery={allowDelivery}
+                                allowPickup={allowPickup}
+                                stockCanOrder={stock.canOrder}
+                                stockIsUnique={stock.isUnique}
+                                stockIsLimited={stock.isLimited}
+                                stockMaxQuantity={stock.maxQuantity}
+                                prodDays={prodDays}
+                                pixDiscountInfo={pixDiscountInfo}
+                                whatsappNumber={menu.whatsappNumber}
+                                storeTitle={menu.title}
+                                selectedVariantLabel={selectedVariant?.label}
+                                hasPhotos={itemPhotos.length > 0}
+                                isLight={isLight}
+                                layoutMode="grid_2col"
+                                onOpenZoom={openCurrentZoom}
+                                cartActionControl={cartActionControl}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={`border rounded-2xl p-4 sm:p-5 flex ${
+                              isPro ? 'flex-col md:flex-row' : 'flex-row'
+                            } gap-4 items-stretch justify-between transition shadow-sm ${
+                              promoEffect === 'christmas' ? 'my-3 overflow-visible' : ''
+                            } ${
+                              isLight
+                                ? 'bg-white border-slate-200/90'
+                                : 'bg-[#121929]/75 border-slate-800/80'
+                            } ${
+                              stock.canOrder
+                                ? isLight
+                                  ? 'hover:border-slate-300 hover:shadow-md'
+                                  : 'hover:border-slate-700'
+                                : 'opacity-60 grayscale-[40%]'
+                            } ${promoFrameClass}`}
+                          >
+                            {promoEffect === 'christmas' && <ChristmasCardDecor />}
+
+                            {isPro ? (
+                              <>
+                                {/* Coluna Principal: Foto (se à esquerda) + Dados, Miniaturas, Destaques, Variações & Preço */}
+                                <div className="flex-1 min-w-0 flex gap-3.5 sm:gap-4 items-start">
+                                  {imageOnLeft && itemPhotos.length > 0 && (
+                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                      {renderProductThumbnail(item, '', 'pro_list')}
+                                    </div>
+                                  )}
+
+                                  <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+                                    <div className="space-y-1.5">
+                                      {renderCardBadgesRow()}
+                                      {item.description && (
+                                        <p
+                                          className={`text-xs line-clamp-3 leading-relaxed ${mutedTextClass}`}
+                                        >
+                                          {item.description}
+                                        </p>
+                                      )}
+                                      {renderHighlightsRow()}
+                                      {renderMiniThumbnailsStrip()}
+                                      {stock.canOrder && prodDays > 0 && (
+                                        <p
+                                          className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                                            isLight ? 'text-orange-700' : 'text-orange-300'
+                                          }`}
+                                        >
+                                          <span>⏱️</span>
+                                          <span>
+                                            Prazo de produção: fica pronto em {prodDays}{' '}
+                                            {prodDays === 1 ? 'dia' : 'dias'}
+                                          </span>
+                                        </p>
+                                      )}
+                                      {renderVariantSelector()}
+                                    </div>
+
+                                    <div className="pt-1">
+                                      <RetailPriceTag
+                                        formattedPrice={formatItemStartingPriceLabel(item)}
+                                        originalPrice={item.originalPrice}
+                                        discountPct={discountPct}
+                                        showSplash={Boolean(item.showPriceSplash)}
+                                        installmentInfo={installmentInfo}
+                                        currency={menu.currency || 'R$'}
+                                        priceScaleClass={activePriceScaleClass}
+                                        priceFont={activePriceFont}
+                                        accentTextColor={theme.readableAccentText}
+                                        isLight={isLight}
+                                        mutedTextClass={mutedTextClass}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {!imageOnLeft && itemPhotos.length > 0 && (
+                                    <div className="flex flex-col items-end gap-2 shrink-0">
+                                      {renderProductThumbnail(item, '', 'pro_list')}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Coluna Direita PRO: Buy Box Comercial (PIX, Frete Grátis, Entrega, Dúvida WhatsApp & Comprar) */}
+                                <ShowcaseBuyBox
+                                  item={item}
+                                  isPro={isPro}
+                                  isCatalog={isCatalog}
+                                  allowDelivery={allowDelivery}
+                                  allowPickup={allowPickup}
+                                  stockCanOrder={stock.canOrder}
+                                  stockIsUnique={stock.isUnique}
+                                  stockIsLimited={stock.isLimited}
+                                  stockMaxQuantity={stock.maxQuantity}
+                                  prodDays={prodDays}
+                                  pixDiscountInfo={pixDiscountInfo}
+                                  whatsappNumber={menu.whatsappNumber}
+                                  storeTitle={menu.title}
+                                  selectedVariantLabel={selectedVariant?.label}
+                                  hasPhotos={itemPhotos.length > 0}
+                                  isLight={isLight}
+                                  layoutMode="list"
+                                  onOpenZoom={openCurrentZoom}
+                                  cartActionControl={cartActionControl}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                {imageOnLeft &&
+                                  renderProductThumbnail(item, 'self-start sm:self-center', 'standard')}
+
+                                <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+                                  <div className="space-y-1.5">
+                                    {renderCardBadgesRow()}
+                                    <p
+                                      className={`text-xs line-clamp-2 leading-relaxed ${mutedTextClass}`}
+                                    >
+                                      {item.description}
+                                    </p>
+                                    {stock.canOrder && prodDays > 0 && (
+                                      <p
+                                        className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                                          isLight ? 'text-orange-700' : 'text-orange-300'
+                                        }`}
+                                      >
+                                        <span>⏱️</span>
+                                        <span>
+                                          Prazo de produção: fica pronto em {prodDays}{' '}
+                                          {prodDays === 1 ? 'dia' : 'dias'}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="pt-1.5 flex flex-wrap items-end justify-between gap-2.5">
+                                    <RetailPriceTag
+                                      formattedPrice={formatItemStartingPriceLabel(item)}
+                                      originalPrice={undefined}
+                                      discountPct={null}
+                                      showSplash={false}
+                                      installmentInfo={null}
+                                      currency={menu.currency || 'R$'}
+                                      priceScaleClass={activePriceScaleClass}
+                                      priceFont={activePriceFont}
+                                      accentTextColor={theme.readableAccentText}
+                                      isLight={isLight}
+                                      mutedTextClass={mutedTextClass}
+                                    />
+                                    {(imageOnLeft || itemPhotos.length === 0) && (
+                                      <div className="ml-auto">{cartActionControl}</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {!imageOnLeft && itemPhotos.length > 0 && (
+                                  <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
+                                    {renderProductThumbnail(item, '', 'standard')}
+                                    {cartActionControl}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* STRATEGIC AD FOR FREE SHOWCASES */}
+                        {!isPro &&
+                          ((index + 1) % 2 === 0 ||
+                            (filteredItems.length === 1 && index === 0)) && (
+                            <AdBanner
+                              format="in-feed"
+                              isPro={isPro}
+                              offerIndexOverride={Math.floor(index / 2)}
+                              themeMode={theme.themeMode}
+                              className="my-3"
+                            />
                           )}
-                        </div>
-
-                        <div className="pt-1.5 flex flex-wrap items-end justify-between gap-2.5">
-                          <RetailPriceTag
-                            formattedPrice={formatItemStartingPriceLabel(item)}
-                            originalPrice={isPro ? item.originalPrice : undefined}
-                            discountPct={discountPct}
-                            showSplash={Boolean(isPro && item.showPriceSplash)}
-                            installmentInfo={installmentInfo}
-                            currency={menu.currency || 'R$'}
-                            priceScaleClass={activePriceScaleClass}
-                            priceFont={activePriceFont}
-                            accentTextColor={theme.readableAccentText}
-                            isLight={isLight}
-                            mutedTextClass={mutedTextClass}
-                          />
-                          {(imageOnLeft ||
-                            extractItemPhotos(item, isPro, selectedVariant).length === 0) && (
-                            <div className="ml-auto">{cartActionControl}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {!imageOnLeft &&
-                        extractItemPhotos(item, isPro, selectedVariant).length > 0 && (
-                        <div className="flex flex-col items-end justify-between gap-2.5 shrink-0">
-                          {renderProductThumbnail(item)}
-                          {cartActionControl}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* STRATEGIC AD FOR FREE SHOWCASES */}
-                    {!isPro &&
-                      ((index + 1) % 2 === 0 ||
-                        (filteredItems.length === 1 && index === 0)) && (
-                        <AdBanner
-                          format="in-feed"
-                          isPro={isPro}
-                          offerIndexOverride={Math.floor(index / 2)}
-                          themeMode={theme.themeMode}
-                          className="my-3"
-                        />
-                      )}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </div>
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </div>
+            );
+          })()}
 
           {/* Bottom Interactive Cart & Category Hub (preenche o espaço vago do rodapé) */}
           <div
@@ -2994,12 +3315,28 @@ export default function DigitalShowcasePage({
                       )}
 
                       <div className="flex flex-wrap items-center gap-2 mt-1">
-                        <span
-                          className="text-[11px] font-semibold"
-                          style={{ color: theme.readableAccentText }}
-                        >
-                          R$ {(effectiveUnitPrice * c.quantity).toFixed(2)}
-                        </span>
+                        {(() => {
+                          const cartEffUnit = getEffectiveCartUnitPrice(c);
+                          const hasPixLineDiscount = cartEffUnit < effectiveUnitPrice;
+                          return (
+                            <>
+                              {hasPixLineDiscount && (
+                                <span
+                                  className={`text-[10px] line-through font-semibold ${mutedTextClass}`}
+                                >
+                                  R$ {(effectiveUnitPrice * c.quantity).toFixed(2)}
+                                </span>
+                              )}
+                              <span
+                                className="text-[11px] font-semibold"
+                                style={{ color: theme.readableAccentText }}
+                              >
+                                R$ {(cartEffUnit * c.quantity).toFixed(2)}
+                                {hasPixLineDiscount ? ' (PIX)' : ''}
+                              </span>
+                            </>
+                          );
+                        })()}
                         {(stock.isUnique || stock.isLimited) && (
                           <span
                             className={`text-[10px] font-semibold ${
@@ -3592,7 +3929,8 @@ export default function DigitalShowcasePage({
                 zoomedItem.maxInstallments,
                 zoomedItem.installmentsHasInterest,
                 zoomedItem.customInstallmentAmount,
-                menu.currency || 'R$'
+                menu.currency || 'R$',
+                zoomedItem.installmentsInterestMode
               )
             : null;
 

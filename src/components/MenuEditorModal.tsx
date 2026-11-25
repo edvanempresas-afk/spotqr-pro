@@ -70,6 +70,7 @@ import MenuFlavorsTab from './MenuFlavorsTab';
 import ItemMultiFlavorSection from './ItemMultiFlavorSection';
 import { ItemProMerchandisingSection } from './ItemProMerchandisingSection';
 import {
+  CATALOG_LAYOUT_OPTIONS,
   PRICE_FONT_OPTIONS,
   PRICE_SCALE_OPTIONS,
   resolvePriceFontOption,
@@ -2701,6 +2702,88 @@ export default function MenuEditorModal({
                           </p>
                           <p className="text-[10px] text-slate-400 leading-relaxed">
                             No PRO você escolhe entre fontes estilo Impacto Marketplace, Editorial Clássica ou Etiqueta Digital e aumenta ainda mais a presença dos valores.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* PRO Layout dos Cards no Desktop (Lista Buy Box vs Grade 2 Colunas) */}
+                    <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-white flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-emerald-400" />
+                            <span>Modo de Exibição dos Produtos (PC &amp; Tablet)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Escolha entre Lista Horizontal completa com Buy Box comercial na direita ou Grade Vitrine com 2 produtos lado a lado.
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 border ${
+                            isProShowcase
+                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                              : 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                          }`}
+                        >
+                          {isProShowcase ? (
+                            <>
+                              <Sparkles className="w-2.5 h-2.5" />
+                              <span>PRO Liberado</span>
+                            </>
+                          ) : (
+                            <>
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Exclusivo PRO</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      {isProShowcase ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {CATALOG_LAYOUT_OPTIONS.map((opt) => {
+                            const currentMode = menu.catalogLayoutMode || 'list';
+                            const isSelected = currentMode === opt.id;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() =>
+                                  setMenu({
+                                    ...menu,
+                                    catalogLayoutMode: opt.id,
+                                  })
+                                }
+                                className={`p-3 rounded-xl border text-left transition space-y-1.5 ${
+                                  isSelected
+                                    ? 'bg-emerald-500/15 border-emerald-500 ring-1 ring-emerald-500/40'
+                                    : 'bg-slate-950/80 border-slate-800 hover:border-slate-600'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-extrabold text-white">
+                                    {opt.id === 'list' ? '📋 ' : '🪟 '}
+                                    {opt.label}
+                                  </span>
+                                  {isSelected && (
+                                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-400 leading-relaxed">
+                                  {opt.description}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/30 space-y-1.5">
+                          <p className="text-[11px] text-amber-200 font-semibold flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>
+                              Grade Vitrine em 2 Colunas &amp; Buy Box comercial exclusivos do Plano PRO.
+                            </span>
                           </p>
                         </div>
                       )}

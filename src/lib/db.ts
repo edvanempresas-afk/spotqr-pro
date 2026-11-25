@@ -3297,6 +3297,21 @@ export async function createStoreOrder(
     }
   }
 
+  const isStorePro = Boolean(
+    slug === 'demo-restaurante' ||
+      slug === 'demo-catalogo' ||
+      isProStillValid(db.dynamicQRs[slug]) ||
+      resolveAccountProEntitlement(
+        db.dynamicQRs[slug]?.ownerId || menu.ownerId,
+        db.dynamicQRs[slug]?.ownerEmail || menu.ownerEmail
+      ).isPaid
+  );
+  const isOrderPaidWithPix = Boolean(
+    isStorePro &&
+      typeof params.paymentMethod === 'string' &&
+      params.paymentMethod.toLowerCase().includes('pix')
+  );
+
   // 2. Deduct stock and compile order items
   const orderItems: StoreOrderItem[] = [];
   let subtotal = 0;
@@ -3403,13 +3418,24 @@ export async function createStoreOrder(
 
     const pricingRule: FlavorPricingRule =
       target.flavorPricingRule || reqItem.flavorPricingRule || 'highest';
-    const { unitPrice: unitCalculatedPrice } = calculateCustomizedUnitPrice({
+    const { unitPrice: baseCalculatedPrice } = calculateCustomizedUnitPrice({
       baseItemPrice: variantEffectiveBasePrice,
       selectedSize: resolvedSize,
       selectedFlavors,
       flavorPricingRule: pricingRule,
       selectedExtras,
     });
+    const pixPct =
+      isOrderPaidWithPix &&
+      typeof target.pixDiscountPercent === 'number' &&
+      Number.isFinite(target.pixDiscountPercent) &&
+      target.pixDiscountPercent >= 1
+        ? Math.min(70, Math.round(target.pixDiscountPercent))
+        : 0;
+    const unitCalculatedPrice =
+      pixPct > 0
+        ? Number((baseCalculatedPrice * (1 - pixPct / 100)).toFixed(2))
+        : baseCalculatedPrice;
 
     subtotal += unitCalculatedPrice * reqQty;
 

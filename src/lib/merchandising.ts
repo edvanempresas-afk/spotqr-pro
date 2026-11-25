@@ -1,10 +1,42 @@
 import type {
+  CatalogLayoutMode,
+  InstallmentsInterestMode,
   MenuItem,
   MenuItemVariant,
   PriceFontStyle,
   PriceScale,
   PromoVisualEffect,
 } from './types';
+
+export const CATALOG_LAYOUT_OPTIONS: {
+  id: CatalogLayoutMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: 'list',
+    label: 'Lista Marketplace (Com Buy Box)',
+    description:
+      'Card horizontal completo com miniaturas clicáveis no centro e painel de entrega/PIX à direita.',
+  },
+  {
+    id: 'grid_2col',
+    label: 'Grade Vitrine (2 Colunas)',
+    description:
+      'Cards verticais lado a lado no computador/tablet com foto em destaque no topo (estilo loja).',
+  },
+];
+
+export const TRUST_HIGHLIGHT_SUGGESTIONS: string[] = [
+  'Pronta entrega',
+  'Garantia 90 dias',
+  'Troca fácil',
+  'Embalagem p/ presente',
+  '100% Algodão',
+  'Bivolt / Testado',
+  'Serve 2 pessoas',
+  'Receita artesanal',
+];
 
 export interface PriceFontOption {
   id: PriceFontStyle;
@@ -127,14 +159,63 @@ export function formatMoneyBR(value: number, currency = 'R$'): string {
   return `${currency} ${safe.toFixed(2).replace('.', ',')}`;
 }
 
+export interface PixDiscountInfo {
+  percent: number;
+  pixPrice: number;
+  pixPriceFormatted: string;
+  savings: number;
+  savingsFormatted: string;
+}
+
+export function calculatePixDiscountInfo(
+  effectivePrice: number,
+  pixDiscountPercent?: number,
+  currency = 'R$'
+): PixDiscountInfo | null {
+  if (
+    typeof pixDiscountPercent !== 'number' ||
+    !Number.isFinite(pixDiscountPercent) ||
+    pixDiscountPercent < 1 ||
+    pixDiscountPercent > 70 ||
+    effectivePrice <= 0
+  ) {
+    return null;
+  }
+  const pct = Math.min(70, Math.round(pixDiscountPercent));
+  const pixPrice = Number((effectivePrice * (1 - pct / 100)).toFixed(2));
+  const savings = Number((effectivePrice - pixPrice).toFixed(2));
+  return {
+    percent: pct,
+    pixPrice,
+    pixPriceFormatted: formatMoneyBR(pixPrice, currency),
+    savings,
+    savingsFormatted: formatMoneyBR(savings, currency),
+  };
+}
+
 export interface InstallmentDisplayInfo {
   count: number;
   perInstallment: number;
   perInstallmentFormatted: string;
+  interestMode: InstallmentsInterestMode;
   hasInterest: boolean;
-  interestSuffix: 'sem juros' | 'com juros';
+  interestSuffix: 'sem juros' | 'com juros' | null;
   cashPriceFormatted: string;
   totalCreditFormatted?: string;
+}
+
+export function resolveEffectiveInterestMode(
+  interestMode?: InstallmentsInterestMode,
+  hasInterest?: boolean
+): InstallmentsInterestMode {
+  if (
+    interestMode === 'no_interest' ||
+    interestMode === 'with_interest' ||
+    interestMode === 'hide'
+  ) {
+    return interestMode;
+  }
+  return hasInterest ? 'with_interest' : 'no_interest';
 }
 
 export function resolveInstallmentInfo(
@@ -142,7 +223,8 @@ export function resolveInstallmentInfo(
   maxInstallments?: number,
   hasInterest?: boolean,
   customInstallmentAmount?: number,
-  currency = 'R$'
+  currency = 'R$',
+  interestMode?: InstallmentsInterestMode
 ): InstallmentDisplayInfo | null {
   if (
     typeof maxInstallments !== 'number' ||
@@ -152,9 +234,11 @@ export function resolveInstallmentInfo(
   ) {
     return null;
   }
+  const resolvedMode = resolveEffectiveInterestMode(interestMode, hasInterest);
+  const isInterest = resolvedMode === 'with_interest';
   const count = Math.min(24, Math.floor(maxInstallments));
   const useCustom =
-    Boolean(hasInterest) &&
+    isInterest &&
     typeof customInstallmentAmount === 'number' &&
     Number.isFinite(customInstallmentAmount) &&
     customInstallmentAmount > 0;
@@ -163,7 +247,6 @@ export function resolveInstallmentInfo(
     : effectivePrice / count;
   if (perInstallment < 1) return null;
 
-  const isInterest = Boolean(hasInterest);
   const totalCredit = Number((perInstallment * count).toFixed(2));
   const showTotalCredit =
     isInterest && totalCredit > effectivePrice + 0.05;
@@ -172,8 +255,14 @@ export function resolveInstallmentInfo(
     count,
     perInstallment,
     perInstallmentFormatted: formatMoneyBR(perInstallment, currency),
+    interestMode: resolvedMode,
     hasInterest: isInterest,
-    interestSuffix: isInterest ? 'com juros' : 'sem juros',
+    interestSuffix:
+      resolvedMode === 'with_interest'
+        ? 'com juros'
+        : resolvedMode === 'no_interest'
+        ? 'sem juros'
+        : null,
     cashPriceFormatted: formatMoneyBR(effectivePrice, currency),
     totalCreditFormatted: showTotalCredit
       ? formatMoneyBR(totalCredit, currency)
@@ -186,17 +275,21 @@ export function formatInstallmentLabel(
   maxInstallments?: number,
   currency = 'R$',
   hasInterest?: boolean,
-  customInstallmentAmount?: number
+  customInstallmentAmount?: number,
+  interestMode?: InstallmentsInterestMode
 ): string | null {
   const info = resolveInstallmentInfo(
     effectivePrice,
     maxInstallments,
     hasInterest,
     customInstallmentAmount,
-    currency
+    currency,
+    interestMode
   );
   if (!info) return null;
-  return `${info.count}x de ${info.perInstallmentFormatted} ${info.interestSuffix}`;
+  return info.interestSuffix
+    ? `${info.count}x de ${info.perInstallmentFormatted} ${info.interestSuffix}`
+    : `${info.count}x de ${info.perInstallmentFormatted}`;
 }
 
 export function getActiveItemVariants(item: MenuItem, isPro: boolean): MenuItemVariant[] {
