@@ -51,7 +51,7 @@ import {
   calculatePixDiscountInfo,
   formatMoneyBR,
   getActiveItemVariants,
-  resolveEffectiveInterestMode,
+  resolveCartInstallmentSummary,
   resolveInstallmentInfo,
   resolvePriceFontOption,
   resolvePriceScaleClasses,
@@ -792,89 +792,25 @@ export default function DigitalShowcasePage({
       ? Number(menu?.deliveryFee || 0)
       : 0;
   const totalPrice = subtotalPrice + deliveryFee;
-  const cartInstallmentSummary = useMemo(() => {
-    if (!isPro || !acceptsCreditCard) return null;
-    const entries = Object.values(cart);
-    if (entries.length === 0) return null;
-    const allParcelable = entries.every(
-      (c) =>
-        typeof c.item.maxInstallments === 'number' &&
-        c.item.maxInstallments >= 2
-    );
-    if (!allParcelable) return null;
-
-    const currency = menu?.currency || 'R$';
-    const sharedCount = Math.min(
-      ...entries.map((c) => Math.min(24, Math.floor(c.item.maxInstallments!)))
-    );
-    if (sharedCount < 2) return null;
-
-    const cardSubtotal = entries.reduce(
-      (acc, c) =>
-        acc +
-        c.quantity *
-          (typeof c.unitPrice === 'number' ? c.unitPrice : c.item.price),
-      0
-    );
-    const cardTotal = Number((cardSubtotal + deliveryFee).toFixed(2));
-    if (cardTotal <= 0) return null;
-
-    const canSumCustom =
-      deliveryFee === 0 &&
-      entries.every(
-        (c) =>
-          Math.min(24, Math.floor(c.item.maxInstallments!)) === sharedCount &&
-          resolveEffectiveInterestMode(
-            c.item.installmentsInterestMode,
-            c.item.installmentsHasInterest
-          ) === 'with_interest' &&
-          typeof c.item.customInstallmentAmount === 'number' &&
-          c.item.customInstallmentAmount > 0
-      );
-    const perParcel = canSumCustom
-      ? entries.reduce(
-          (acc, c) =>
-            acc + c.quantity * Number(c.item.customInstallmentAmount || 0),
-          0
-        )
-      : cardTotal / sharedCount;
-    if (perParcel < 1) return null;
-
-    const modes = new Set(
-      entries.map((c) =>
-        resolveEffectiveInterestMode(
-          c.item.installmentsInterestMode,
-          c.item.installmentsHasInterest
-        )
-      )
-    );
-    const sharedInterestSuffix =
-      modes.size === 1
-        ? Array.from(modes)[0] === 'with_interest'
-          ? 'com juros'
-          : Array.from(modes)[0] === 'no_interest'
-          ? 'sem juros'
-          : null
-        : null;
-
-    const perParcelFormatted = formatMoneyBR(perParcel, currency);
-    const creditTotalFormatted = formatMoneyBR(
-      canSumCustom ? perParcel * sharedCount : cardTotal,
-      currency
-    );
-    const shortLabel = `${sharedCount}x de ${perParcelFormatted}`;
-
-    return {
-      count: sharedCount,
-      perParcelFormatted,
-      cashTotalFormatted: creditTotalFormatted,
-      shortLabel,
-      interestSuffix: sharedInterestSuffix,
-      whatsappTotalLabel: `${shortLabel} = ${creditTotalFormatted}${
-        sharedInterestSuffix ? ` (${sharedInterestSuffix})` : ''
-      }`,
-    };
-  }, [isPro, acceptsCreditCard, cart, deliveryFee, menu?.currency]);
+  const cartInstallmentSummary = useMemo(
+    () =>
+      resolveCartInstallmentSummary({
+        entries: Object.values(cart),
+        isPro,
+        acceptsCreditCard,
+        allowMixedCartInstallments: Boolean(menu?.allowMixedCartInstallments),
+        deliveryFee,
+        currency: menu?.currency || 'R$',
+      }),
+    [
+      cart,
+      isPro,
+      acceptsCreditCard,
+      menu?.allowMixedCartInstallments,
+      deliveryFee,
+      menu?.currency,
+    ]
+  );
   const parseBrlAmount = (raw: string): number => {
     const cleaned = raw.replace(/[^\d.,]/g, '').trim();
     if (!cleaned) return 0;
@@ -1081,10 +1017,25 @@ export default function DigitalShowcasePage({
       message += `\n*Subtotal:* R$ ${subtotalPrice.toFixed(2)}`;
       message += `\n*${isCatalog ? 'Frete / Entrega' : 'Taxa de Entrega'}:* R$ ${deliveryFee.toFixed(2)}`;
     }
-    if (cartInstallmentSummary && isCreditCardSelected) {
+    if (
+      cartInstallmentSummary?.kind === 'installments' &&
+      isCreditCardSelected
+    ) {
       message += `\n*TOTAL: ${cartInstallmentSummary.whatsappTotalLabel}*\n`;
     } else {
       message += `\n*TOTAL: R$ ${totalPrice.toFixed(2)}*\n`;
+      if (
+        cartInstallmentSummary?.kind === 'mixed_cash_only' &&
+        isCreditCardSelected
+      ) {
+        message += `*Carrinho Misto (Cartão):* Parceláveis ${cartInstallmentSummary.parcelableTotalFormatted}${
+          cartInstallmentSummary.parcelableInstallmentLabel
+            ? ` (até ${cartInstallmentSummary.parcelableInstallmentLabel})`
+            : ''
+        } + À vista${
+          cartInstallmentSummary.hasDeliveryFeeInCash ? '/entrega' : ''
+        } ${cartInstallmentSummary.cashOnlyTotalFormatted} (combinar à vista ou entrada + parcelas).\n`;
+      }
     }
 
     if (cardFeeNotice && isAnyCardSelected) {
@@ -2784,8 +2735,22 @@ export default function DigitalShowcasePage({
                   <p className={`text-xs mt-1 leading-relaxed ${mutedTextClass}`}>
                     {totalItems === 0
                       ? 'Nenhum item adicionado ainda. Escolha seus produtos acima ou selecione uma categoria abaixo para pedir via WhatsApp / PIX.'
-                      : cartInstallmentSummary
-                      ? `Parcelamento no cartão: ${cartInstallmentSummary.shortLabel} (Total ${cartInstallmentSummary.cashTotalFormatted}) • Toque no botão ao lado para revisar endereço, forma de pagamento e fechar o pedido.`
+                      : cartInstallmentSummary?.kind === 'installments'
+                      ? `Parcelamento no cartão: ${cartInstallmentSummary.shortLabel} (Total ${cartInstallmentSummary.cashTotalFormatted})${
+                          cartInstallmentSummary.isMixedUpsell
+                            ? ' — parcelamento estendido ao total do pedido'
+                            : ''
+                        } • Toque no botão ao lado para revisar endereço, forma de pagamento e fechar o pedido.`
+                      : cartInstallmentSummary?.kind === 'mixed_cash_only'
+                      ? `Total atual: ${cartInstallmentSummary.cashTotalFormatted} (contém ${cartInstallmentSummary.cashOnlyItemCount} item somente à vista) • Parceláveis: ${cartInstallmentSummary.parcelableTotalFormatted}${
+                          cartInstallmentSummary.parcelableInstallmentLabel
+                            ? ` (${cartInstallmentSummary.parcelableInstallmentLabel})`
+                            : ''
+                        } + À vista${
+                          cartInstallmentSummary.hasDeliveryFeeInCash
+                            ? '/entrega'
+                            : ''
+                        }: ${cartInstallmentSummary.cashOnlyTotalFormatted}.`
                       : `Total atual: R$ ${totalPrice.toFixed(
                           2
                         )} • Toque no botão ao lado para revisar endereço, forma de pagamento e fechar o pedido.`}
@@ -2816,7 +2781,7 @@ export default function DigitalShowcasePage({
                 <span>
                   {totalItems > 0
                     ? `Fechar Pedido (${
-                        cartInstallmentSummary
+                        cartInstallmentSummary?.kind === 'installments'
                           ? cartInstallmentSummary.shortLabel
                           : `R$ ${totalPrice.toFixed(2)}`
                       })`
@@ -2997,7 +2962,7 @@ export default function DigitalShowcasePage({
       </div>
 
       {/* Floating Bottom Cart / Category Navigation Bar */}
-      {totalItems > 0 ? (
+      {totalItems > 0 && !isNearBottom ? (
         <div className="fixed bottom-4 inset-x-4 max-w-md mx-auto z-40 animate-slide-up">
           <button
             onClick={() => setIsCartOpen(true)}
@@ -3021,11 +2986,16 @@ export default function DigitalShowcasePage({
                 <span className="text-xs opacity-85 block">
                   {isCatalog ? 'Ver Carrinho / Pedido' : 'Ver Comanda / Sacola'}
                 </span>
-                <span className="text-sm font-extrabold">
-                  {cartInstallmentSummary
+                <span className="text-sm font-extrabold block leading-tight">
+                  {cartInstallmentSummary?.kind === 'installments'
                     ? cartInstallmentSummary.shortLabel
                     : `R$ ${totalPrice.toFixed(2)}`}
                 </span>
+                {cartInstallmentSummary?.kind === 'mixed_cash_only' && (
+                  <span className="text-[10px] opacity-85 block leading-tight mt-0.5">
+                    Contém item somente à vista
+                  </span>
+                )}
               </div>
             </div>
 
@@ -4026,12 +3996,14 @@ export default function DigitalShowcasePage({
               )}
               <div className="flex items-center justify-between text-sm gap-2">
                 <span className={`font-semibold ${labelTextClass}`}>
-                  {cartInstallmentSummary && isCreditCardSelected
+                  {cartInstallmentSummary?.kind === 'installments' &&
+                  isCreditCardSelected
                     ? 'Total no Cartão:'
                     : 'Total do Pedido:'}
                 </span>
                 <div className="text-right">
-                  {cartInstallmentSummary && isCreditCardSelected ? (
+                  {cartInstallmentSummary?.kind === 'installments' &&
+                  isCreditCardSelected ? (
                     <>
                       <span
                         className="text-lg font-extrabold block leading-tight"
@@ -4045,6 +4017,11 @@ export default function DigitalShowcasePage({
                       <span className={`text-[11px] font-semibold block ${mutedTextClass}`}>
                         Total: {cartInstallmentSummary.cashTotalFormatted}
                       </span>
+                      {cartInstallmentSummary.isMixedUpsell && (
+                        <span className="text-[10px] font-bold text-sky-400 block">
+                          Parcelamento estendido a todo o pedido
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span
@@ -4056,6 +4033,36 @@ export default function DigitalShowcasePage({
                   )}
                 </div>
               </div>
+
+              {cartInstallmentSummary?.kind === 'mixed_cash_only' &&
+                isCreditCardSelected && (
+                  <div
+                    className={`px-3 py-2.5 rounded-xl border text-[11px] space-y-1 ${
+                      isLight
+                        ? 'bg-sky-50 border-sky-200 text-slate-700'
+                        : 'bg-sky-500/10 border-sky-500/30 text-slate-200'
+                    }`}
+                  >
+                    <p className="font-extrabold">
+                      🛍️ Carrinho misto: item parcelável + item somente à vista
+                    </p>
+                    <p className="leading-snug opacity-90">
+                      • Parceláveis: <strong>{cartInstallmentSummary.parcelableTotalFormatted}</strong>
+                      {cartInstallmentSummary.parcelableInstallmentLabel
+                        ? ` (${cartInstallmentSummary.parcelableInstallmentLabel})`
+                        : ''}
+                      <br />• Somente à vista
+                      {cartInstallmentSummary.hasDeliveryFeeInCash
+                        ? ' / entrega'
+                        : ''}
+                      : <strong>{cartInstallmentSummary.cashOnlyTotalFormatted}</strong>
+                    </p>
+                    <p className="text-[10px] opacity-80 leading-snug">
+                      Em cobrança única no cartão fecha em{' '}
+                      <strong>{cartInstallmentSummary.cashTotalFormatted}</strong> à vista (ou combine entrada + parcelas pelo WhatsApp).
+                    </p>
+                  </div>
+                )}
 
               {canPayPixAtCheckout && (
                 <p className={`text-[11px] leading-relaxed ${mutedTextClass}`}>

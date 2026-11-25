@@ -121,6 +121,8 @@ export async function GET(request: NextRequest) {
     {
       ...menu,
       items: sanitizedItems,
+      allowMixedCartInstallments:
+        canShowInstallments && Boolean(menu.allowMixedCartInstallments),
       passCardFeeToBuyer: storeAcceptsAnyCard && Boolean(menu.passCardFeeToBuyer),
       cardFeeNoticeText: resolvedCardFeeNotice || undefined,
       christmasPageSkin: Boolean(menu.christmasPageSkin),
@@ -480,6 +482,8 @@ export async function POST(request: NextRequest) {
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
       items: sanitizedIncomingItems,
+      allowMixedCartInstallments:
+        canSaveInstallments && Boolean(cleanMenuBody.allowMixedCartInstallments),
       passCardFeeToBuyer: cleanPassCardFee,
       cardFeeNoticeText: cleanCardFeeNotice,
       christmasPageSkin: Boolean(cleanMenuBody.christmasPageSkin),

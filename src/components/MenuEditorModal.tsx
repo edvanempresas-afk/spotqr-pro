@@ -274,6 +274,76 @@ function CardFeePassThroughControl({
   );
 }
 
+interface MixedCartInstallmentsControlProps {
+  allowMixedCartInstallments: boolean;
+  compact?: boolean;
+  onChange: (allowUpsell: boolean) => void;
+}
+
+/**
+ * Configures how mixed carts (parcelable + cash-only items) are presented at checkout:
+ * - Protected mode (default): shows full cash total + transparent split notice.
+ * - Upsell mode: extends lowest installment count across full cart total.
+ */
+function MixedCartInstallmentsControl({
+  allowMixedCartInstallments,
+  compact = false,
+  onChange,
+}: MixedCartInstallmentsControlProps) {
+  return (
+    <div
+      className={`rounded-xl border border-sky-500/35 bg-sky-950/20 ${
+        compact ? 'p-2.5 space-y-2' : 'p-3 space-y-2.5'
+      }`}
+    >
+      <div className="space-y-0.5">
+        <span className="text-[11.5px] font-bold text-white block leading-snug">
+          🛍️ Carrinho Misto (Item Parcelado + Item sem Parcela)
+        </span>
+        <span className="text-[10px] text-slate-300 block leading-snug">
+          Escolha o que mostrar no <strong>Fechar Pedido</strong> se o comprador misturar um item parcelável e outro sem parcelamento:
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={`p-2 rounded-xl border text-left transition ${
+            !allowMixedCartInstallments
+              ? 'bg-emerald-500/15 border-emerald-400 text-white shadow-sm'
+              : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600'
+          }`}
+        >
+          <span className="text-[11px] font-extrabold block">
+            🛡️ Valor Total à Vista (Padrão)
+          </span>
+          <span className="text-[10px] text-slate-300/90 leading-tight block mt-0.5">
+            Protege sua margem: mostra o total cheio + aviso transparente do item à vista no checkout e WhatsApp.
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={`p-2 rounded-xl border text-left transition ${
+            allowMixedCartInstallments
+              ? 'bg-sky-500/20 border-sky-400 text-white shadow-sm'
+              : 'bg-slate-950/70 border-slate-800 text-slate-300 hover:border-slate-600'
+          }`}
+        >
+          <span className="text-[11px] font-extrabold block">
+            🚀 Modo Upsell (Parcelar Total)
+          </span>
+          <span className="text-[10px] text-slate-300/90 leading-tight block mt-0.5">
+            Estende a menor parcela do carrinho ao valor total do pedido para estimular compras adicionais.
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function MenuEditorModal({
   isOpen,
   onClose,
@@ -1349,6 +1419,23 @@ export default function MenuEditorModal({
                           />
                         </div>
                       )}
+                      {isProShowcase &&
+                        acceptedPayments.includes('credit_card') && (
+                          <div className="w-full pt-1.5">
+                            <MixedCartInstallmentsControl
+                              compact
+                              allowMixedCartInstallments={Boolean(
+                                menu.allowMixedCartInstallments
+                              )}
+                              onChange={(allowUpsell) =>
+                                setMenu({
+                                  ...menu,
+                                  allowMixedCartInstallments: allowUpsell,
+                                })
+                              }
+                            />
+                          </div>
+                        )}
                       {!acceptedPayments.includes('credit_card') && (
                         <div className="w-full pt-1.5">
                           <CreditCardInstallmentNotice
@@ -3813,6 +3900,22 @@ export default function MenuEditorModal({
                           />
                         </div>
                       )}
+                      {isProShowcase &&
+                        acceptedPayments.includes('credit_card') && (
+                          <div className="mt-2.5">
+                            <MixedCartInstallmentsControl
+                              allowMixedCartInstallments={Boolean(
+                                menu.allowMixedCartInstallments
+                              )}
+                              onChange={(allowUpsell) =>
+                                setMenu({
+                                  ...menu,
+                                  allowMixedCartInstallments: allowUpsell,
+                                })
+                              }
+                            />
+                          </div>
+                        )}
                       {!acceptedPayments.includes('credit_card') && (
                         <div className="mt-2.5">
                           <CreditCardInstallmentNotice

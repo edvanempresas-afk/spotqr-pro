@@ -201,6 +201,7 @@ export interface RestaurantMenu {
   allowOnSite?: boolean;
   allowCallWaiter?: boolean; // Se o cliente pode chamar o garçom pelo WhatsApp (só exibe se leu o QR da mesa)
   acceptedPayments?: ShowcasePaymentMethod[];
+  allowMixedCartInstallments?: boolean; // Opcional (Cartão PRO): estende a menor parcela ao total quando o carrinho mistura item parcelável e item sem parcela
   passCardFeeToBuyer?: boolean; // Opcional: avisa no card/checkout que pagamentos no cartão têm repasse da taxa da maquininha
   cardFeeNoticeText?: string;   // Texto opcional do aviso da taxa (ex: "Taxa da maquininha +4% no cartão")
   productImagePosition?: 'left' | 'right';

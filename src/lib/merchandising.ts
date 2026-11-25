@@ -292,6 +292,183 @@ export function formatInstallmentLabel(
     : `${info.count}x de ${info.perInstallmentFormatted}`;
 }
 
+export type CartInstallmentSummary =
+  | {
+      kind: 'installments';
+      isMixedUpsell: boolean;
+      count: number;
+      perParcelFormatted: string;
+      cashTotalFormatted: string;
+      shortLabel: string;
+      interestSuffix: 'com juros' | 'sem juros' | null;
+      whatsappTotalLabel: string;
+    }
+  | {
+      kind: 'mixed_cash_only';
+      cashTotalFormatted: string;
+      parcelableTotalFormatted: string;
+      parcelableInstallmentLabel: string | null;
+      cashOnlyTotalFormatted: string;
+      hasDeliveryFeeInCash: boolean;
+      cashOnlyItemCount: number;
+    };
+
+export interface CartInstallmentEntryInput {
+  item: MenuItem;
+  quantity: number;
+  unitPrice?: number;
+}
+
+/**
+ * Resolves checkout/WhatsApp installment behavior for homogeneous or mixed carts:
+ * - All parcelable (or mixed with allowMixedCartInstallments=true): extends shared installment count to order total.
+ * - Mixed with allowMixedCartInstallments=false: keeps cash total upfront while surfacing transparent split breakdown.
+ */
+export function resolveCartInstallmentSummary(params: {
+  entries: CartInstallmentEntryInput[];
+  isPro: boolean;
+  acceptsCreditCard: boolean;
+  allowMixedCartInstallments: boolean;
+  deliveryFee: number;
+  currency?: string;
+}): CartInstallmentSummary | null {
+  const {
+    entries,
+    isPro,
+    acceptsCreditCard,
+    allowMixedCartInstallments,
+    deliveryFee,
+    currency = 'R$',
+  } = params;
+
+  if (!isPro || !acceptsCreditCard || entries.length === 0) return null;
+
+  const parcelableEntries = entries.filter(
+    (c) =>
+      typeof c.item.maxInstallments === 'number' &&
+      Number.isFinite(c.item.maxInstallments) &&
+      c.item.maxInstallments >= 2
+  );
+  if (parcelableEntries.length === 0) return null;
+
+  const cashOnlyEntries = entries.filter(
+    (c) =>
+      typeof c.item.maxInstallments !== 'number' ||
+      !Number.isFinite(c.item.maxInstallments) ||
+      c.item.maxInstallments < 2
+  );
+
+  const sharedCount = Math.min(
+    ...parcelableEntries.map((c) => Math.min(24, Math.floor(c.item.maxInstallments!)))
+  );
+  if (sharedCount < 2) return null;
+
+  const sumEntries = (list: CartInstallmentEntryInput[]) =>
+    list.reduce(
+      (acc, c) =>
+        acc +
+        c.quantity *
+          (typeof c.unitPrice === 'number' ? c.unitPrice : Number(c.item.price) || 0),
+      0
+    );
+
+  const parcelableSubtotal = Number(sumEntries(parcelableEntries).toFixed(2));
+  const cashOnlySubtotal = Number(sumEntries(cashOnlyEntries).toFixed(2));
+  const safeDelivery = Math.max(0, Number(deliveryFee || 0));
+  const cardTotal = Number((parcelableSubtotal + cashOnlySubtotal + safeDelivery).toFixed(2));
+  if (cardTotal <= 0) return null;
+
+  const modes = new Set(
+    parcelableEntries.map((c) =>
+      resolveEffectiveInterestMode(
+        c.item.installmentsInterestMode,
+        c.item.installmentsHasInterest
+      )
+    )
+  );
+  const sharedInterestSuffix: 'com juros' | 'sem juros' | null =
+    modes.size === 1
+      ? Array.from(modes)[0] === 'with_interest'
+        ? 'com juros'
+        : Array.from(modes)[0] === 'no_interest'
+        ? 'sem juros'
+        : null
+      : null;
+
+  const allParcelableHaveMatchingCustom =
+    parcelableEntries.every(
+      (c) =>
+        Math.min(24, Math.floor(c.item.maxInstallments!)) === sharedCount &&
+        resolveEffectiveInterestMode(
+          c.item.installmentsInterestMode,
+          c.item.installmentsHasInterest
+        ) === 'with_interest' &&
+        typeof c.item.customInstallmentAmount === 'number' &&
+        c.item.customInstallmentAmount > 0
+    );
+
+  const hasCashOnlyItems = cashOnlyEntries.length > 0;
+
+  if (hasCashOnlyItems && !allowMixedCartInstallments) {
+    const parcelablePerParcel =
+      allParcelableHaveMatchingCustom
+        ? parcelableEntries.reduce(
+            (acc, c) =>
+              acc + c.quantity * Number(c.item.customInstallmentAmount || 0),
+            0
+          )
+        : parcelableSubtotal / sharedCount;
+    const parcelableInstallmentLabel =
+      parcelablePerParcel >= 1
+        ? `${sharedCount}x de ${formatMoneyBR(parcelablePerParcel, currency)}${
+            sharedInterestSuffix ? ` ${sharedInterestSuffix}` : ''
+          }`
+        : null;
+    const cashAndFeeTotal = Number((cashOnlySubtotal + safeDelivery).toFixed(2));
+    return {
+      kind: 'mixed_cash_only',
+      cashTotalFormatted: formatMoneyBR(cardTotal, currency),
+      parcelableTotalFormatted: formatMoneyBR(parcelableSubtotal, currency),
+      parcelableInstallmentLabel,
+      cashOnlyTotalFormatted: formatMoneyBR(cashAndFeeTotal, currency),
+      hasDeliveryFeeInCash: safeDelivery > 0,
+      cashOnlyItemCount: cashOnlyEntries.reduce((acc, c) => acc + c.quantity, 0),
+    };
+  }
+
+  const canUseCustomOnTotal =
+    !hasCashOnlyItems && safeDelivery === 0 && allParcelableHaveMatchingCustom;
+  const perParcel = canUseCustomOnTotal
+    ? parcelableEntries.reduce(
+        (acc, c) =>
+          acc + c.quantity * Number(c.item.customInstallmentAmount || 0),
+        0
+      )
+    : cardTotal / sharedCount;
+
+  if (perParcel < 1) return null;
+
+  const perParcelFormatted = formatMoneyBR(perParcel, currency);
+  const creditTotalFormatted = formatMoneyBR(
+    canUseCustomOnTotal ? perParcel * sharedCount : cardTotal,
+    currency
+  );
+  const shortLabel = `${sharedCount}x de ${perParcelFormatted}`;
+
+  return {
+    kind: 'installments',
+    isMixedUpsell: hasCashOnlyItems,
+    count: sharedCount,
+    perParcelFormatted,
+    cashTotalFormatted: creditTotalFormatted,
+    shortLabel,
+    interestSuffix: sharedInterestSuffix,
+    whatsappTotalLabel: `${shortLabel} = ${creditTotalFormatted}${
+      sharedInterestSuffix ? ` (${sharedInterestSuffix})` : ''
+    }`,
+  };
+}
+
 export function getActiveItemVariants(item: MenuItem, isPro: boolean): MenuItemVariant[] {
   if (!isPro || !Array.isArray(item.variants) || item.variants.length === 0) {
     return [];
