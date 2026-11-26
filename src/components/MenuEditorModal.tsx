@@ -2640,7 +2640,7 @@ export default function MenuEditorModal({
                           }}
                         />
                         {menu.christmasPageSkin && (
-                          <ChristmasPageSkin variant="preview" />
+                          <ChristmasPageSkin variant="preview" isLight={theme.isLight} />
                         )}
                         <span className="absolute top-2.5 right-3 z-30 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-slate-200 border border-white/15">
                           Prévia ao Vivo ({theme.isLight ? '☀️ Claro' : '🌙 Escuro'}
@@ -2885,7 +2885,7 @@ export default function MenuEditorModal({
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-300 leading-relaxed">
-                            Enfeita o topo com neve suave caindo, cantos em arco, todas as laterais iluminadas e cenário natalino completo no rodapé (Presépio com Reis Magos, Árvore de Natal e Papai Noel levantando voo).{' '}
+                            Neve contínua caindo por toda a página até o rodapé, guirlandas curvas pela gravidade nos cantos, laterais iluminadas e paisagem natalina integrada ao fim da vitrine (Presépio com Reis Magos, Árvore orgânica iluminada e Papai Noel levantando voo).{' '}
                             <span className="text-slate-400">
                               (A borda natalina individual ao redor dos quadrados dos produtos continua exclusiva do Plano PRO.)
                             </span>

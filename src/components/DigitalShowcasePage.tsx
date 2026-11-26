@@ -1655,10 +1655,14 @@ export default function DigitalShowcasePage({
 
   return (
     <div
-      className={`relative min-h-screen overflow-x-clip pb-28 transition-colors ${pageBgClass}`}
+      className={`relative min-h-screen flex flex-col overflow-x-clip transition-colors ${
+        menu.christmasPageSkin ? 'pb-0' : 'pb-28'
+      } ${pageBgClass}`}
     >
-      {/* Skin Natalina em toda a página (Topo, Diagonais dos Cantos e Laterais) — Liberada para Free e PRO */}
-      {Boolean(menu.christmasPageSkin) && <ChristmasPageSkin variant="page" />}
+      {/* Skin Natalina em toda a página (Neve contínua, Topo, Cantos Curvos e Laterais) — Liberada para Free e PRO */}
+      {Boolean(menu.christmasPageSkin) && (
+        <ChristmasPageSkin variant="page" isLight={isLight} />
+      )}
 
       {/* Cover Banner (PRO animated video when enabled & valid, or static image fallback) */}
       <div className="relative w-full h-44 sm:h-56 bg-slate-900 overflow-hidden">
@@ -1723,7 +1727,7 @@ export default function DigitalShowcasePage({
       </div>
 
       {/* Main 3-Column Container: Left Ad | Showcase | Right Ad */}
-      <div className="max-w-[1440px] mx-auto px-4 -mt-16 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="max-w-[1440px] w-full flex-1 mx-auto px-4 -mt-16 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT LATERAL AD (Only on Free / Non-PRO Showcases) */}
         {!isPro && (
           <div className="hidden lg:block lg:col-span-3 sticky top-6 pt-16">
@@ -2964,10 +2968,10 @@ export default function DigitalShowcasePage({
         )}
       </div>
 
-      {/* Cenário Natalino de Rodapé (Presépio à esquerda, Árvore ao centro, Papai Noel decolando à direita) — Free e PRO */}
+      {/* Paisagem Natalina Full-Bleed Integrada ao Rodapé — Liberada para Free e PRO */}
       {Boolean(menu.christmasPageSkin) && (
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 mt-8 relative z-20">
-          <ChristmasFooterScene />
+        <div className="w-full mt-12 relative z-[14]">
+          <ChristmasFooterScene isLight={isLight} />
         </div>
       )}
 
