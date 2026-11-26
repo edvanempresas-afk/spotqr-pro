@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { LED_PALETTE } from './ChristmasCardDecor';
 
 interface ChristmasFooterSceneProps {
   /** Adapta suavemente a transição superior da paisagem ao fundo claro ou escuro da vitrine. */
@@ -11,180 +10,240 @@ interface ChristmasFooterSceneProps {
 type IdHelper = (name: string) => string;
 
 function makeId(prefix: string): IdHelper {
-  return (name: string) => `natal-${prefix}-${name}`;
+  return (name: string) => `natal3d-${prefix}-${name}`;
 }
 
 /**
- * Definições compartilhadas de gradientes e filtros atmosféricos (IDs isolados por prefixo
- * para evitar colisões entre as composições desktop e mobile no DOM).
+ * Definições 3D estilo Pixar / Clay:
+ * Sombras de oclusão suave entre camadas, gradientes esféricos volumétricos com luz-chave superior esquerda,
+ * sombras de rebote quentes e halos luminosos suaves para luzes neon e estrela guia.
  */
 function ChristmasSceneDefs({ prefix }: { prefix: string }) {
   const id = makeId(prefix);
   return (
     <defs>
-      {/* Céu noturno de Natal */}
+      {/* Filtros de Oclusão 3D (dão volume tátil de massinha / vinil fosco entre camadas) */}
+      <filter id={id('clayShadow')} x="-25%" y="-25%" width="150%" height="165%">
+        <feDropShadow dx="0" dy="4.5" stdDeviation="3.2" floodColor="#040814" floodOpacity="0.46" />
+      </filter>
+      <filter id={id('claySoftShadow')} x="-25%" y="-25%" width="150%" height="165%">
+        <feDropShadow dx="0" dy="2.5" stdDeviation="1.8" floodColor="#070e20" floodOpacity="0.34" />
+      </filter>
+      <filter id={id('auroraBlur')} x="-25%" y="-40%" width="150%" height="180%">
+        <feGaussianBlur stdDeviation="17" />
+      </filter>
+      <filter id={id('softBeamBlur')} x="-30%" y="-20%" width="160%" height="150%">
+        <feGaussianBlur stdDeviation="14" />
+      </filter>
+      <filter id={id('softGlow')} x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="5.5" />
+      </filter>
+
+      {/* Céu noturno profundo */}
       <linearGradient id={id('skyGrad')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#070d1f" />
-        <stop offset="45%" stopColor="#0d1b3e" />
-        <stop offset="82%" stopColor="#162d59" />
-        <stop offset="100%" stopColor="#1e3a6d" />
+        <stop offset="0%" stopColor="#070d1e" />
+        <stop offset="46%" stopColor="#0d1b3f" />
+        <stop offset="84%" stopColor="#162e5e" />
+        <stop offset="100%" stopColor="#1e3c72" />
       </linearGradient>
 
       {/* Aurora Boreal orgânica */}
       <linearGradient id={id('auroraGreen')} x1="0" y1="0" x2="1" y2="0.4">
         <stop offset="0%" stopColor="#10b981" stopOpacity="0" />
-        <stop offset="32%" stopColor="#34d399" stopOpacity="0.32" />
-        <stop offset="65%" stopColor="#38bdf8" stopOpacity="0.28" />
+        <stop offset="32%" stopColor="#34d399" stopOpacity="0.3" />
+        <stop offset="66%" stopColor="#38bdf8" stopOpacity="0.24" />
         <stop offset="100%" stopColor="#818cf8" stopOpacity="0" />
       </linearGradient>
       <linearGradient id={id('auroraViolet')} x1="0" y1="0" x2="1" y2="0">
         <stop offset="0%" stopColor="#818cf8" stopOpacity="0" />
-        <stop offset="45%" stopColor="#a78bfa" stopOpacity="0.22" />
-        <stop offset="80%" stopColor="#2dd4bf" stopOpacity="0.24" />
+        <stop offset="45%" stopColor="#a78bfa" stopOpacity="0.2" />
+        <stop offset="80%" stopColor="#2dd4bf" stopOpacity="0.22" />
         <stop offset="100%" stopColor="#2dd4bf" stopOpacity="0" />
       </linearGradient>
 
-      {/* Filtros Gaussianos suaves (sem recortes duros) */}
-      <filter id={id('auroraBlur')} x="-25%" y="-40%" width="150%" height="180%">
-        <feGaussianBlur stdDeviation="16" />
-      </filter>
-      <filter id={id('softBeamBlur')} x="-30%" y="-20%" width="160%" height="150%">
-        <feGaussianBlur stdDeviation="13" />
-      </filter>
-      <filter id={id('softGlow')} x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur stdDeviation="6" />
-      </filter>
+      {/* Estrela Cadente com cauda suave */}
+      <linearGradient id={id('shootingTail')} x1="0" y1="0" x2="1" y2="0.35">
+        <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0" />
+        <stop offset="55%" stopColor="#bae6fd" stopOpacity="0.55" />
+        <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+      </linearGradient>
 
-      {/* Estrela Guia e Luz Acolhedora do Presépio */}
+      {/* Estrela Guia & Luzes Quentes */}
       <radialGradient id={id('starAura')} cx="50%" cy="50%" r="50%">
         <stop offset="0%" stopColor="#ffffff" stopOpacity="0.98" />
-        <stop offset="28%" stopColor="#fef08a" stopOpacity="0.72" />
-        <stop offset="62%" stopColor="#f59e0b" stopOpacity="0.24" />
+        <stop offset="30%" stopColor="#fef08a" stopOpacity="0.72" />
+        <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.25" />
         <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
       </radialGradient>
       <linearGradient id={id('starBeam')} x1="0.5" y1="0" x2="0.5" y2="1">
-        <stop offset="0%" stopColor="#fef9c3" stopOpacity="0.46" />
-        <stop offset="45%" stopColor="#fde047" stopOpacity="0.18" />
+        <stop offset="0%" stopColor="#fef9c3" stopOpacity="0.44" />
+        <stop offset="48%" stopColor="#fde047" stopOpacity="0.18" />
         <stop offset="100%" stopColor="#fde047" stopOpacity="0" />
       </linearGradient>
       <radialGradient id={id('hearthGlow')} cx="50%" cy="55%" r="52%">
-        <stop offset="0%" stopColor="#fef08a" stopOpacity="0.78" />
-        <stop offset="38%" stopColor="#f59e0b" stopOpacity="0.34" />
+        <stop offset="0%" stopColor="#fef08a" stopOpacity="0.82" />
+        <stop offset="40%" stopColor="#f59e0b" stopOpacity="0.34" />
         <stop offset="78%" stopColor="#b45309" stopOpacity="0.1" />
         <stop offset="100%" stopColor="#78350f" stopOpacity="0" />
       </radialGradient>
       <radialGradient id={id('rudolphGlow')} cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#fecaca" stopOpacity="0.98" />
-        <stop offset="35%" stopColor="#ef4444" stopOpacity="0.65" />
+        <stop offset="0%" stopColor="#fecaca" stopOpacity="1" />
+        <stop offset="36%" stopColor="#ff2e4c" stopOpacity="0.72" />
         <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
       </radialGradient>
 
-      {/* Montanhas distantes e Colinas Nevadas */}
+      {/* Montanhas e Neve 3D suave */}
       <linearGradient id={id('mountainFar')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#1e335c" />
-        <stop offset="100%" stopColor="#122142" />
+        <stop offset="0%" stopColor="#1e3561" />
+        <stop offset="100%" stopColor="#112142" />
       </linearGradient>
       <linearGradient id={id('mountainMid')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#26406e" />
-        <stop offset="100%" stopColor="#16294d" />
+        <stop offset="0%" stopColor="#264273" />
+        <stop offset="100%" stopColor="#15294f" />
       </linearGradient>
       <linearGradient id={id('snowHorizon')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#e2edff" />
-        <stop offset="55%" stopColor="#cbdcf3" />
-        <stop offset="100%" stopColor="#9fb8db" />
+        <stop offset="0%" stopColor="#e4efff" />
+        <stop offset="60%" stopColor="#cadcf5" />
+        <stop offset="100%" stopColor="#a0b9dc" />
       </linearGradient>
       <linearGradient id={id('snowMid')} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor="#f8fbff" />
-        <stop offset="65%" stopColor="#dfeaf9" />
-        <stop offset="100%" stopColor="#bdd0ea" />
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="60%" stopColor="#e2edfb" />
+        <stop offset="100%" stopColor="#bfd3ed" />
       </linearGradient>
       <linearGradient id={id('snowFront')} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor="#ffffff" />
-        <stop offset="50%" stopColor="#eff5fd" />
+        <stop offset="55%" stopColor="#eff6ff" />
         <stop offset="100%" stopColor="#d7e4f5" />
       </linearGradient>
       <linearGradient id={id('valleyMist')} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor="#93c5fd" stopOpacity="0" />
-        <stop offset="55%" stopColor="#bfdbfe" stopOpacity="0.16" />
-        <stop offset="100%" stopColor="#dbeafe" stopOpacity="0.32" />
+        <stop offset="60%" stopColor="#bfdbfe" stopOpacity="0.16" />
+        <stop offset="100%" stopColor="#dbeafe" stopOpacity="0.28" />
       </linearGradient>
 
-      {/* Pinheiro da Árvore Central (sombras ricas e brilho suave) */}
-      <linearGradient id={id('pineTierDark')} x1="0.2" y1="0" x2="0.8" y2="1">
-        <stop offset="0%" stopColor="#14532d" />
-        <stop offset="100%" stopColor="#052e16" />
-      </linearGradient>
-      <linearGradient id={id('pineTierMid')} x1="0.25" y1="0" x2="0.8" y2="1">
-        <stop offset="0%" stopColor="#16a34a" />
-        <stop offset="65%" stopColor="#15803d" />
-        <stop offset="100%" stopColor="#064e3b" />
-      </linearGradient>
-      <linearGradient id={id('pineTierBright')} x1="0.3" y1="0" x2="0.7" y2="1">
-        <stop offset="0%" stopColor="#22c55e" />
-        <stop offset="65%" stopColor="#16a34a" />
-        <stop offset="100%" stopColor="#14532d" />
-      </linearGradient>
+      {/* === MATERIAIS CLAY-3D (Inspirados diretamente nas referências 3D Pixar) === */}
+      {/* Folhagem 3D almofadada verde-oliva/musgo quente da árvore */}
+      <radialGradient id={id('clayPineTop')} cx="45%" cy="22%" r="78%">
+        <stop offset="0%" stopColor="#86bf3b" />
+        <stop offset="52%" stopColor="#4f8021" />
+        <stop offset="100%" stopColor="#25420e" />
+      </radialGradient>
+      <radialGradient id={id('clayPineMid')} cx="42%" cy="24%" r="78%">
+        <stop offset="0%" stopColor="#74ad30" />
+        <stop offset="55%" stopColor="#3f6b18" />
+        <stop offset="100%" stopColor="#1b3409" />
+      </radialGradient>
+      <radialGradient id={id('clayPineDeep')} cx="44%" cy="24%" r="80%">
+        <stop offset="0%" stopColor="#5d9423" />
+        <stop offset="58%" stopColor="#335912" />
+        <stop offset="100%" stopColor="#152806" />
+      </radialGradient>
 
-      {/* Bolinhas 3D da Árvore */}
-      <radialGradient id={id('baubleRuby')} cx="35%" cy="32%" r="65%">
-        <stop offset="0%" stopColor="#fca5a5" />
-        <stop offset="45%" stopColor="#dc2626" />
+      {/* Peles 3D macias (Clay) */}
+      <radialGradient id={id('claySkinLight')} cx="38%" cy="30%" r="72%">
+        <stop offset="0%" stopColor="#ffedd5" />
+        <stop offset="58%" stopColor="#fdba8c" />
+        <stop offset="100%" stopColor="#c97a4b" />
+      </radialGradient>
+      <radialGradient id={id('claySkinMedium')} cx="38%" cy="30%" r="72%">
+        <stop offset="0%" stopColor="#fde0c4" />
+        <stop offset="58%" stopColor="#db9463" />
+        <stop offset="100%" stopColor="#8c4f27" />
+      </radialGradient>
+      <radialGradient id={id('claySkinDeep')} cx="38%" cy="30%" r="72%">
+        <stop offset="0%" stopColor="#bd8158" />
+        <stop offset="58%" stopColor="#7e4a29" />
+        <stop offset="100%" stopColor="#46240f" />
+      </radialGradient>
+
+      {/* Barba nuvem, pelúcia branca, neve no telhado e ovelhinha 3D */}
+      <radialGradient id={id('claySnowWhite')} cx="38%" cy="26%" r="76%">
+        <stop offset="0%" stopColor="#ffffff" />
+        <stop offset="62%" stopColor="#f1f5f9" />
+        <stop offset="100%" stopColor="#c5d2e3" />
+      </radialGradient>
+
+      {/* Roupa Papai Noel / Saco / Trenó 3D Carmesim */}
+      <radialGradient id={id('clayRedVelvet')} cx="35%" cy="26%" r="76%">
+        <stop offset="0%" stopColor="#ff6b6b" />
+        <stop offset="48%" stopColor="#dc2626" />
+        <stop offset="100%" stopColor="#7a1111" />
+      </radialGradient>
+
+      {/* Ouro 3D fosco/cetim (Fivela, Sino, Estrela da Árvore, Coroas) */}
+      <radialGradient id={id('clayGold3D')} cx="34%" cy="26%" r="76%">
+        <stop offset="0%" stopColor="#fef9c3" />
+        <stop offset="45%" stopColor="#fbbf24" />
+        <stop offset="100%" stopColor="#b45309" />
+      </radialGradient>
+
+      {/* Biscoito Gingerbread 3D */}
+      <radialGradient id={id('clayGingerbread')} cx="35%" cy="28%" r="76%">
+        <stop offset="0%" stopColor="#e59d52" />
+        <stop offset="60%" stopColor="#b46321" />
+        <stop offset="100%" stopColor="#6e360c" />
+      </radialGradient>
+
+      {/* Couro / Madeira 3D (Botas, Cinto, Estábulo, Manjedoura) */}
+      <radialGradient id={id('clayBrown')} cx="35%" cy="28%" r="76%">
+        <stop offset="0%" stopColor="#a86a3d" />
+        <stop offset="58%" stopColor="#6e3f1d" />
+        <stop offset="100%" stopColor="#3b1e0a" />
+      </radialGradient>
+
+      {/* Pelagem Clay das Renas 3D */}
+      <radialGradient id={id('clayReindeer')} cx="36%" cy="28%" r="76%">
+        <stop offset="0%" stopColor="#dc924f" />
+        <stop offset="58%" stopColor="#9c5622" />
+        <stop offset="100%" stopColor="#522608" />
+      </radialGradient>
+
+      {/* Mantos 3D dos Reis Magos e Maria */}
+      <radialGradient id={id('clayPurple3D')} cx="35%" cy="26%" r="78%">
+        <stop offset="0%" stopColor="#c084fc" />
+        <stop offset="52%" stopColor="#7e22ce" />
+        <stop offset="100%" stopColor="#3b0764" />
+      </radialGradient>
+      <radialGradient id={id('clayEmerald3D')} cx="35%" cy="26%" r="78%">
+        <stop offset="0%" stopColor="#34d399" />
+        <stop offset="52%" stopColor="#0f766e" />
+        <stop offset="100%" stopColor="#022c22" />
+      </radialGradient>
+      <radialGradient id={id('clayMaryBlue')} cx="36%" cy="25%" r="78%">
+        <stop offset="0%" stopColor="#60a5fa" />
+        <stop offset="52%" stopColor="#1d4ed8" />
+        <stop offset="100%" stopColor="#172554" />
+      </radialGradient>
+      <radialGradient id={id('clayJosephOchre')} cx="36%" cy="26%" r="78%">
+        <stop offset="0%" stopColor="#fbbf24" />
+        <stop offset="52%" stopColor="#b45309" />
+        <stop offset="100%" stopColor="#451a03" />
+      </radialGradient>
+
+      {/* Bolinhas 3D brilhantes */}
+      <radialGradient id={id('clayBaubleRuby')} cx="34%" cy="28%" r="68%">
+        <stop offset="0%" stopColor="#fda4af" />
+        <stop offset="45%" stopColor="#e11d48" />
         <stop offset="100%" stopColor="#7f1d1d" />
       </radialGradient>
-      <radialGradient id={id('baubleGold')} cx="35%" cy="32%" r="65%">
-        <stop offset="0%" stopColor="#fef9c3" />
-        <stop offset="45%" stopColor="#eab308" />
-        <stop offset="100%" stopColor="#854d0e" />
-      </radialGradient>
-      <radialGradient id={id('baubleIce')} cx="35%" cy="32%" r="65%">
+      <radialGradient id={id('clayBaubleBlue')} cx="34%" cy="28%" r="68%">
         <stop offset="0%" stopColor="#bae6fd" />
         <stop offset="45%" stopColor="#0284c7" />
         <stop offset="100%" stopColor="#0c4a6e" />
       </radialGradient>
 
-      {/* Mantos dos Reis Magos e Sagrada Família */}
-      <linearGradient id={id('robePurple')} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#9333ea" />
-        <stop offset="100%" stopColor="#4c1d95" />
-      </linearGradient>
-      <linearGradient id={id('robeCrimson')} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#e11d48" />
-        <stop offset="100%" stopColor="#881337" />
-      </linearGradient>
-      <linearGradient id={id('robeEmerald')} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#0d9488" />
-        <stop offset="100%" stopColor="#064e3b" />
-      </linearGradient>
-      <linearGradient id={id('maryMantle')} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#38bdf8" />
-        <stop offset="45%" stopColor="#1d4ed8" />
-        <stop offset="100%" stopColor="#172554" />
-      </linearGradient>
-      <linearGradient id={id('sleighRuby')} x1="0" y1="0" x2="0.8" y2="1">
-        <stop offset="0%" stopColor="#ef4444" />
-        <stop offset="55%" stopColor="#b91c1c" />
-        <stop offset="100%" stopColor="#6b0f0f" />
-      </linearGradient>
-      <linearGradient id={id('goldTrim')} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#fef08a" />
-        <stop offset="50%" stopColor="#facc15" />
-        <stop offset="100%" stopColor="#b45309" />
-      </linearGradient>
-      <linearGradient id={id('reindeerCoat')} x1="0.2" y1="0" x2="0.8" y2="1">
-        <stop offset="0%" stopColor="#b45309" />
-        <stop offset="65%" stopColor="#78350f" />
-        <stop offset="100%" stopColor="#451a03" />
-      </linearGradient>
+      {/* Rastro mágico luminoso do trenó */}
       <linearGradient id={id('magicCometGold')} x1="0" y1="0.8" x2="1" y2="0.2">
         <stop offset="0%" stopColor="#fde047" stopOpacity="0" />
-        <stop offset="35%" stopColor="#facc15" stopOpacity="0.65" />
-        <stop offset="100%" stopColor="#fef9c3" stopOpacity="0.95" />
+        <stop offset="35%" stopColor="#facc15" stopOpacity="0.68" />
+        <stop offset="100%" stopColor="#fef9c3" stopOpacity="0.98" />
       </linearGradient>
     </defs>
   );
 }
 
-/** Céu estrelado, aurora boreal animada, estrela cadente e cordilheiras nevadas orgânicas. */
+/** Céu estrelado, aurora boreal animada, estrela cadente com cauda suave e montanhas nevadas. */
 function SkyAndMountains({
   width,
   height,
@@ -198,44 +257,42 @@ function SkyAndMountains({
   const scaleX = width / 1440;
 
   const stars = [
-    { x: 0.04, y: 0.14, r: 1.4, diamond: false },
-    { x: 0.08, y: 0.28, r: 1.1, diamond: false },
-    { x: 0.13, y: 0.12, r: 2.1, diamond: true },
-    { x: 0.19, y: 0.34, r: 1.3, diamond: false },
-    { x: 0.25, y: 0.18, r: 1.5, diamond: false },
-    { x: 0.33, y: 0.26, r: 1.9, diamond: true },
-    { x: 0.41, y: 0.11, r: 1.4, diamond: false },
-    { x: 0.47, y: 0.32, r: 1.2, diamond: false },
-    { x: 0.55, y: 0.16, r: 2.2, diamond: true },
-    { x: 0.62, y: 0.29, r: 1.4, diamond: false },
-    { x: 0.68, y: 0.13, r: 1.8, diamond: true },
-    { x: 0.74, y: 0.24, r: 1.2, diamond: false },
-    { x: 0.81, y: 0.11, r: 1.6, diamond: false },
-    { x: 0.88, y: 0.22, r: 2.0, diamond: true },
-    { x: 0.94, y: 0.14, r: 1.4, diamond: false },
-    { x: 0.97, y: 0.36, r: 1.3, diamond: false },
+    { x: 0.04, y: 0.16, r: 1.5, diamond: false },
+    { x: 0.09, y: 0.28, r: 1.2, diamond: false },
+    { x: 0.14, y: 0.14, r: 2.2, diamond: true },
+    { x: 0.2, y: 0.34, r: 1.3, diamond: false },
+    { x: 0.26, y: 0.19, r: 1.5, diamond: false },
+    { x: 0.36, y: 0.24, r: 1.8, diamond: true },
+    { x: 0.42, y: 0.12, r: 1.4, diamond: false },
+    { x: 0.56, y: 0.18, r: 2.1, diamond: true },
+    { x: 0.63, y: 0.29, r: 1.4, diamond: false },
+    { x: 0.69, y: 0.15, r: 1.8, diamond: true },
+    { x: 0.76, y: 0.24, r: 1.3, diamond: false },
+    { x: 0.82, y: 0.13, r: 1.6, diamond: false },
+    { x: 0.89, y: 0.22, r: 2.1, diamond: true },
+    { x: 0.95, y: 0.15, r: 1.5, diamond: false },
   ];
 
-  // Silhuetas suaves de pinheiros distantes ao longo das colinas
-  const distantPinesX = [85, 130, 175, 480, 520, 815, 860, 1295, 1345, 1390];
+  // Silhuetas arredondadas suaves de pinheiros ao longe
+  const distantPinesX = [78, 122, 168, 495, 540, 835, 882, 1300, 1352, 1396];
 
   return (
     <g>
       <rect x="0" y="0" width={width} height={height} fill={`url(#${id('skyGrad')})`} />
 
-      {/* Cortinas de Aurora Boreal ondulando suavemente no céu */}
+      {/* Cortinas de Aurora Boreal ondulando */}
       <g filter={`url(#${id('auroraBlur')})`} className="natal-aurora-wave">
         <path
-          d={`M${-60 * scaleX} ${height * 0.22} C${280 * scaleX} ${height * 0.06}, ${560 * scaleX} ${height * 0.32}, ${940 * scaleX} ${height * 0.14} C${1160 * scaleX} ${height * 0.04}, ${1340 * scaleX} ${height * 0.24}, ${width + 60} ${height * 0.12} L${width + 60} ${height * 0.38} C${1220 * scaleX} ${height * 0.42}, ${860 * scaleX} ${height * 0.24}, ${520 * scaleX} ${height * 0.4} C${240 * scaleX} ${height * 0.5}, ${40 * scaleX} ${height * 0.28}, ${-60 * scaleX} ${height * 0.36} Z`}
+          d={`M${-60 * scaleX} ${height * 0.22} C${280 * scaleX} ${height * 0.07}, ${560 * scaleX} ${height * 0.31}, ${940 * scaleX} ${height * 0.15} C${1160 * scaleX} ${height * 0.05}, ${1340 * scaleX} ${height * 0.24}, ${width + 60} ${height * 0.13} L${width + 60} ${height * 0.38} C${1220 * scaleX} ${height * 0.41}, ${860 * scaleX} ${height * 0.24}, ${520 * scaleX} ${height * 0.39} C${240 * scaleX} ${height * 0.48}, ${40 * scaleX} ${height * 0.28}, ${-60 * scaleX} ${height * 0.35} Z`}
           fill={`url(#${id('auroraGreen')})`}
         />
         <path
-          d={`M${120 * scaleX} ${height * 0.16} C${480 * scaleX} ${height * 0.28}, ${790 * scaleX} ${height * 0.04}, ${1180 * scaleX} ${height * 0.2} L${1260 * scaleX} ${height * 0.34} C${880 * scaleX} ${height * 0.18}, ${540 * scaleX} ${height * 0.4}, ${120 * scaleX} ${height * 0.3} Z`}
+          d={`M${120 * scaleX} ${height * 0.16} C${480 * scaleX} ${height * 0.28}, ${790 * scaleX} ${height * 0.06}, ${1180 * scaleX} ${height * 0.2} L${1260 * scaleX} ${height * 0.34} C${880 * scaleX} ${height * 0.19}, ${540 * scaleX} ${height * 0.38}, ${120 * scaleX} ${height * 0.29} Z`}
           fill={`url(#${id('auroraViolet')})`}
         />
       </g>
 
-      {/* Estrelas cintilantes */}
+      {/* Estrelas */}
       {stars.map((s, idx) => {
         const cx = s.x * width;
         const cy = s.y * height;
@@ -263,54 +320,61 @@ function SkyAndMountains({
         );
       })}
 
-      {/* Estrela Cadente atravessando o céu */}
+      {/* Estrela Cadente afunilada com cauda gradiente luminosa */}
       <g className="natal-shooting-star">
         <path
-          d={`M${width * 0.58} ${height * 0.16} L${width * 0.68} ${height * 0.21}`}
-          stroke="#fef9c3"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          opacity="0.85"
+          d={`M${width * 0.56} ${height * 0.17} Q${width * 0.61} ${height * 0.185}, ${width * 0.66} ${height * 0.21} Q${width * 0.61} ${height * 0.193}, ${width * 0.56} ${height * 0.17} Z`}
+          fill={`url(#${id('shootingTail')})`}
         />
-        <path
-          d={`M${width * 0.56} ${height * 0.15} L${width * 0.68} ${height * 0.21}`}
-          stroke="#7dd3fc"
-          strokeWidth="1"
+        <line
+          x1={width * 0.56}
+          y1={height * 0.17}
+          x2={width * 0.66}
+          y2={height * 0.21}
+          stroke={`url(#${id('shootingTail')})`}
+          strokeWidth="2.4"
           strokeLinecap="round"
+        />
+        <circle
+          cx={width * 0.66}
+          cy={height * 0.21}
+          r="5"
+          fill="#fef9c3"
           opacity="0.55"
+          filter={`url(#${id('softGlow')})`}
         />
-        <circle cx={width * 0.68} cy={height * 0.21} r="2.2" fill="#ffffff" />
+        <circle cx={width * 0.66} cy={height * 0.21} r="2.2" fill="#ffffff" />
       </g>
 
-      {/* Cadeia de Montanhas Distantes (curvas suaves, sem quinas) */}
+      {/* Montanhas distantes */}
       <path
-        d={`M0 ${height * 0.66} C${180 * scaleX} ${height * 0.52}, ${310 * scaleX} ${height * 0.62}, ${490 * scaleX} ${height * 0.54} C${670 * scaleX} ${height * 0.46}, ${820 * scaleX} ${height * 0.6}, ${1020 * scaleX} ${height * 0.51} C${1190 * scaleX} ${height * 0.43}, ${1320 * scaleX} ${height * 0.56}, ${width} ${height * 0.52} L${width} ${height} L0 ${height} Z`}
+        d={`M0 ${height * 0.64} C${180 * scaleX} ${height * 0.52}, ${310 * scaleX} ${height * 0.61}, ${490 * scaleX} ${height * 0.53} C${670 * scaleX} ${height * 0.46}, ${820 * scaleX} ${height * 0.59}, ${1020 * scaleX} ${height * 0.5} C${1190 * scaleX} ${height * 0.43}, ${1320 * scaleX} ${height * 0.55}, ${width} ${height * 0.52} L${width} ${height} L0 ${height} Z`}
         fill={`url(#${id('mountainFar')})`}
       />
       <path
-        d={`M0 ${height * 0.72} C${190 * scaleX} ${height * 0.62}, ${360 * scaleX} ${height * 0.69}, ${580 * scaleX} ${height * 0.61} C${790 * scaleX} ${height * 0.54}, ${980 * scaleX} ${height * 0.67}, ${1180 * scaleX} ${height * 0.58} C${1310 * scaleX} ${height * 0.54}, ${1390 * scaleX} ${height * 0.62}, ${width} ${height * 0.64} L${width} ${height} L0 ${height} Z`}
+        d={`M0 ${height * 0.7} C${190 * scaleX} ${height * 0.6}, ${360 * scaleX} ${height * 0.67}, ${580 * scaleX} ${height * 0.59} C${790 * scaleX} ${height * 0.53}, ${980 * scaleX} ${height * 0.65}, ${1180 * scaleX} ${height * 0.57} C${1310 * scaleX} ${height * 0.53}, ${1390 * scaleX} ${height * 0.61}, ${width} ${height * 0.63} L${width} ${height} L0 ${height} Z`}
         fill={`url(#${id('mountainMid')})`}
       />
 
-      {/* Bosques distantes em silhueta orgânica curvada */}
+      {/* Bosques distantes suaves arredondados */}
       {distantPinesX.map((px, i) => {
         const x = px * scaleX;
-        const baseY = height * (0.64 + (i % 3) * 0.02);
-        const h = 22 + (i % 3) * 7;
+        const baseY = height * (0.63 + (i % 3) * 0.02);
+        const h = 21 + (i % 3) * 7;
         return (
           <path
             key={`dp-${i}`}
-            d={`M${x} ${baseY - h} C${x - 4} ${baseY - h * 0.5}, ${x - 9} ${baseY - 4}, ${x - 10} ${baseY} C${x - 3} ${baseY - 2}, ${x + 3} ${baseY - 2}, ${x + 10} ${baseY} C${x + 9} ${baseY - 4}, ${x + 4} ${baseY - h * 0.5}, ${x} ${baseY - h} Z`}
-            fill="#112244"
+            d={`M${x} ${baseY - h} C${x - 5} ${baseY - h * 0.55}, ${x - 10} ${baseY - 4}, ${x - 9} ${baseY} C${x - 3} ${baseY + 2}, ${x + 3} ${baseY + 2}, ${x + 9} ${baseY} C${x + 10} ${baseY - 4}, ${x + 5} ${baseY - h * 0.55}, ${x} ${baseY - h} Z`}
+            fill="#102145"
             opacity="0.72"
           />
         );
       })}
 
-      {/* Névoa prateada de inverno entre as montanhas e as colinas */}
+      {/* Névoa prateada suave entre as montanhas e as colinas */}
       <rect
         x="0"
-        y={height * 0.56}
+        y={height * 0.54}
         width={width}
         height={height * 0.24}
         fill={`url(#${id('valleyMist')})`}
@@ -319,7 +383,7 @@ function SkyAndMountains({
   );
 }
 
-/** Estrela Guia de Belém com feixe de luz volumétrico suave iluminando a manjedoura. */
+/** Estrela Guia 3D dourada chanfrada com feixe difuso iluminando a Manjedoura. */
 function StarOfBethlehem({
   x,
   y,
@@ -334,37 +398,92 @@ function StarOfBethlehem({
   prefix: string;
 }) {
   const id = makeId(prefix);
-  const halfSpan = 105;
+  const halfSpan = 120;
   return (
     <g>
-      {/* Feixe luminoso difuso com Gaussian Blur — sem pontas rígidas */}
       <path
-        d={`M${x - 4} ${y} C${x - 42} ${y + 65}, ${targetX - halfSpan * 0.78} ${targetY - 45}, ${targetX - halfSpan} ${targetY} L${targetX + halfSpan} ${targetY} C${targetX + halfSpan * 0.78} ${targetY - 45}, ${x + 42} ${y + 65}, ${x + 4} ${y} Z`}
+        d={`M${x - 6} ${y + 6} C${x - 45} ${y + 68}, ${targetX - halfSpan * 0.8} ${targetY - 42}, ${targetX - halfSpan} ${targetY} L${targetX + halfSpan} ${targetY} C${targetX + halfSpan * 0.8} ${targetY - 42}, ${x + 45} ${y + 68}, ${x + 6} ${y + 6} Z`}
         fill={`url(#${id('starBeam')})`}
         filter={`url(#${id('softBeamBlur')})`}
       />
-
-      {/* Corpo radiante da Estrela Guia */}
-      <g transform={`translate(${x}, ${y})`} className="natal-star-twinkle">
+      <g
+        transform={`translate(${x}, ${y})`}
+        filter={`url(#${id('claySoftShadow')})`}
+        className="natal-star-twinkle"
+      >
         <circle cx="0" cy="0" r="46" fill={`url(#${id('starAura')})`} />
-        {/* Raios principais alongados com pontas finas */}
         <path
-          d="M0 -34 C2.5 -8 6 -4.5 28 0 C6 4.5 2.5 8 0 42 C-2.5 8 -6 4.5 -28 0 C-6 -4.5 -2.5 -8 0 -34 Z"
-          fill="#fef9c3"
+          d="M0 -30 C4 -9 8 -6 26 0 C8 6 4 9 0 38 C-4 9 -8 6 -26 0 C-8 -6 -4 -9 0 -30 Z"
+          fill={`url(#${id('clayGold3D')})`}
         />
-        {/* Raios diagonais menores */}
         <path
-          d="M0 -18 C1.6 -5 4.2 -3 15 -11 C5.5 -2 4.5 2 14 13 C3 4 -1 6 0 18 C-1 6 -3 4 -14 13 C-4.5 2 -5.5 -2 -15 -11 C-4.2 -3 -1.6 -5 0 -18 Z"
-          fill="#fde047"
+          d="M0 -18 C3 -6 5 -4 14 -12 C6 -3 5 3 13 13 C3 5 -2 6 0 18 C-2 6 -4 4 -13 13 C-5 3 -6 -3 -14 -12 C-5 -4 -3 -6 0 -18 Z"
+          fill="#fef9c3"
           opacity="0.88"
         />
-        <circle cx="0" cy="0" r="5" fill="#ffffff" />
+        <circle cx="-1" cy="-2" r="4.5" fill="#ffffff" />
       </g>
     </g>
   );
 }
 
-/** Os Três Reis Magos caminhando pela colina nevada acompanhando a Estrela Guia. */
+/** Rosto 3D expressivo compartilhado (olhos brilhantes com catchlight, sobrancelhas, bochechas rosadas e nariz fofo). */
+function CuteClayFace({
+  cx,
+  cy,
+  skinFill,
+  cheeksOpacity = 0.6,
+  noseColor = '#f59e0b',
+  isSleeping = false,
+}: {
+  cx: number;
+  cy: number;
+  skinFill: string;
+  cheeksOpacity?: number;
+  noseColor?: string;
+  isSleeping?: boolean;
+}) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r="9.5" fill={skinFill} />
+      {/* Bochechas rosadas 3D */}
+      <ellipse
+        cx={cx - 4.8}
+        cy={cy + 2.4}
+        rx="2.6"
+        ry="1.6"
+        fill="#fb7185"
+        opacity={cheeksOpacity}
+      />
+      <ellipse
+        cx={cx + 4.8}
+        cy={cy + 2.4}
+        rx="2.6"
+        ry="1.6"
+        fill="#fb7185"
+        opacity={cheeksOpacity}
+      />
+      {/* Olhos 3D com reflexo de estúdio */}
+      {isSleeping ? (
+        <g stroke="#451a03" strokeWidth="1.4" strokeLinecap="round" fill="none">
+          <path d={`M${cx - 5.2} ${cy - 0.5} Q${cx - 3.6} ${cy + 1.2} ${cx - 2} ${cy - 0.5}`} />
+          <path d={`M${cx + 2} ${cy - 0.5} Q${cx + 3.6} ${cy + 1.2} ${cx + 5.2} ${cy - 0.5}`} />
+        </g>
+      ) : (
+        <g>
+          <circle cx={cx - 3.5} cy={cy - 1} r="1.75" fill="#1c1917" />
+          <circle cx={cx - 4} cy={cy - 1.6} r="0.6" fill="#ffffff" />
+          <circle cx={cx + 3.5} cy={cy - 1} r="1.75" fill="#1c1917" />
+          <circle cx={cx + 3} cy={cy - 1.6} r="0.6" fill="#ffffff" />
+        </g>
+      )}
+      {/* Narizinho fofo 3D */}
+      <circle cx={cx} cy={cy + 1.3} r="2.2" fill={noseColor} opacity="0.92" />
+    </g>
+  );
+}
+
+/** Os Três Reis Magos em estilo Clay-3D expressivo chegando pela colina com presentes, incenso e lanterna. */
 function ThreeWiseMenCaravan({
   x,
   y,
@@ -379,117 +498,123 @@ function ThreeWiseMenCaravan({
   const id = makeId(prefix);
   return (
     <g transform={`translate(${x}, ${y}) scale(${scale})`}>
-      {/* Pegadas sutis iluminadas pelo luar na neve atrás dos Reis */}
-      <g fill="#93c5fd" opacity="0.32">
-        <ellipse cx="-26" cy="108" rx="4.5" ry="1.8" />
-        <ellipse cx="-12" cy="106" rx="4.5" ry="1.8" />
-        <ellipse cx="4" cy="107" rx="4.2" ry="1.6" />
+      {/* Pegadas suaves na neve */}
+      <g fill="#93c5fd" opacity="0.34">
+        <ellipse cx="-18" cy="108" rx="5.5" ry="2.2" />
+        <ellipse cx="-2" cy="106" rx="5.2" ry="2" />
+        <ellipse cx="14" cy="107" rx="4.8" ry="1.8" />
       </g>
 
-      {/* Mago 1: Melquior (manto real roxo + borda de arminho + cofre dourado) */}
-      <g transform="translate(0, 12)">
-        <ellipse cx="22" cy="96" rx="18" ry="4" fill="#64748b" opacity="0.3" />
-        {/* Manto esvoaçante atrás */}
+      {/* Mago 1: Melquior (Clay Roxo + Gola Peluda 3D + Rosto fofo + Coroa Dourada + Cofre 3D) */}
+      <g transform="translate(0, 6)" filter={`url(#${id('clayShadow')})`}>
+        <ellipse cx="22" cy="99" rx="22" ry="5" fill="#64748b" opacity="0.32" />
+        {/* Corpo gordinho 3D curvado em sino */}
         <path
-          d="M14 28 C5 48, 0 74, -6 93 C6 96, 18 96, 28 94 C26 68, 25 46, 22 28 Z"
-          fill="#581c87"
+          d="M11 32 C6 52, 4 76, 6 95 C14 100, 31 100, 38 95 C40 76, 36 52, 31 32 Z"
+          fill={`url(#${id('clayPurple3D')})`}
         />
-        {/* Túnica principal com caimento curvo */}
+        {/* Faixa de ouro 3D na frente */}
         <path
-          d="M13 24 C11 52, 8 76, 8 95 C18 98, 30 98, 36 93 C35 72, 31 46, 27 24 Z"
-          fill={`url(#${id('robePurple')})`}
-        />
-        {/* Estola dourada */}
-        <path
-          d="M19 25 C17 48, 17 72, 20 94"
-          stroke="#facc15"
-          strokeWidth="2.6"
+          d="M21 35 C20 56, 20 76, 22 97"
+          stroke={`url(#${id('clayGold3D')})`}
+          strokeWidth="3.5"
           strokeLinecap="round"
-          fill="none"
-          opacity="0.85"
         />
-        {/* Gola de arminho fofa */}
+        {/* Capa peluda fofa branca */}
         <path
-          d="M12 24 C17 29, 25 29, 29 24 C27 21, 14 21, 12 24 Z"
-          fill="#f8fafc"
+          d="M9 32 C14 40, 29 40, 33 32 C31 27, 11 27, 9 32 Z"
+          fill={`url(#${id('claySnowWhite')})`}
+          filter={`url(#${id('claySoftShadow')})`}
         />
-        {/* Cabeça e barba branca real */}
-        <circle cx="21.5" cy="14.5" r="6" fill="#fed7aa" />
-        <path
-          d="M17 16 C18 23, 25 23, 27 16 C25 18, 19 18, 17 16 Z"
-          fill="#f1f5f9"
+        {/* Cabeça + Barba nuvem fofa */}
+        <CuteClayFace
+          cx={21.5}
+          cy={20}
+          skinFill={`url(#${id('claySkinLight')})`}
+          noseColor="#f4a261"
         />
-        {/* Coroa curvada ornamentada */}
         <path
-          d="M14.5 11 C15 6, 18 5, 19.5 8 C20.5 4, 23 4, 24 8 C25.5 5, 28 6, 28.5 11 Z"
-          fill={`url(#${id('goldTrim')})`}
+          d="M12.5 22 C12 31, 31 31, 30.5 22 C26 24, 17 24, 12.5 22 Z"
+          fill={`url(#${id('claySnowWhite')})`}
         />
-        {/* Braço e cofre de ouro */}
+        {/* Coroa 3D arredondada */}
         <path
-          d="M24 30 C29 36, 33 41, 35 44"
-          stroke="#9333ea"
-          strokeWidth="4.8"
+          d="M13 13 C12 7, 17 5, 19 9 C20.5 4, 22.5 4, 24 9 C26 5, 31 7, 30 13 C26 15, 17 15, 13 13 Z"
+          fill={`url(#${id('clayGold3D')})`}
+        />
+        {/* Braço e Bauzinho 3D */}
+        <path
+          d="M28 38 C34 43, 38 47, 40 50"
+          stroke={`url(#${id('clayPurple3D')})`}
+          strokeWidth="6.5"
           strokeLinecap="round"
-          fill="none"
         />
-        <path
-          d="M32 39 C35 37, 42 37, 44 40 L43 47 C39 48, 34 48, 32 46 Z"
-          fill={`url(#${id('goldTrim')})`}
-          stroke="#92400e"
-          strokeWidth="0.9"
+        <circle cx="40.5" cy="50.5" r="3" fill={`url(#${id('claySkinLight')})`} />
+        <rect
+          x="35"
+          y="42"
+          width="13"
+          height="10"
+          rx="3"
+          fill={`url(#${id('clayGold3D')})`}
+          filter={`url(#${id('claySoftShadow')})`}
         />
+        <rect x="35" y="45.5" width="13" height="2" rx="1" fill="#78350f" opacity="0.45" />
       </g>
 
-      {/* Mago 2: Gaspar (manto carmesim + turbante real + incensário com fumaça animada) */}
-      <g transform="translate(52, 6)">
-        <ellipse cx="22" cy="100" rx="18" ry="4" fill="#64748b" opacity="0.3" />
-        {/* Capa carmesim ampla em curva */}
+      {/* Mago 2: Gaspar (Clay Carmesim + Turbante 3D + Incensário com Fumaça Animada) */}
+      <g transform="translate(56, 2)" filter={`url(#${id('clayShadow')})`}>
+        <ellipse cx="22" cy="103" rx="22" ry="5" fill="#64748b" opacity="0.32" />
         <path
-          d="M15 26 C6 48, 2 76, 1 98 C12 101, 25 101, 34 97 C34 72, 30 48, 26 26 Z"
-          fill={`url(#${id('robeCrimson')})`}
+          d="M10 34 C6 54, 4 80, 6 99 C14 104, 31 104, 38 99 C40 80, 36 54, 32 34 Z"
+          fill={`url(#${id('clayRedVelvet')})`}
         />
-        {/* Faixa de seda dourada */}
+        {/* Faixa de seda dourada almofadada */}
         <path
-          d="M13 48 C18 53, 25 53, 29 48"
-          stroke="#fde047"
-          strokeWidth="3"
-          fill="none"
+          d="M8 58 C16 63, 28 63, 36 58"
+          stroke={`url(#${id('clayGold3D')})`}
+          strokeWidth="4.2"
           strokeLinecap="round"
+          fill="none"
         />
-        {/* Cabeça & barba castanha */}
-        <circle cx="21" cy="15" r="6" fill="#f1b488" />
+        {/* Rosto + barba fofa */}
+        <CuteClayFace
+          cx={21.5}
+          cy={21}
+          skinFill={`url(#${id('claySkinMedium')})`}
+          noseColor="#c97a4b"
+        />
         <path
-          d="M16.5 17 C18.5 22.5, 24.5 22.5, 26.5 16.5"
+          d="M14 23 C14 31, 29 31, 29 23 C25 25, 18 25, 14 23 Z"
           fill="#451a03"
         />
-        {/* Turbante real em camadas curvas */}
+        {/* Turbante Real Clay 3D fofo */}
         <path
-          d="M13.5 12 C13 4, 28 3, 28.5 12 C24 14, 17 14, 13.5 12 Z"
-          fill="#f8fafc"
+          d="M10 17 C9 6, 33 5, 33 17 C27 20, 16 20, 10 17 Z"
+          fill={`url(#${id('claySnowWhite')})`}
         />
         <path
-          d="M14.5 10 C19 6.5, 24 7, 27.5 10"
-          stroke="#facc15"
-          strokeWidth="1.6"
+          d="M12 13 C18 8, 25 8, 31 13"
+          stroke={`url(#${id('clayGold3D')})`}
+          strokeWidth="2.4"
+          strokeLinecap="round"
           fill="none"
         />
-        <circle cx="21" cy="7.5" r="2" fill="#10b981" />
-        {/* Incensário suspenso */}
-        <g transform="translate(33, 39)">
+        <circle cx="21.5" cy="9.5" r="2.6" fill="#10b981" />
+        {/* Braço e Incensário dourado */}
+        <path
+          d="M29 40 C35 44, 39 48, 41 51"
+          stroke={`url(#${id('clayRedVelvet')})`}
+          strokeWidth="6.2"
+          strokeLinecap="round"
+        />
+        <g transform="translate(42, 51)" className="natal-ornament-sway">
+          <line x1="0" y1="0" x2="0" y2="9" stroke="#fde047" strokeWidth="1.4" />
+          <ellipse cx="0" cy="12.5" rx="5" ry="4.5" fill={`url(#${id('clayGold3D')})`} />
           <path
-            d="M-3 -3 L4 11"
-            stroke="#fde047"
-            strokeWidth="1.1"
-          />
-          <path
-            d="M1 11 C3 8, 8 8, 10 11 C10 16, 7 18, 5.5 18 C4 18, 1 16, 1 11 Z"
-            fill={`url(#${id('goldTrim')})`}
-          />
-          {/* Fumaça suave de incenso subindo */}
-          <path
-            d="M5.5 7 C3 3, 8 -1, 5.5 -6"
+            d="M0 7 C-2 3, 3 -2, 0 -7"
             stroke="#e2e8f0"
-            strokeWidth="1.6"
+            strokeWidth="2"
             strokeLinecap="round"
             fill="none"
             className="natal-incense-float"
@@ -497,54 +622,59 @@ function ThreeWiseMenCaravan({
         </g>
       </g>
 
-      {/* Mago 3: Baltazar (manto esmeralda + lanterna luminosa guiando o caminho) */}
-      <g transform="translate(104, 14)">
-        <ellipse cx="21" cy="94" rx="17" ry="4" fill="#64748b" opacity="0.3" />
-        {/* Halo aconchegante da lanterna na neve */}
+      {/* Mago 3: Baltazar (Clay Esmeralda + Gola Dourada + Vaso de Mirra + Lanterna Quente) */}
+      <g transform="translate(112, 8)" filter={`url(#${id('clayShadow')})`}>
+        <ellipse cx="21" cy="97" rx="21" ry="4.8" fill="#64748b" opacity="0.3" />
         <circle
-          cx="39"
-          cy="62"
-          r="20"
+          cx="43"
+          cy="66"
+          r="24"
           fill={`url(#${id('hearthGlow')})`}
           className="natal-hearth-breath"
         />
         <path
-          d="M14 24 C6 46, 4 72, 6 92 C16 95, 27 95, 34 91 C32 68, 29 46, 26 24 Z"
-          fill={`url(#${id('robeEmerald')})`}
+          d="M10 31 C6 50, 5 74, 7 93 C15 98, 29 98, 36 93 C38 74, 34 50, 30 31 Z"
+          fill={`url(#${id('clayEmerald3D')})`}
         />
         <path
-          d="M16 25 C12 44, 10 68, 13 91"
-          stroke="#34d399"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          fill="none"
-          opacity="0.55"
-        />
-        <circle cx="20.5" cy="14" r="5.8" fill="#8d5524" />
-        <path
-          d="M13.5 11.5 C15 6.5, 25 6.5, 27.5 11.5"
-          stroke="#facc15"
-          strokeWidth="2.6"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Braço segurando lanterna oscilante e vaso de mirra */}
-        <path
-          d="M24 30 C30 35, 34 40, 38 44"
-          stroke="#0f766e"
-          strokeWidth="4.4"
+          d="M10 31 C15 37, 26 37, 31 31"
+          stroke={`url(#${id('clayGold3D')})`}
+          strokeWidth="3.6"
           strokeLinecap="round"
           fill="none"
         />
-        <g transform="translate(38, 44)" className="natal-ornament-sway">
-          <line x1="0" y1="0" x2="0" y2="7" stroke="#facc15" strokeWidth="1.2" />
-          <path
-            d="M-4 7 L4 7 L5 16 L-5 16 Z"
+        <CuteClayFace
+          cx={20.5}
+          cy={19.5}
+          skinFill={`url(#${id('claySkinDeep')})`}
+          cheeksOpacity={0.35}
+          noseColor="#6b3e1f"
+        />
+        {/* Coroa curvada dourada */}
+        <path
+          d="M12 13 C12 8, 28 8, 29 13 C25 15, 16 15, 12 13 Z"
+          fill={`url(#${id('clayGold3D')})`}
+        />
+        <path
+          d="M27 38 C34 42, 38 46, 41 49"
+          stroke={`url(#${id('clayEmerald3D')})`}
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+        {/* Lanterna 3D quente oscilante */}
+        <g transform="translate(42, 49)" className="natal-ornament-sway">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#facc15" strokeWidth="1.5" />
+          <rect
+            x="-5.5"
+            y="6"
+            width="11"
+            height="12"
+            rx="3.5"
             fill="#fef08a"
             stroke="#92400e"
-            strokeWidth="1.2"
+            strokeWidth="1.6"
           />
-          <circle cx="0" cy="11.5" r="2.2" fill="#ffffff" />
+          <circle cx="0" cy="12" r="3" fill="#ffffff" />
         </g>
       </g>
     </g>
@@ -552,8 +682,8 @@ function ThreeWiseMenCaravan({
 }
 
 /**
- * Estábulo de Belém com Menino Jesus na Manjedoura, Maria, José com lanterna,
- * cordeirinho sereno e telhado curvo coberto por neve macia.
+ * Presépio Clay-3D: Estábulo de madeira arredondada com neve fofa de marshmallow,
+ * clarão acolhedor animado, Maria, José, Menino Jesus dormindo na palha e ovelhinha fofa.
  */
 function BethlehemNativityStable({
   x,
@@ -569,251 +699,261 @@ function BethlehemNativityStable({
   const id = makeId(prefix);
   return (
     <g transform={`translate(${x}, ${y}) scale(${scale})`}>
-      {/* Tamareira de Belém curvando suavemente atrás da cabana */}
-      <g opacity="0.48">
-        <path
-          d="M24 132 C16 95, 10 62, 18 32"
-          stroke="#3f2718"
-          strokeWidth="5"
-          strokeLinecap="round"
-          fill="none"
-        />
-        <path
-          d="M18 32 C4 20, -10 26, -18 38 M18 32 C6 14, -4 10, -14 14 M18 32 C26 15, 38 14, 48 22 M18 32 C32 28, 42 36, 46 46"
-          stroke="#064e3b"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          fill="none"
-        />
-      </g>
-
-      {/* Clarão dourado acolhedor emanando da Manjedoura */}
+      {/* Clarão dourado vivo de dentro da manjedoura */}
       <circle
-        cx="112"
+        cx="114"
         cy="98"
-        r="86"
+        r="92"
         fill={`url(#${id('hearthGlow')})`}
         className="natal-hearth-breath"
       />
+      <ellipse cx="114" cy="145" rx="96" ry="10" fill="#64748b" opacity="0.32" />
 
-      {/* Sombra macia do abrigo na neve */}
-      <ellipse cx="112" cy="144" rx="92" ry="9" fill="#64748b" opacity="0.32" />
-
-      {/* Parede traseira orgânica sombreada do estábulo */}
+      {/* Interior aquecido sombreado */}
       <path
-        d="M28 56 C58 34, 88 20, 112 10 C136 20, 166 34, 196 56 L194 140 L30 140 Z"
-        fill="#1e150e"
-        opacity="0.82"
+        d="M26 58 C56 36, 86 20, 114 10 C142 20, 172 36, 202 58 L200 142 L28 142 Z"
+        fill="#24170e"
+        opacity="0.88"
       />
-      {/* Ripas rústicas sutis no fundo */}
       <path
-        d="M58 44 L58 138 M84 28 L84 138 M140 28 L140 138 M166 44 L166 138"
-        stroke="#2c1d12"
-        strokeWidth="1.6"
-        opacity="0.55"
+        d="M52 46 L52 140 M82 28 L82 140 M146 28 L146 140 M176 46 L176 140"
+        stroke="#362315"
+        strokeWidth="2.5"
+        opacity="0.6"
       />
 
-      {/* Colunas de madeira natural curvada */}
-      <path
-        d="M34 54 C33 82, 34 110, 32 140"
-        stroke="#6b3410"
-        strokeWidth="8.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M190 54 C191 82, 189 110, 192 140"
-        stroke="#6b3410"
-        strokeWidth="8.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M34 66 L54 46 M190 66 L170 46"
-        stroke="#78350f"
-        strokeWidth="4.5"
-        strokeLinecap="round"
-      />
-
-      {/* Telhado de palha e madeira orgânica */}
-      <path
-        d="M14 60 C52 38, 84 22, 112 6 C140 22, 172 38, 210 60"
-        stroke="#854d0e"
-        strokeWidth="12"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Cobertor espesso e macio de neve sobre o telhado */}
-      <path
-        d="M12 56 C48 36, 82 20, 112 4 C142 20, 176 36, 212 56 C204 62, 194 60, 184 54 C162 42, 138 28, 112 16 C86 28, 62 42, 40 54 C30 60, 20 62, 12 56 Z"
-        fill="#f1f5f9"
-      />
-      {/* Pequenos pingentes de gelo cristalinos sob o beiral */}
-      <path
-        d="M24 58 L26 68 L28 58 M194 58 L196 67 L198 58"
-        fill="#bae6fd"
-        opacity="0.75"
-      />
-
-      {/* MARIA ajoelhada em oração à esquerda da Manjedoura */}
-      <g transform="translate(46, 62)">
-        <circle
-          cx="18"
-          cy="14"
-          r="12"
-          fill="none"
-          stroke="#fde047"
-          strokeWidth="1.4"
-          opacity="0.78"
-        />
-        {/* Manto azul esvoaçante curvado */}
+      {/* Troncos 3D grossos com pontas arredondadas */}
+      <g filter={`url(#${id('clayShadow')})`}>
         <path
-          d="M3 76 C6 48, 11 28, 20 22 C30 28, 35 48, 35 76 C24 80, 12 80, 3 76 Z"
-          fill={`url(#${id('maryMantle')})`}
-        />
-        {/* Véu claro em cascata sobre o ombro */}
-        <path
-          d="M11 16 C12 7, 25 6, 26 16 C27 32, 23 48, 16 54 C11 45, 9 30, 11 16 Z"
-          fill="#7dd3fc"
-          opacity="0.92"
-        />
-        <circle cx="20.5" cy="15.5" r="5" fill="#fed7aa" />
-        {/* Mãos unidas suavemente em direção à manjedoura */}
-        <path
-          d="M23 36 C28 38, 31 41, 32 44"
-          stroke="#fed7aa"
-          strokeWidth="3.2"
+          d="M32 54 C30 82, 32 112, 30 142"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="11"
           strokeLinecap="round"
+        />
+        <path
+          d="M196 54 C198 82, 196 112, 198 142"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="11"
+          strokeLinecap="round"
+        />
+        {/* Telhado rústico espesso 3D */}
+        <path
+          d="M10 62 C50 38, 84 22, 114 4 C144 22, 178 38, 218 62"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="14"
+          strokeLinecap="round"
+          fill="none"
+        />
+        {/* Almofada espessa de neve macia sobre o telhado */}
+        <path
+          d="M8 57 C46 35, 82 18, 114 1 C146 18, 182 35, 220 57 C216 66, 200 66, 186 58 C162 44, 138 30, 114 16 C90 30, 66 44, 42 58 C28 66, 12 66, 8 57 Z"
+          fill={`url(#${id('claySnowWhite')})`}
         />
       </g>
 
-      {/* MANJEDOURA COM PALHA DOURADA E MENINO JESUS */}
-      <g transform="translate(88, 92)">
-        {/* Pernas em X entalhadas em madeira */}
-        <path
-          d="M10 22 L42 48 M42 22 L10 48"
-          stroke="#78350f"
-          strokeWidth="4"
-          strokeLinecap="round"
-        />
-        {/* Berço de tábuas curvas */}
-        <path
-          d="M4 18 C16 20, 36 20, 48 18 L43 32 C32 34, 20 34, 9 32 Z"
-          fill="#92400e"
-          stroke="#451a03"
-          strokeWidth="1.2"
-        />
-        {/* Fios dourados de palha saindo do berço */}
-        <path
-          d="M4 18 C12 8, 24 6, 32 14 C38 7, 45 10, 48 18 Z"
-          fill="#facc15"
-        />
-        <path
-          d="M6 16 L14 9 M19 14 L23 7 M30 14 L36 8 M39 16 L46 11"
-          stroke="#fef08a"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
-        {/* Auréola celeste e Menino Jesus em panos brancos */}
+      {/* MARIA Clay-3D ajoelhada com rosto expressivo, auréola e manto azul-celeste */}
+      <g transform="translate(46, 56)" filter={`url(#${id('clayShadow')})`}>
         <circle
-          cx="25"
+          cx="21"
+          cy="19"
+          r="14.5"
+          fill="none"
+          stroke="#fde047"
+          strokeWidth="1.8"
+          opacity="0.82"
+        />
+        {/* Corpo curvado fofo */}
+        <path
+          d="M4 82 C6 52, 12 32, 22 26 C32 32, 38 52, 38 82 C26 87, 14 87, 4 82 Z"
+          fill={`url(#${id('clayMaryBlue')})`}
+        />
+        {/* Manto claro curvado emoldurando o rosto */}
+        <path
+          d="M9 19 C9 6, 33 6, 33 19 C33 34, 28 52, 21 58 C14 52, 9 34, 9 19 Z"
+          fill="#60a5fa"
+        />
+        <CuteClayFace
+          cx={21}
+          cy={20}
+          skinFill={`url(#${id('claySkinLight')})`}
+          noseColor="#f4a261"
+        />
+        {/* Mãos rosadas postas em oração */}
+        <ellipse
+          cx="32"
+          cy="44"
+          rx="4.5"
+          ry="3.2"
+          transform="rotate(-18 32 44)"
+          fill={`url(#${id('claySkinLight')})`}
+        />
+      </g>
+
+      {/* MANJEDOURA 3D + MENINO JESUS DORMINDO NA PALHA */}
+      <g transform="translate(90, 92)" filter={`url(#${id('claySoftShadow')})`}>
+        {/* Pernas grossas 3D em X */}
+        <path
+          d="M9 22 L43 50 M43 22 L9 50"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="5.2"
+          strokeLinecap="round"
+        />
+        {/* Palha fofa dourada */}
+        <path
+          d="M2 18 C11 6, 24 4, 34 12 C42 6, 48 10, 50 18 Z"
+          fill={`url(#${id('clayGold3D')})`}
+        />
+        {/* Auréola e Menino Jesus com rostinho doce dormindo */}
+        <circle
+          cx="26"
           cy="11"
-          r="13"
+          r="16"
           fill={`url(#${id('hearthGlow')})`}
           className="natal-hearth-breath"
         />
         <ellipse
-          cx="29"
-          cy="14.5"
-          rx="11"
-          ry="5.2"
-          fill="#ffffff"
-          stroke="#e2e8f0"
-          strokeWidth="1"
+          cx="30"
+          cy="15"
+          rx="12.5"
+          ry="6"
+          fill={`url(#${id('claySnowWhite')})`}
         />
+        <CuteClayFace
+          cx={17}
+          cy={11}
+          skinFill={`url(#${id('claySkinLight')})`}
+          noseColor="#f4a261"
+          isSleeping
+        />
+        {/* Berço de madeira curvado 3D na frente da palha */}
         <path
-          d="M22 12 C26 15, 31 15, 36 12"
-          stroke="#cbd5e1"
-          strokeWidth="1"
-          fill="none"
+          d="M2 18 C16 21, 36 21, 50 18 C48 30, 44 33, 41 34 C30 36, 22 36, 11 34 C8 33, 4 30, 2 18 Z"
+          fill={`url(#${id('clayBrown')})`}
         />
-        <circle cx="17.5" cy="11.5" r="4.6" fill="#fed7aa" />
       </g>
 
-      {/* Cordeirinho sereno descansando na neve ao pé da Manjedoura */}
-      <g transform="translate(136, 124)">
-        <ellipse cx="10" cy="8" rx="9" ry="6" fill="#f8fafc" />
-        <circle cx="4" cy="6" r="4.2" fill="#ffffff" />
-        <circle cx="15" cy="6" r="4.5" fill="#ffffff" />
-        <circle cx="19" cy="4" r="3.2" fill="#fed7aa" />
-        <ellipse cx="16.5" cy="3.2" rx="2.2" ry="1.2" transform="rotate(-25 16.5 3.2)" fill="#e2e8f0" />
+      {/* Cordeirinho 3D de algodão doce descansando na neve */}
+      <g transform="translate(139, 121)" filter={`url(#${id('claySoftShadow')})`}>
+        <ellipse cx="11" cy="11" rx="9" ry="6.5" fill={`url(#${id('claySnowWhite')})`} />
+        <circle cx="5" cy="9" r="5" fill="#ffffff" />
+        <circle cx="15" cy="8" r="5.5" fill="#ffffff" />
+        <circle cx="20" cy="6" r="4.2" fill={`url(#${id('claySkinLight')})`} />
+        <circle cx="21.5" cy="5.5" r="0.9" fill="#1c1917" />
+        <ellipse cx="16.5" cy="5" rx="2.6" ry="1.4" transform="rotate(-30 16.5 5)" fill="#e2e8f0" />
       </g>
 
-      {/* JOSÉ protetor com cajado e lanterna acesa à direita */}
-      <g transform="translate(148, 48)">
+      {/* JOSÉ Clay-3D protetor com cajado e lanterna acesa */}
+      <g transform="translate(150, 44)" filter={`url(#${id('clayShadow')})`}>
         <circle
-          cx="17"
-          cy="14"
-          r="12"
+          cx="20"
+          cy="19"
+          r="14"
           fill="none"
           stroke="#fde047"
-          strokeWidth="1.3"
-          opacity="0.72"
-        />
-        {/* Manto castanho-dourado com dobras */}
-        <path
-          d="M5 88 C6 54, 10 30, 18 24 C27 30, 31 54, 31 88 C21 91, 12 91, 5 88 Z"
-          fill="#9a3412"
-        />
-        <path
-          d="M7 26 C14 38, 22 38, 28 26 L29 58 C20 62, 12 62, 6 58 Z"
-          fill="#d97706"
+          strokeWidth="1.6"
           opacity="0.78"
         />
-        <circle cx="17.5" cy="15.5" r="5.4" fill="#fed7aa" />
-        {/* Capuz e barba de José */}
         <path
-          d="M11 14 C11 6, 24 6, 24 14"
+          d="M5 94 C6 58, 10 34, 21 28 C31 34, 36 58, 36 94 C24 99, 13 99, 5 94 Z"
+          fill={`url(#${id('clayJosephOchre')})`}
+        />
+        <path
+          d="M7 30 C16 42, 26 42, 33 30 L34 62 C24 66, 15 66, 7 62 Z"
+          fill="#7c2d12"
+          opacity="0.65"
+        />
+        <CuteClayFace
+          cx={20.5}
+          cy={20}
+          skinFill={`url(#${id('claySkinMedium')})`}
+          noseColor="#c97a4b"
+        />
+        {/* Capuz fofo & barba */}
+        <path
+          d="M11 16 C11 6, 30 6, 30 16"
           stroke="#7c2d12"
-          strokeWidth="4.2"
+          strokeWidth="5.2"
           strokeLinecap="round"
           fill="none"
         />
         <path
-          d="M13 18 C15 23, 20 23, 22 18"
+          d="M13 22 C13 30, 28 30, 28 22 C24 24, 17 24, 13 22 Z"
           fill="#5c3a21"
         />
-        {/* Cajado de pastor + lanterna quente balançando */}
+        {/* Cajado de madeira 3D + lanterna quente */}
         <path
-          d="M34 15 L31 88"
-          stroke="#92400e"
-          strokeWidth="2.8"
+          d="M39 18 L36 95"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="3.8"
           strokeLinecap="round"
         />
         <path
-          d="M27 15 C31 6, 39 6, 40 16"
-          stroke="#92400e"
-          strokeWidth="2.8"
+          d="M31 18 C35 8, 45 8, 46 20"
+          stroke={`url(#${id('clayBrown')})`}
+          strokeWidth="3.8"
           strokeLinecap="round"
           fill="none"
         />
-        <g transform="translate(39, 17)" className="natal-ornament-sway">
-          <line x1="0" y1="0" x2="0" y2="6" stroke="#facc15" strokeWidth="1.2" />
-          <path
-            d="M-3.5 6 L3.5 6 L4.5 14 L-4.5 14 Z"
+        <g transform="translate(46, 21)" className="natal-ornament-sway">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#facc15" strokeWidth="1.4" />
+          <rect
+            x="-4.5"
+            y="6"
+            width="9"
+            height="10"
+            rx="3"
             fill="#fde047"
             stroke="#78350f"
-            strokeWidth="1.1"
+            strokeWidth="1.3"
           />
-          <circle cx="0" cy="10" r="2" fill="#ffffff" />
+          <circle cx="0" cy="11" r="2.4" fill="#ffffff" />
         </g>
       </g>
     </g>
   );
 }
 
+/** Biscoito Gingerbread 3D fofo inspirado diretamente na Imagem 2. */
+function Gingerbread3D({
+  x,
+  y,
+  scale = 1,
+  rotate = 0,
+  prefix,
+}: {
+  x: number;
+  y: number;
+  scale?: number;
+  rotate?: number;
+  prefix: string;
+}) {
+  const id = makeId(prefix);
+  return (
+    <g
+      transform={`translate(${x}, ${y}) rotate(${rotate}) scale(${scale})`}
+      filter={`url(#${id('claySoftShadow')})`}
+      className="natal-bauble-swing"
+    >
+      {/* Corpo arredondado de biscoito de gengibre 3D */}
+      <path
+        d="M0 -13 C4.5 -13 7 -9.5 7 -6 C7 -3.5 5.5 -2 4 -1 C8 -1 12 0 13 2.5 C13.5 4.5 11 6 7 5.5 C6 9 7.5 13 8.5 16 C9 18.5 5.5 19.5 4 17.5 C2.5 15.5 1 13 0 12.5 C-1 13 -2.5 15.5 -4 17.5 C-5.5 19.5 -9 18.5 -8.5 16 C-7.5 13 -6 9 -7 5.5 C-11 6 -13.5 4.5 -13 2.5 C-12 0 -8 -1 -4 -1 C-5.5 -2 -7 -3.5 -7 -6 C-7 -9.5 -4.5 -13 0 -13 Z"
+        fill={`url(#${id('clayGingerbread')})`}
+      />
+      {/* Olhinhos, sorriso e botões de glacê branco */}
+      <circle cx="-2.2" cy="-7" r="1" fill="#ffffff" />
+      <circle cx="2.2" cy="-7" r="1" fill="#ffffff" />
+      <path d="M-2.2 -4.2 Q0 -2.6 2.2 -4.2" stroke="#ffffff" strokeWidth="1.1" strokeLinecap="round" fill="none" />
+      <circle cx="0" cy="2.2" r="1.2" fill="#ef4444" />
+      <circle cx="0" cy="6.2" r="1.2" fill="#ffffff" />
+      <path d="M-9.5 2 L-8 4.8 M8 4.8 L9.5 2" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" />
+    </g>
+  );
+}
+
 /**
- * Árvore de Natal Majestosa & Esculpida (ZERO triângulos retos):
- * Galhos orgânicos ondulados em 6 camadas sombreadas, festões curvos, bolinhas 3D,
- * lâmpadas LED alternadas, neve nos galhos e presentes com laços na base.
+ * Árvore de Natal Clay-3D (Modelada exatamente pela Referência 2 enviada pelo usuário):
+ * Lobos almofadados 3D empilhados com sombras de oclusão, estrela dourada chanfrada no topo,
+ * fios escuros com lâmpadas ciano/pink/amarelo neon, biscoitos gingerbread, bengalas doces e bolinhas listradas!
  */
 function OrnateChristmasTree({
   x,
@@ -828,210 +968,192 @@ function OrnateChristmasTree({
 }) {
   const id = makeId(prefix);
 
-  // Galhos orgânicos recortados em curvas Bezier (sem lados retos de triângulo)
-  const boughs = [
-    {
-      path: 'M0 158 C-34 176, -68 188, -104 226 C-76 234, -52 222, -26 234 C-10 240, 10 240, 26 234 C52 222, 76 234, 104 226 C68 188, 34 176, 0 158 Z',
-      fill: `url(#${id('pineTierDark')})`,
-    },
-    {
-      path: 'M0 124 C-28 142, -58 156, -88 192 C-62 200, -40 190, -18 200 C-4 206, 4 206, 18 200 C40 190, 62 200, 88 192 C58 156, 28 142, 0 124 Z',
-      fill: `url(#${id('pineTierMid')})`,
-    },
-    {
-      path: 'M0 92 C-24 110, -48 124, -72 156 C-50 163, -32 155, -14 164 C-4 168, 4 168, 14 164 C32 155, 50 163, 72 156 C48 124, 24 110, 0 92 Z',
-      fill: `url(#${id('pineTierDark')})`,
-    },
-    {
-      path: 'M0 64 C-20 80, -38 92, -56 120 C-38 126, -24 119, -10 127 C-2 130, 2 130, 10 127 C24 119, 38 126, 56 120 C38 92, 20 80, 0 64 Z',
-      fill: `url(#${id('pineTierMid')})`,
-    },
-    {
-      path: 'M0 36 C-15 50, -28 62, -40 86 C-26 91, -15 86, 0 92 C15 86, 26 91, 40 86 C28 62, 15 50, 0 36 Z',
-      fill: `url(#${id('pineTierBright')})`,
-    },
-  ];
-
-  const bulbs = [
-    { bx: -14, by: 76, p: 0 },
-    { bx: 15, by: 82, p: 1 },
-    { bx: -30, by: 108, p: 2 },
-    { bx: 2, by: 115, p: 3 },
-    { bx: 32, by: 112, p: 4 },
-    { bx: -45, by: 145, p: 1 },
-    { bx: -12, by: 151, p: 0 },
-    { bx: 20, by: 148, p: 2 },
-    { bx: 48, by: 144, p: 3 },
-    { bx: -60, by: 184, p: 4 },
-    { bx: -24, by: 192, p: 1 },
-    { bx: 16, by: 191, p: 0 },
-    { bx: 58, by: 182, p: 2 },
-    { bx: -72, by: 222, p: 3 },
-    { bx: -28, by: 229, p: 2 },
-    { bx: 28, by: 228, p: 4 },
-    { bx: 74, by: 221, p: 1 },
-  ];
-
-  const baubles = [
-    { cx: -21, cy: 96, r: 5.2, type: 'baubleRuby' },
-    { cx: 19, cy: 102, r: 4.8, type: 'baubleGold' },
-    { cx: -38, cy: 132, r: 5.8, type: 'baubleIce' },
-    { cx: 6, cy: 134, r: 5.4, type: 'baubleRuby' },
-    { cx: 36, cy: 130, r: 5.2, type: 'baubleGold' },
-    { cx: -50, cy: 170, r: 6.2, type: 'baubleGold' },
-    { cx: -8, cy: 175, r: 6, type: 'baubleRuby' },
-    { cx: 38, cy: 172, r: 6, type: 'baubleIce' },
-    { cx: -64, cy: 208, r: 6.4, type: 'baubleRuby' },
-    { cx: -16, cy: 214, r: 6.2, type: 'baubleGold' },
-    { cx: 34, cy: 213, r: 6.2, type: 'baubleRuby' },
-    { cx: 68, cy: 206, r: 5.8, type: 'baubleIce' },
+  // Luzes neon sobre os fios escuros (exatamente nas cores ciano #22d3ee, pink #f43f5e/#ec4899 e ouro #fde047 da Imagem 2)
+  const wireBulbs = [
+    // Fio 1 (topo)
+    { x: -24, y: 74, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 0 },
+    { x: -1, y: 80, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 1 },
+    { x: 22, y: 78, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 0 },
+    // Fio 2
+    { x: -46, y: 108, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 1 },
+    { x: -20, y: 117, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 0 },
+    { x: 10, y: 119, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 1 },
+    { x: 40, y: 112, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 0 },
+    // Fio 3
+    { x: -64, y: 152, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 0 },
+    { x: -34, y: 162, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 1 },
+    { x: -2, y: 164, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 0 },
+    { x: 32, y: 161, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 1 },
+    { x: 64, y: 151, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 0 },
+    // Fio 4
+    { x: -82, y: 194, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 1 },
+    { x: -48, y: 204, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 0 },
+    { x: -10, y: 208, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 1 },
+    { x: 30, y: 207, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 0 },
+    { x: 70, y: 198, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 1 },
+    // Fio 5 (base)
+    { x: -96, y: 229, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 0 },
+    { x: -58, y: 238, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 1 },
+    { x: 4, y: 243, c: '#fde047', g: 'rgba(253,224,71,0.88)', p: 0 },
+    { x: 48, y: 241, c: '#22d3ee', g: 'rgba(34,211,238,0.85)', p: 1 },
+    { x: 92, y: 231, c: '#ec4899', g: 'rgba(236,72,153,0.88)', p: 0 },
   ];
 
   return (
     <g transform={`translate(${x}, ${y}) scale(${scale})`}>
-      {/* Reflexo caloroso da árvore sobre a neve */}
-      <ellipse cx="0" cy="254" rx="108" ry="16" fill="#64748b" opacity="0.28" />
-      <ellipse cx="0" cy="250" rx="88" ry="12" fill={`url(#${id('hearthGlow')})`} opacity="0.48" />
+      {/* Sombra suave na neve + reflexo quente */}
+      <ellipse cx="0" cy="272" rx="112" ry="15" fill="#64748b" opacity="0.3" />
 
-      {/* Tronco orgânico esculpido com base enraizada */}
+      {/* Vaso/Tronco 3D marrom robusto (estilo Imagem 2) */}
       <path
-        d="M-13 218 C-12 230, -14 244, -20 254 L20 254 C14 244, 12 230, 13 218 Z"
-        fill="#5c2d0c"
-      />
-
-      {/* Camadas orgânicas dos galhos */}
-      {boughs.map((b, i) => (
-        <path key={`bough-${i}`} d={b.path} fill={b.fill} />
-      ))}
-
-      {/* Toques sutis de neve repousando nos galhos superiores */}
-      <path
-        d="M-38 84 C-26 88, -16 84, -8 87 M12 85 C22 88, 30 84, 38 84 M-68 154 C-52 159, -38 154, -24 157 M28 155 C44 158, 56 153, 70 154 M-96 223 C-78 229, -62 220, -44 225 M44 224 C62 228, 78 220, 98 223"
-        stroke="#e0f2fe"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        fill="none"
-        opacity="0.58"
+        d="M-22 238 L22 238 L17 270 C10 274, -10 274, -17 270 Z"
+        fill={`url(#${id('clayBrown')})`}
+        filter={`url(#${id('clayShadow')})`}
       />
 
-      {/* Festões sedosos dourados & vermelhos em curvas naturais */}
-      <path
-        d="M-26 76 C-8 90, 10 90, 28 78"
-        stroke={`url(#${id('goldTrim')})`}
-        strokeWidth="3.2"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M-48 114 C-14 132, 16 132, 48 112"
-        stroke="#dc2626"
-        strokeWidth="3.6"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M-66 150 C-18 172, 20 172, 66 148"
-        stroke={`url(#${id('goldTrim')})`}
-        strokeWidth="3.8"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M-84 188 C-26 212, 28 212, 84 186"
-        stroke="#dc2626"
-        strokeWidth="4"
-        strokeLinecap="round"
-        fill="none"
-      />
+      {/* === CAMADA 5 (BASE - 5 lobos almofadados 3D arredondados) === */}
+      <g filter={`url(#${id('clayShadow')})`}>
+        <path
+          d="M-38 186 C-72 204, -104 222, -110 236 C-112 248, -88 256, -66 244 C-56 238, -42 252, -26 248 C-16 256, 16 256, 26 248 C42 252, 56 238, 66 244 C88 256, 112 248, 110 236 C104 222, 72 204, 38 186 Z"
+          fill={`url(#${id('clayPineDeep')})`}
+        />
+        {/* Almofada central direita/esquerda para volume extra */}
+        <ellipse cx="-32" cy="236" rx="22" ry="16" fill={`url(#${id('clayPineMid')})`} />
+        <ellipse cx="32" cy="236" rx="22" ry="16" fill={`url(#${id('clayPineMid')})`} />
+        <ellipse cx="0" cy="238" rx="24" ry="17" fill={`url(#${id('clayPineTop')})`} />
+      </g>
 
-      {/* Bolinhas 3D sombreadas com reflexo */}
-      {baubles.map((b, i) => (
-        <g key={`bauble-${i}`}>
-          <rect x={b.cx - 1.6} y={b.cy - b.r - 2} width="3.2" height="2.6" rx="0.8" fill="#facc15" />
-          <circle cx={b.cx} cy={b.cy} r={b.r} fill={`url(#${id(b.type)})`} />
-          <path
-            d={`M${b.cx - b.r * 0.45} ${b.cy - b.r * 0.15} C${b.cx - b.r * 0.45} ${b.cy - b.r * 0.55}, ${b.cx - b.r * 0.1} ${b.cy - b.r * 0.55}, ${b.cx + b.r * 0.1} ${b.cy - b.r * 0.45}`}
-            stroke="#ffffff"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            fill="none"
-            opacity="0.7"
-          />
+      {/* Bengalas doces listradas encaixadas nos galhos inferiores */}
+      <g transform="translate(-38, 224) rotate(24)" filter={`url(#${id('claySoftShadow')})`}>
+        <path d="M0 24 L0 6 C0 -2, 10 -2, 10 6" stroke="#ffffff" strokeWidth="5.2" strokeLinecap="round" fill="none" />
+        <path d="M0 24 L0 6 C0 -2, 10 -2, 10 6" stroke="#dc2626" strokeWidth="5.2" strokeDasharray="4.5 4.5" strokeLinecap="round" fill="none" />
+      </g>
+      <g transform="translate(36, 178) rotate(-32)" filter={`url(#${id('claySoftShadow')})`}>
+        <path d="M0 24 L0 6 C0 -2, 10 -2, 10 6" stroke="#ffffff" strokeWidth="4.8" strokeLinecap="round" fill="none" />
+        <path d="M0 24 L0 6 C0 -2, 10 -2, 10 6" stroke="#dc2626" strokeWidth="4.8" strokeDasharray="4.5 4.5" strokeLinecap="round" fill="none" />
+      </g>
+
+      {/* === CAMADA 4 === */}
+      <g filter={`url(#${id('clayShadow')})`}>
+        <path
+          d="M-32 146 C-62 164, -90 184, -94 198 C-96 210, -74 216, -54 206 C-42 216, -18 216, 0 208 C18 216, 42 216, 54 206 C74 216, 96 210, 94 198 C90 184, 62 164, 32 146 Z"
+          fill={`url(#${id('clayPineMid')})`}
+        />
+        <ellipse cx="-24" cy="198" rx="20" ry="14" fill={`url(#${id('clayPineTop')})`} />
+        <ellipse cx="24" cy="198" rx="20" ry="14" fill={`url(#${id('clayPineTop')})`} />
+      </g>
+
+      {/* === CAMADA 3 === */}
+      <g filter={`url(#${id('clayShadow')})`}>
+        <path
+          d="M-24 108 C-50 126, -72 146, -76 159 C-78 170, -56 176, -38 167 C-22 178, 22 178, 38 167 C56 176, 78 170, 76 159 C72 146, 50 126, 24 108 Z"
+          fill={`url(#${id('clayPineMid')})`}
+        />
+        <ellipse cx="0" cy="162" rx="22" ry="15" fill={`url(#${id('clayPineTop')})`} />
+      </g>
+
+      {/* === CAMADA 2 === */}
+      <g filter={`url(#${id('clayShadow')})`}>
+        <path
+          d="M-16 74 C-36 92, -52 108, -56 119 C-57 129, -40 134, -24 126 C-12 135, 12 135, 24 126 C40 134, 57 129, 56 119 C52 108, 36 92, 16 74 Z"
+          fill={`url(#${id('clayPineTop')})`}
+        />
+      </g>
+
+      {/* === CAMADA 1 (COPA ARREDONDADA FOFA) === */}
+      <g filter={`url(#${id('clayShadow')})`}>
+        <path
+          d="M0 38 C-14 58, -32 76, -34 86 C-35 95, -20 98, -10 92 C-4 97, 4 97, 10 92 C20 98, 35 95, 34 86 C32 76, 14 58, 0 38 Z"
+          fill={`url(#${id('clayPineTop')})`}
+        />
+      </g>
+
+      {/* Fios escuros festonados com lâmpadas ciano/pink/amarelo neon da Imagem 2 */}
+      <g stroke="#1c1917" strokeWidth="2.4" fill="none" strokeLinecap="round" opacity="0.88">
+        <path d="M-26 70 C-8 84, 10 84, 26 72" />
+        <path d="M-49 105 C-16 124, 18 124, 48 106" />
+        <path d="M-68 148 C-20 170, 22 170, 68 147" />
+        <path d="M-86 190 C-24 214, 26 214, 86 190" />
+        <path d="M-100 225 C-28 248, 30 248, 100 226" />
+      </g>
+
+      {/* Bulbos Neon 3D nos fios */}
+      {wireBulbs.map((b, i) => (
+        <g key={`wb-${i}`} className={b.p === 0 ? 'natal-led-odd' : 'natal-led-even'}>
+          {/* Soquete preto no fio */}
+          <rect x={b.x - 2.4} y={b.y - 4.5} width="4.8" height="4" rx="1" fill="#1c1917" />
+          {/* Halo colorido iluminando os galhos 3D */}
+          <circle cx={b.x} cy={b.y + 3} r="10.5" fill={b.g} opacity="0.48" filter={`url(#${id('softGlow')})`} />
+          <ellipse cx={b.x} cy={b.y + 3} rx="4" ry="4.8" fill={b.c} />
+          <ellipse cx={b.x - 1.2} cy={b.y + 1.5} rx="1.2" ry="1.8" fill="#ffffff" opacity="0.7" />
         </g>
       ))}
 
-      {/* Luzes LED piscantes */}
-      {bulbs.map((pt, i) => {
-        const pal = LED_PALETTE[pt.p % LED_PALETTE.length];
-        const cls = i % 2 === 0 ? 'natal-led-odd' : 'natal-led-even';
-        return (
-          <g key={`tl-${i}`} className={cls}>
-            <circle cx={pt.bx} cy={pt.by} r="7.5" fill={pal.glow} opacity="0.34" />
-            <circle cx={pt.bx} cy={pt.by} r="3.4" fill={pal.fill} />
-          </g>
-        );
-      })}
+      {/* Enfeites 3D da Referência 2: Gingerbread Men, Bolinhas Listradas & Rubis */}
+      <Gingerbread3D x={-16} y={66} scale={0.62} rotate={-10} prefix={prefix} />
+      <Gingerbread3D x={66} y={194} scale={0.76} rotate={12} prefix={prefix} />
+      <Gingerbread3D x={-7} y={199} scale={0.82} rotate={-4} prefix={prefix} />
 
-      {/* Estrela Dourada no Topo da Árvore */}
-      <g transform="translate(0, 28)" className="natal-star-twinkle">
-        <circle cx="0" cy="0" r="24" fill={`url(#${id('starAura')})`} />
+      {/* Bolinhas listradas & brilhantes 3D */}
+      <g filter={`url(#${id('claySoftShadow')})`} className="natal-bauble-swing">
+        <circle cx="-36" cy="128" r="8.2" fill={`url(#${id('clayBaubleRuby')})`} />
+        <path d="M-43 126 Q-36 129 -29 126 M-42 130 Q-36 133 -30 130" stroke="#ffffff" strokeWidth="2.1" fill="none" opacity="0.88" />
+        <circle cx="18" cy="134" r="8" fill={`url(#${id('clayBaubleRuby')})`} />
+        <path d="M11 132 Q18 135 25 132 M12 136 Q18 139 24 136" stroke="#ffffff" strokeWidth="2" fill="none" opacity="0.88" />
+        <circle cx="-26" cy="175" r="9.2" fill={`url(#${id('clayBaubleRuby')})`} />
+        <ellipse cx="-29" cy="171.5" rx="2.5" ry="1.4" transform="rotate(-30 -29 171.5)" fill="#ffffff" opacity="0.75" />
+        <circle cx="48" cy="222" r="8.4" fill={`url(#${id('clayBaubleBlue')})`} />
+        <ellipse cx="45" cy="219" rx="2.2" ry="1.2" transform="rotate(-30 45 219)" fill="#ffffff" opacity="0.78" />
+      </g>
+
+      {/* Estrela 3D Dourada Chanfrada no Topo (exatamente estilo Imagem 2) */}
+      <g transform="translate(0, 24)" filter={`url(#${id('clayShadow')})`} className="natal-star-twinkle">
+        <circle cx="0" cy="0" r="24" fill={`url(#${id('starAura')})`} opacity="0.65" />
         <path
-          d="M0 -18 C2 -5 4 -4 17 -4 C6 2 5 5 10 16 C1 8 -1 8 -10 16 C-5 5 -6 2 -17 -4 C-4 -4 -2 -5 0 -18 Z"
-          fill={`url(#${id('goldTrim')})`}
+          d="M0 -18 C2.5 -18 4.2 -7 5.5 -6 C7 -5 18 -6 19 -3.5 C19.5 -1 11 5.5 10.5 7 C10 9 14 18 11.5 19.5 C9 20.5 1.5 14.5 0 14.5 C-1.5 14.5 -9 20.5 -11.5 19.5 C-14 18 -10 9 -10.5 7 C-11 5.5 -19.5 -1 -19 -3.5 C-18 -6 -7 -5 -5.5 -6 C-4.2 -7 -2.5 -18 0 -18 Z"
+          fill={`url(#${id('clayGold3D')})`}
+        />
+        {/* Brilho macio no topo da estrela */}
+        <path
+          d="M-7 -4 Q0 -11 7 -4"
           stroke="#fef9c3"
-          strokeWidth="0.9"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          fill="none"
+          opacity="0.7"
         />
       </g>
 
-      {/* Presentes curvados em perspectiva 3D e laços ao pé da árvore */}
-      {/* Presente Esquerdo (Carmesim com laço dourado) */}
-      <g transform="translate(-62, 232)">
-        <path
-          d="M0 5 L16 0 L34 6 L18 11 Z"
-          fill="#ef4444"
-        />
-        <path
-          d="M0 5 L18 11 L18 27 L0 21 Z"
-          fill="#b91c1c"
-        />
-        <path
-          d="M18 11 L34 6 L34 22 L18 27 Z"
-          fill="#991b1b"
-        />
-        {/* Fitas douradas acompanhando os 3 planos */}
-        <path d="M8 2.5 L26 8.5 M26 8.5 L26 24.5 M8 8 L8 24 M8 8 L25 3" stroke="#facc15" strokeWidth="2.8" fill="none" />
-        {/* Laço fofo no topo */}
-        <path
-          d="M17 5 C11 -2, 8 2, 16 6 C24 2, 22 -2, 17 5 Z"
-          fill="#fde047"
-        />
+      {/* Presentes 3D almofadados com laços fofos na neve */}
+      <g transform="translate(-68, 246)" filter={`url(#${id('claySoftShadow')})`}>
+        <path d="M0 6 L16 0 L34 6 L18 12 Z" fill="#f87171" />
+        <path d="M0 6 L18 12 L18 28 L0 22 Z" fill="#dc2626" />
+        <path d="M18 12 L34 6 L34 22 L18 28 Z" fill="#991b1b" />
+        <path d="M8 3 L26 9 M26 9 L26 25 M8 9 L8 25" stroke="#fde047" strokeWidth="3.2" fill="none" />
+        <path d="M17 5 C9 -3, 6 2, 16 7 C26 2, 23 -3, 17 5 Z" fill={`url(#${id('clayGold3D')})`} />
       </g>
-
-      {/* Presente Central-Esquerdo (Azul Real com laço prata) */}
-      <g transform="translate(-26, 240)">
-        <path d="M0 4 L12 0 L26 5 L14 9 Z" fill="#3b82f6" />
-        <path d="M0 4 L14 9 L14 21 L0 16 Z" fill="#1d4ed8" />
-        <path d="M14 9 L26 5 L26 17 L14 21 Z" fill="#1e3a8a" />
-        <path d="M6 2 L20 7 M20 7 L20 19 M7 6.5 L7 18.5" stroke="#f8fafc" strokeWidth="2.2" fill="none" />
-        <path d="M13 4 C9 -1, 7 2, 13 5 C19 2, 17 -1, 13 4 Z" fill="#ffffff" />
+      <g transform="translate(-32, 254)" filter={`url(#${id('claySoftShadow')})`}>
+        <path d="M0 5 L13 0 L28 5 L15 10 Z" fill="#60a5fa" />
+        <path d="M0 5 L15 10 L15 23 L0 18 Z" fill="#2563eb" />
+        <path d="M15 10 L28 5 L28 18 L15 23 Z" fill="#1e3a8a" />
+        <path d="M6.5 2.5 L21.5 7.5 M21.5 7.5 L21.5 20.5 M7.5 7.5 L7.5 20.5" stroke="#f8fafc" strokeWidth="2.6" fill="none" />
+        <path d="M14 4 C9 -2, 6 2, 14 6 C22 2, 19 -2, 14 4 Z" fill="#ffffff" />
       </g>
-
-      {/* Presente Direito (Dourado & Esmeralda) */}
-      <g transform="translate(26, 234)">
-        <path d="M0 5 L15 0 L32 6 L17 11 Z" fill="#facc15" />
-        <path d="M0 5 L17 11 L17 26 L0 20 Z" fill="#d97706" />
-        <path d="M17 11 L32 6 L32 21 L17 26 Z" fill="#b45309" />
-        <path d="M7.5 2.5 L24.5 8.5 M24.5 8.5 L24.5 23.5 M8 8 L8 23" stroke="#16a34a" strokeWidth="2.8" fill="none" />
-        <path d="M16 5 C10 -2, 8 2, 16 6 C24 2, 22 -2, 16 5 Z" fill="#22c55e" />
+      <g transform="translate(32, 248)" filter={`url(#${id('claySoftShadow')})`}>
+        <path d="M0 6 L16 0 L34 6 L18 12 Z" fill="#fde047" />
+        <path d="M0 6 L18 12 L18 28 L0 22 Z" fill="#eab308" />
+        <path d="M18 12 L34 6 L34 22 L18 28 Z" fill="#b45309" />
+        <path d="M8 3 L26 9 M26 9 L26 25 M8 9 L8 25" stroke="#16a34a" strokeWidth="3.2" fill="none" />
+        <path d="M17 5 C9 -3, 6 2, 16 7 C26 2, 23 -3, 17 5 Z" fill="#22c55e" />
       </g>
     </g>
   );
 }
 
 /**
- * Papai Noel no Trenó Ornamentado levantando voo em formação diagonal
- * com 4 renas articuladas galopando (Rodolfo na ponta com farol vermelho vivo)
- * e rastro mágico contínuo saindo das pistas na neve.
+ * Papai Noel Clay-3D (modelado pela Referência 3: olhos brilhantes, nariz redondo fofo,
+ * barba nuvem, fivela dourada 3D, saco de presentes com azevinho e sino dourado),
+ * em trenó vitoriano 3D puxado por 4 renas fofas galopando rumo ao céu estrelado.
  */
 function SantaSleighTakeoffTeam({
   x,
@@ -1046,274 +1168,257 @@ function SantaSleighTakeoffTeam({
 }) {
   const id = makeId(prefix);
 
-  // 4 renas em formação dinâmica curva subindo para a direita superior
   const reindeerTeam = [
-    { rx: 145, ry: -24, phase: 0, lead: false },
+    { rx: 148, ry: -24, phase: 0, lead: false },
     { rx: 215, ry: -54, phase: 0.22, lead: false },
-    { rx: 285, ry: -86, phase: 0.44, lead: false },
-    { rx: 356, ry: -118, phase: 0.12, lead: true },
+    { rx: 282, ry: -86, phase: 0.44, lead: false },
+    { rx: 350, ry: -118, phase: 0.12, lead: true },
   ];
 
-  // Faíscas mágicas flutuantes ao longo do rastro
   const magicSparkles = [
-    { sx: -92, sy: 62, delay: '0.1s', r: 3.5 },
-    { sx: -48, sy: 48, delay: '0.7s', r: 4.5 },
-    { sx: -12, sy: 34, delay: '1.3s', r: 3.2 },
-    { sx: 38, sy: 16, delay: '0.4s', r: 4.2 },
-    { sx: -72, sy: 74, delay: '1.1s', r: 3 },
-    { sx: 14, sy: 46, delay: '1.7s', r: 3.8 },
+    { sx: -94, sy: 62, delay: '0.1s', r: 4 },
+    { sx: -52, sy: 48, delay: '0.7s', r: 5 },
+    { sx: -12, sy: 34, delay: '1.3s', r: 3.8 },
+    { sx: 36, sy: 16, delay: '0.4s', r: 4.5 },
+    { sx: -74, sy: 74, delay: '1.1s', r: 3.4 },
+    { sx: 14, sy: 46, delay: '1.7s', r: 4 },
   ];
 
   return (
     <g transform={`translate(${x}, ${y}) scale(${scale})`}>
-      {/* Rastro Mágico Duplo animado fluindo de baixo da neve até o trenó */}
+      {/* Rastro Mágico Duplo fluindo das pistas na neve */}
       <path
-        d="M-128 84 C-64 74, 8 54, 72 16"
+        d="M-130 86 C-64 76, 8 54, 72 16"
         stroke={`url(#${id('magicCometGold')})`}
-        strokeWidth="4.2"
+        strokeWidth="4.8"
         strokeDasharray="16 12"
         strokeLinecap="round"
         fill="none"
         className="natal-magic-trail"
       />
       <path
-        d="M-108 94 C-42 82, 24 62, 86 24"
+        d="M-110 96 C-42 84, 24 62, 86 24"
         stroke="#7dd3fc"
-        strokeWidth="2.4"
+        strokeWidth="2.8"
         strokeDasharray="10 14"
         strokeLinecap="round"
         fill="none"
-        opacity="0.65"
+        opacity="0.7"
         className="natal-magic-trail"
       />
 
-      {/* Partículas cintilantes atrás da decolagem */}
       {magicSparkles.map((sp, i) => (
         <path
           key={`sp-${i}`}
-          d={`M${sp.sx} ${sp.sy - sp.r} Q${sp.sx + 0.5} ${sp.sy - 0.5} ${sp.sx + sp.r} ${sp.sy} Q${sp.sx + 0.5} ${sp.sy + 0.5} ${sp.sx} ${sp.sy + sp.r} Q${sp.sx - 0.5} ${sp.sy + 0.5} ${sp.sx - sp.r} ${sp.sy} Q${sp.sx - 0.5} ${sp.sy - 0.5} ${sp.sx} ${sp.sy - sp.r} Z`}
+          d={`M${sp.sx} ${sp.sy - sp.r} Q${sp.sx + 0.6} ${sp.sy - 0.6} ${sp.sx + sp.r} ${sp.sy} Q${sp.sx + 0.6} ${sp.sy + 0.6} ${sp.sx} ${sp.sy + sp.r} Q${sp.sx - 0.6} ${sp.sy + 0.6} ${sp.sx - sp.r} ${sp.sy} Q${sp.sx - 0.6} ${sp.sy - 0.6} ${sp.sx} ${sp.sy - sp.r} Z`}
           fill={i % 2 === 0 ? '#fef08a' : '#bae6fd'}
           className="natal-star-twinkle"
           style={{ animationDelay: sp.delay }}
         />
       ))}
 
-      {/* Conjunto Trenó + Papai Noel + 4 Renas em voo fluido */}
+      {/* Conjunto Trenó + Papai Noel Clay-3D + 4 Renas Clay-3D */}
       <g className="natal-santa-flight">
-        {/* Rédeas douradas contínuas do Papai Noel até o arreio de cada rena */}
+        {/* Rédeas douradas até o arreio de cada rena */}
         <path
-          d="M54 -14 C105 -20, 128 -26, 158 -32 C192 -42, 212 -52, 228 -62 C262 -72, 282 -82, 298 -94 C332 -106, 354 -116, 368 -126"
+          d="M52 -15 C106 -22, 130 -27, 160 -32 C194 -43, 212 -52, 227 -62 C260 -73, 280 -83, 294 -94 C328 -106, 348 -116, 362 -126"
           stroke="#facc15"
-          strokeWidth="1.6"
+          strokeWidth="1.8"
           fill="none"
-          opacity="0.88"
+          opacity="0.9"
         />
 
-        {/* TRENÓ VITORIANO E PAPAI NOEL inclinados levantando voo (-18deg) */}
-        <g transform="translate(24, 0) rotate(-18)">
-          {/* Saco volumoso de veludo com brinquedos e presentes saindo */}
-          <path
-            d="M-38 -20 C-42 -42, -14 -48, -6 -24 C-2 -12, -10 -4, -32 -6 Z"
-            fill="#7f1d1d"
-          />
-          <path
-            d="M-28 -44 C-26 -48, -19 -48, -17 -43"
-            stroke="#facc15"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-          {/* Presentes em curva peeking do saco */}
-          <path d="M-36 -48 L-24 -52 L-21 -38 L-33 -34 Z" fill="#22c55e" />
-          <path d="M-30 -50 L-27 -36" stroke="#facc15" strokeWidth="2.2" />
-          <path d="M-22 -52 L-10 -50 L-12 -36 L-24 -38 Z" fill="#3b82f6" />
-          <path d="M-16 -51 L-18 -37" stroke="#f8fafc" strokeWidth="2.2" />
-          {/* Bengala doce natalina */}
-          <path
-            d="M-10 -42 C-7 -56, 1 -55, 0 -47"
-            stroke="#ffffff"
-            strokeWidth="3.2"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <path
-            d="M-10 -42 C-7 -56, 1 -55, 0 -47"
-            stroke="#ef4444"
-            strokeWidth="3.2"
-            strokeDasharray="3 3"
-            strokeLinecap="round"
-            fill="none"
-          />
-
-          {/* Papai Noel alegre acenando com barba esvoaçante */}
-          <g transform="translate(6, -34)">
-            {/* Corpo aconchegante vermelho com barra branca */}
-            <path
-              d="M-10 26 C-8 6, 14 4, 18 26 Z"
-              fill="#dc2626"
-            />
-            <path d="M-10 25 C-2 27, 10 27, 18 25" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
-            {/* Rosto rosado + barba branca ondulada ao vento */}
-            <circle cx="5" cy="4" r="6.8" fill="#fed7aa" />
-            <circle cx="7" cy="4" r="1.4" fill="#fb7185" />
-            <path
-              d="M-2 5 C0 18, 12 19, 13 6 C8 8, 2 8, -2 5 Z"
-              fill="#ffffff"
-            />
-            {/* Gorro macio dobrado para trás pelo vento */}
-            <path
-              d="M-3 0 C0 -14, 12 -14, 14 -1 C10 1, 2 1, -3 0 Z"
-              fill="#dc2626"
-            />
-            <path d="M-4 0 C1 -2, 10 -2, 14 0" stroke="#ffffff" strokeWidth="3.4" strokeLinecap="round" />
-            <circle cx="-6" cy="-7" r="2.8" fill="#ffffff" />
-            {/* Braço erguido acenando */}
-            <path
-              d="M12 12 C18 6, 24 0, 26 -6"
-              stroke="#dc2626"
-              strokeWidth="4.6"
-              strokeLinecap="round"
-              fill="none"
-            />
-            <circle cx="26.5" cy="-6.5" r="3" fill="#ffffff" />
+        {/* TRENÓ 3D & PAPAI NOEL CLAY-3D (Inspirado diretamente na Referência 3) */}
+        <g transform="translate(22, 0) rotate(-18)" filter={`url(#${id('clayShadow')})`}>
+          {/* Saco vermelho gordinho 3D com azevinho e sino dourado da Referência 3 */}
+          <g transform="translate(-26, -24)">
+            <ellipse cx="0" cy="4" rx="22" ry="18" fill={`url(#${id('clayRedVelvet')})`} />
+            {/* Folhas verdes 3D de azevinho e frutinhas no topo do saco */}
+            <ellipse cx="-6" cy="-14" rx="7" ry="4" transform="rotate(-24 -6 -14)" fill={`url(#${id('clayPineTop')})`} />
+            <ellipse cx="7" cy="-13" rx="7" ry="4" transform="rotate(24 7 -13)" fill={`url(#${id('clayPineTop')})`} />
+            <circle cx="-1" cy="-11" r="2.6" fill="#dc2626" />
+            <circle cx="3" cy="-12" r="2.4" fill="#ef4444" />
+            {/* Sino dourado 3D brilhando na bolsa */}
+            <g transform="translate(8, -22) rotate(14)">
+              <path d="M-5 8 C-5 2, 5 2, 5 8 L7 15 L-7 15 Z" fill={`url(#${id('clayGold3D')})`} />
+              <circle cx="0" cy="16" r="2.2" fill="#b45309" />
+            </g>
+            {/* Presente fofo e bengala doce saindo */}
+            <path d="M-16 -22 L-4 -25 L-1 -12 L-13 -9 Z" fill="#60a5fa" />
+            <path d="M-10 -24 L-7 -10" stroke="#ef4444" strokeWidth="2.4" />
+            <path d="M10 -16 C12 -30, 20 -29, 19 -21" stroke="#ffffff" strokeWidth="3.4" strokeLinecap="round" fill="none" />
+            <path d="M10 -16 C12 -30, 20 -29, 19 -21" stroke="#dc2626" strokeWidth="3.4" strokeDasharray="3.2 3.2" strokeLinecap="round" fill="none" />
           </g>
 
-          {/* Carroceria escultural vitoriana do trenó */}
+          {/* PAPAI NOEL CLAY-3D (Olhos com brilho, nariz redondo, bigode e barba nuvem, fivela 3D!) */}
+          <g transform="translate(6, -34)">
+            {/* Tronco fofo vermelho */}
+            <path
+              d="M-14 30 C-14 8, 18 6, 22 30 Z"
+              fill={`url(#${id('clayRedVelvet')})`}
+            />
+            {/* Cinto marrom escuro + FIVELA DOURADA GROSSA 3D da Imagem 3 */}
+            <path d="M-12 22 C-2 25, 10 25, 20 22" stroke="#451a03" strokeWidth="4.8" fill="none" />
+            <rect
+              x="-1.5"
+              y="19"
+              width="9"
+              height="7.5"
+              rx="2"
+              fill="none"
+              stroke={`url(#${id('clayGold3D')})`}
+              strokeWidth="2.4"
+            />
+            {/* Barra branca peluda do casaco */}
+            <path d="M-13 28 C-2 31, 10 31, 21 28" stroke={`url(#${id('claySnowWhite')})`} strokeWidth="4.5" strokeLinecap="round" />
+
+            {/* Rosto fofo 3D com olhos expressivos, bochechas e nariz redondinho */}
+            <CuteClayFace
+              cx={5}
+              cy={1}
+              skinFill={`url(#${id('claySkinLight')})`}
+              cheeksOpacity={0.75}
+              noseColor="#f87171"
+            />
+            {/* Sobrancelhas fofas brancas 3D */}
+            <path d="M-1.5 -3.5 Q1.5 -5 3.5 -3.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+            <path d="M6.5 -3.5 Q8.5 -5 11.5 -3.5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+
+            {/* Barba nuvem fofa + Bigode escultural 3D da Referência 3 */}
+            <path
+              d="M-7 4 C-8 19, 18 19, 17 4 C11 7, -1 7, -7 4 Z"
+              fill={`url(#${id('claySnowWhite')})`}
+              filter={`url(#${id('claySoftShadow')})`}
+            />
+            <ellipse cx="1.2" cy="4.2" rx="4.2" ry="2.2" transform="rotate(-12 1.2 4.2)" fill="#ffffff" />
+            <ellipse cx="8.8" cy="4.2" rx="4.2" ry="2.2" transform="rotate(12 8.8 4.2)" fill="#ffffff" />
+
+            {/* Gorro vermelho curvado com aba fofa branca e POMPOM gigante */}
+            <path
+              d="M-6 -4 C-3 -20, 14 -20, 16 -4 C10 -2, 0 -2, -6 -4 Z"
+              fill={`url(#${id('clayRedVelvet')})`}
+            />
+            <path d="M-8 -4 C-1 -7, 11 -7, 17 -4" stroke={`url(#${id('claySnowWhite')})`} strokeWidth="5.2" strokeLinecap="round" />
+            <circle cx="-11" cy="-12" r="4.4" fill={`url(#${id('claySnowWhite')})`} />
+
+            {/* Braço direito animadamente acenando com punho peludo + luva fofa */}
+            <g className="natal-santa-wave">
+              <path
+                d="M14 14 C21 8, 27 1, 30 -5"
+                stroke={`url(#${id('clayRedVelvet')})`}
+                strokeWidth="6.2"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <circle cx="27.5" cy="-1" r="3.4" fill={`url(#${id('claySnowWhite')})`} />
+              <circle cx="30.5" cy="-6" r="4.2" fill={`url(#${id('clayRedVelvet')})`} />
+            </g>
+          </g>
+
+          {/* Carroceria escultural vitoriana do Trenó 3D */}
           <path
-            d="M-46 -18 C-44 6, -36 12, -20 12 L24 12 C40 12, 48 -4, 42 -16 C34 -20, 28 -10, 22 -8 C14 -6, 6 -16, -2 -14 C-12 -12, -16 -24, -46 -18 Z"
-            fill={`url(#${id('sleighRuby')})`}
-            stroke={`url(#${id('goldTrim')})`}
-            strokeWidth="2.4"
+            d="M-48 -18 C-46 8, -37 14, -20 14 L26 14 C42 14, 51 -4, 44 -17 C36 -21, 29 -10, 22 -8 C14 -6, 6 -16, -2 -14 C-12 -12, -16 -24, -48 -18 Z"
+            fill={`url(#${id('clayRedVelvet')})`}
+            stroke={`url(#${id('clayGold3D')})`}
+            strokeWidth="2.8"
             strokeLinejoin="round"
           />
-          {/* Filigrana dourada lateral */}
           <path
-            d="M-28 2 C-12 6, 8 6, 26 -2"
-            stroke="#fde047"
-            strokeWidth="1.6"
+            d="M-28 3 C-10 8, 10 8, 28 -2"
+            stroke="#fef08a"
+            strokeWidth="2"
             fill="none"
-            opacity="0.85"
+            opacity="0.9"
           />
-          {/* Patins dourados longos com ponta enrolada em espiral */}
+          {/* Patins grossos dourados 3D */}
           <path
-            d="M-50 20 L34 20 C50 20, 56 8, 48 2 C44 0, 40 4, 44 7"
-            stroke={`url(#${id('goldTrim')})`}
-            strokeWidth="3.4"
+            d="M-52 22 L35 22 C52 22, 58 9, 50 2 C45 0, 41 4, 46 8"
+            stroke={`url(#${id('clayGold3D')})`}
+            strokeWidth="4.2"
             strokeLinecap="round"
             fill="none"
           />
-          <path
-            d="M-26 12 L-28 20 M16 12 L18 20"
-            stroke="#eab308"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
+          <path d="M-26 14 L-28 22 M17 14 L19 22" stroke="#d97706" strokeWidth="3.4" strokeLinecap="round" />
         </g>
 
-        {/* 4 RENAS ARTICULADAS EM GALOPE ASCENDENTE */}
+        {/* 4 RENAS CLAY-3D ARTICULADAS GALOPANDO */}
         {reindeerTeam.map((rd, rIdx) => (
           <g
-            key={`rd-${rIdx}`}
-            transform={`translate(${rd.rx}, ${rd.ry}) rotate(-21)`}
+            key={`rd3d-${rIdx}`}
+            transform={`translate(${rd.rx}, ${rd.ry}) rotate(-20)`}
+            filter={`url(#${id('claySoftShadow')})`}
           >
-            {/* Pernas traseiras em movimento articulado */}
-            <g
-              className="natal-gallop-hind"
-              style={{ animationDelay: `${rd.phase}s` }}
-            >
-              <path
-                d="M-12 5 C-18 11, -24 14, -27 17"
-                stroke="#6b2d0c"
-                strokeWidth="3"
-                strokeLinecap="round"
-                fill="none"
-              />
-              <path
-                d="M-8 6 C-12 13, -17 17, -21 21"
-                stroke="#451a03"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                fill="none"
-              />
+            {/* Pernas traseiras grossinhas 3D articuladas */}
+            <g className="natal-gallop-hind" style={{ animationDelay: `${rd.phase}s` }}>
+              <path d="M-12 6 C-18 12, -25 16, -28 20" stroke={`url(#${id('clayReindeer')})`} strokeWidth="4.6" strokeLinecap="round" fill="none" />
+              <circle cx="-28" cy="20" r="2.2" fill="#291206" />
+              <path d="M-8 7 C-12 14, -18 19, -22 23" stroke="#5c2d0c" strokeWidth="4" strokeLinecap="round" fill="none" />
+              <circle cx="-22" cy="23" r="2" fill="#291206" />
             </g>
 
-            {/* Pernas dianteiras em movimento articulado alternado */}
-            <g
-              className="natal-gallop-fore"
-              style={{ animationDelay: `${rd.phase}s` }}
-            >
-              <path
-                d="M11 4 C18 7, 24 8, 28 5"
-                stroke="#78350f"
-                strokeWidth="3"
-                strokeLinecap="round"
-                fill="none"
-              />
-              <path
-                d="M9 6 C14 12, 19 15, 24 14"
-                stroke="#451a03"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                fill="none"
-              />
+            {/* Pernas dianteiras grossinhas 3D articuladas */}
+            <g className="natal-gallop-fore" style={{ animationDelay: `${rd.phase}s` }}>
+              <path d="M12 5 C19 8, 26 9, 30 6" stroke={`url(#${id('clayReindeer')})`} strokeWidth="4.6" strokeLinecap="round" fill="none" />
+              <circle cx="30" cy="6" r="2.2" fill="#291206" />
+              <path d="M10 7 C15 13, 21 17, 26 16" stroke="#5c2d0c" strokeWidth="4" strokeLinecap="round" fill="none" />
+              <circle cx="26" cy="16" r="2" fill="#291206" />
             </g>
 
-            {/* Rabo erguido fofo branco por baixo */}
-            <path
-              d="M-15 0 C-21 -4, -22 -7, -18 -8 C-15 -7, -14 -4, -15 0 Z"
-              fill="#f8fafc"
-            />
+            {/* Rabo fofo branco */}
+            <ellipse cx="-19" cy="-2" rx="4.2" ry="2.8" transform="rotate(-35 -19 -2)" fill={`url(#${id('claySnowWhite')})`} />
 
-            {/* Silhueta anatômica curvada da rena (peito, dorso, pescoço arqueado, focinho) */}
-            <path
-              d="M-16 2 C-16 -4, -6 -6, 3 -4 C8 -3, 12 -9, 15 -14 C18 -16, 24 -14, 26 -10 C26 -8, 22 -6, 17 -6 C16 -1, 14 5, 6 7 C-2 8, -14 7, -16 2 Z"
-              fill={`url(#${id('reindeerCoat')})`}
-            />
+            {/* Corpo rechonchudo Clay-3D */}
+            <ellipse cx="-1" cy="3" rx="17" ry="8.5" fill={`url(#${id('clayReindeer')})`} />
+            {/* Barriguinha creme */}
+            <path d="M-10 8 C-2 11, 8 10, 12 7" stroke="#fef3c7" strokeWidth="3.2" strokeLinecap="round" fill="none" opacity="0.82" />
 
-            {/* Peitoral peludo creme + arreio vermelho com guizo dourado */}
-            <path
-              d="M9 -3 C12 0, 14 2, 14 5"
-              stroke="#fef3c7"
-              strokeWidth="2.6"
-              strokeLinecap="round"
-              fill="none"
-              opacity="0.7"
-            />
-            <path d="M5 -4 L7 7" stroke="#dc2626" strokeWidth="3.2" strokeLinecap="round" />
-            <circle cx="11" cy="-2" r="2.2" fill="#facc15" />
+            {/* Coleira vermelha 3D com guizo dourado grande */}
+            <path d="M8 -3 L10 9" stroke="#dc2626" strokeWidth="4.2" strokeLinecap="round" />
+            <circle cx="13" cy="2" r="3" fill={`url(#${id('clayGold3D')})`} />
 
-            {/* Galhada real curvada */}
-            <path
-              d="M17 -14 C15 -21, 12 -24, 9 -25 M15 -19 C12 -20, 10 -20, 8 -19 M16 -21 C18 -25, 20 -26, 22 -26"
-              stroke="#fde68a"
-              strokeWidth="1.7"
-              strokeLinecap="round"
-              fill="none"
-            />
-
-            {/* Rodolfo na dianteira com farol vermelho vivo */}
-            {rd.lead ? (
-              <g>
-                {/* Cone sutil de luz vermelha à frente de Rodolfo */}
-                <path
-                  d="M27 -10 L62 -22 L62 2 Z"
-                  fill={`url(#${id('rudolphGlow')})`}
-                  opacity="0.45"
-                  filter={`url(#${id('softGlow')})`}
-                />
-                <circle
-                  cx="26.5"
-                  cy="-10"
-                  r="8.5"
-                  fill={`url(#${id('rudolphGlow')})`}
-                  className="natal-rudolph-beacon"
-                />
-                <circle cx="26.5" cy="-10" r="2.8" fill="#ef4444" />
-                <circle cx="25.8" cy="-10.8" r="0.9" fill="#ffffff" />
-              </g>
-            ) : (
-              <circle cx="26" cy="-10" r="1.5" fill="#291206" />
-            )}
+            {/* Pescoço & Cabeça fofa 3D com leve balanço no galope */}
+            <g className="natal-reindeer-bob" style={{ animationDelay: `${rd.phase}s` }}>
+              <path
+                d="M9 1 C11 -6, 15 -14, 19 -17 C24 -19, 30 -15, 31 -9 C31 -5, 25 -4, 19 -5 L15 5 Z"
+                fill={`url(#${id('clayReindeer')})`}
+              />
+              {/* Focinho claro & Olho 3D brilhante */}
+              <ellipse cx="26" cy="-9.5" rx="4.8" ry="3.6" fill="#fde68a" opacity="0.85" />
+              <circle cx="20.5" cy="-12" r="2" fill="#1c1917" />
+              <circle cx="19.9" cy="-12.6" r="0.7" fill="#ffffff" />
+              {/* Orelhinha curvada */}
+              <ellipse cx="14" cy="-14" rx="3.4" ry="1.8" transform="rotate(-40 14 -14)" fill="#78350f" />
+              {/* Galhada 3D arredondada */}
+              <path
+                d="M17 -16 C15 -24, 11 -27, 8 -28 M15 -21 C12 -22, 9 -22, 7 -21 M16 -23 C19 -28, 22 -29, 25 -28"
+                stroke="#fde68a"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                fill="none"
+              />
+              {/* Nariz luminoso vermelho 3D de Rodolfo na vanguarda */}
+              {rd.lead ? (
+                <g>
+                  <path
+                    d="M31 -10 L70 -24 L70 4 Z"
+                    fill={`url(#${id('rudolphGlow')})`}
+                    opacity="0.48"
+                    filter={`url(#${id('softGlow')})`}
+                  />
+                  <circle
+                    cx="30.5"
+                    cy="-10"
+                    r="10"
+                    fill={`url(#${id('rudolphGlow')})`}
+                    className="natal-rudolph-beacon"
+                  />
+                  <circle cx="30.5" cy="-10" r="3.6" fill="#ff2e4c" />
+                  <circle cx="29.4" cy="-11.2" r="1.2" fill="#ffffff" />
+                </g>
+              ) : (
+                <circle cx="29.8" cy="-10" r="2.2" fill="#291206" />
+              )}
+            </g>
           </g>
         ))}
       </g>
@@ -1321,7 +1426,7 @@ function SantaSleighTakeoffTeam({
   );
 }
 
-/** Colinas nevadas contínuas no horizonte e camada profunda de base para acomodar o rodapé flutuante. */
+/** Colinas de neve 3D contínua e fundo espesso até a última linha inferior (sem espigões cortados nos cantos). */
 function SnowHillsForeground({
   width,
   height,
@@ -1337,66 +1442,48 @@ function SnowHillsForeground({
 }) {
   const id = makeId(prefix);
   const scaleX = width / 1440;
-  const horizonY = isDesktop ? 310 : 418;
+  const horizonY = isDesktop ? 320 : 418;
 
   return (
     <g>
-      {/* Colina distante iluminada pelo luar */}
       <path
         d={`M0 ${horizonY + 12} C${220 * scaleX} ${horizonY - 22}, ${460 * scaleX} ${horizonY + 14}, ${treeX} ${horizonY - 2} C${960 * scaleX} ${horizonY - 18}, ${1190 * scaleX} ${horizonY - 34}, ${width} ${horizonY - 8} L${width} ${height} L0 ${height} Z`}
         fill={`url(#${id('snowHorizon')})`}
       />
-
-      {/* Colina intermediária onde repousam o Presépio, os Reis e a base da Árvore */}
       <path
         d={`M0 ${horizonY + 34} C${280 * scaleX} ${horizonY + 12}, ${520 * scaleX} ${horizonY + 38}, ${treeX + 40 * scaleX} ${horizonY + 18} C${990 * scaleX} ${horizonY + 2}, ${1210 * scaleX} ${horizonY - 12}, ${width} ${horizonY + 20} L${width} ${height} L0 ${height} Z`}
         fill={`url(#${id('snowMid')})`}
       />
 
-      {/* Trilho duplo na neve onde o trenó acabou de decolar (lado direito) */}
       {isDesktop && (
         <g opacity="0.55">
           <path
-            d="M845 344 C912 332, 976 318, 1020 302"
+            d="M842 350 C908 338, 972 324, 1018 308"
             stroke="#93c5fd"
-            strokeWidth="2.4"
+            strokeWidth="2.8"
             strokeLinecap="round"
             fill="none"
           />
           <path
-            d="M862 350 C928 338, 990 324, 1034 307"
+            d="M860 357 C926 344, 988 330, 1034 313"
             stroke="#93c5fd"
-            strokeWidth="2.4"
+            strokeWidth="2.8"
             strokeLinecap="round"
             fill="none"
           />
         </g>
       )}
 
-      {/* Primeiro plano de neve fofa até o último pixel inferior (encaixe perfeito no rodapé e doca) */}
+      {/* Neve macia no primeiro plano até o rodapé — sem formas recortadas nas bordas laterais */}
       <path
         d={`M0 ${height - (isDesktop ? 82 : 92)} C${320 * scaleX} ${height - (isDesktop ? 104 : 114)}, ${680 * scaleX} ${height - (isDesktop ? 76 : 84)}, ${1040 * scaleX} ${height - (isDesktop ? 96 : 104)} C${1240 * scaleX} ${height - (isDesktop ? 104 : 112)}, ${1360 * scaleX} ${height - (isDesktop ? 86 : 94)}, ${width} ${height - (isDesktop ? 78 : 86)} L${width} ${height} L0 ${height} Z`}
         fill={`url(#${id('snowFront')})`}
       />
-
-      {/* Pequenos pinheiros nevados laterais emoldurando suavemente as bordas externas no desktop */}
-      {isDesktop && (
-        <g opacity="0.9">
-          <path
-            d={`M18 ${height - 68} C8 ${height - 84}, 4 ${height - 104}, 14 ${height - 124} C22 ${height - 104}, 30 ${height - 84}, 36 ${height - 68} Z`}
-            fill="#064e3b"
-          />
-          <path
-            d={`M${width - 18} ${height - 66} C${width - 8} ${height - 84}, ${width - 4} ${height - 104}, ${width - 14} ${height - 124} C${width - 22} ${height - 104}, ${width - 30} ${height - 84}, ${width - 36} ${height - 66} Z`}
-            fill="#064e3b"
-          />
-        </g>
-      )}
     </g>
   );
 }
 
-/** Neve suave adicional caindo diretamente dentro da paisagem para unir céu e solo. */
+/** Neve suave brilhante integrada dentro da própria paisagem. */
 function SceneAtmosphericSnow({
   width,
   height,
@@ -1405,23 +1492,23 @@ function SceneAtmosphericSnow({
   height: number;
 }) {
   const dots = [
-    { x: 0.07, y: 0.28, r: 1.8, d: '0.2s' },
-    { x: 0.16, y: 0.45, r: 2.3, d: '0.8s' },
-    { x: 0.24, y: 0.22, r: 1.6, d: '1.4s' },
-    { x: 0.34, y: 0.56, r: 2.1, d: '0.5s' },
-    { x: 0.44, y: 0.31, r: 1.9, d: '1.1s' },
-    { x: 0.52, y: 0.48, r: 2.4, d: '1.7s' },
-    { x: 0.61, y: 0.27, r: 1.7, d: '0.4s' },
-    { x: 0.69, y: 0.54, r: 2.2, d: '0.9s' },
-    { x: 0.78, y: 0.35, r: 1.8, d: '1.5s' },
-    { x: 0.87, y: 0.49, r: 2.4, d: '0.3s' },
-    { x: 0.93, y: 0.29, r: 1.7, d: '1.2s' },
+    { x: 0.07, y: 0.28, r: 2, d: '0.2s' },
+    { x: 0.16, y: 0.45, r: 2.5, d: '0.8s' },
+    { x: 0.24, y: 0.22, r: 1.8, d: '1.4s' },
+    { x: 0.34, y: 0.56, r: 2.3, d: '0.5s' },
+    { x: 0.44, y: 0.31, r: 2, d: '1.1s' },
+    { x: 0.52, y: 0.48, r: 2.6, d: '1.7s' },
+    { x: 0.61, y: 0.27, r: 1.8, d: '0.4s' },
+    { x: 0.69, y: 0.54, r: 2.4, d: '0.9s' },
+    { x: 0.78, y: 0.35, r: 2, d: '1.5s' },
+    { x: 0.87, y: 0.49, r: 2.6, d: '0.3s' },
+    { x: 0.93, y: 0.29, r: 1.8, d: '1.2s' },
   ];
   return (
     <g>
       {dots.map((pt, i) => (
         <circle
-          key={`as-${i}`}
+          key={`as3d-${i}`}
           cx={pt.x * width}
           cy={pt.y * height}
           r={pt.r}
@@ -1436,80 +1523,74 @@ function SceneAtmosphericSnow({
 }
 
 /**
- * Paisagem Natalina Full-Bleed Integrada ao Rodapé da Vitrine (Free e PRO):
- * - Funde-se organicamente ao fundo da página (Claro ou Escuro) sem bordas ou caixas quadradas;
- * - Composição cinematográfica panorâmica no Desktop (1440×430) e dedicada no Mobile (600×520);
- * - Esquerda: Os Três Reis Magos caminhando pela neve sob a Estrela Guia até o Presépio (José, Maria, Menino Jesus e cordeirinho);
- * - Centro: Árvore de Natal orgânica esculpida e iluminada separando o cenário sagrado do festivo;
- * - Direita: Papai Noel no trenó ornamentado levantando voo com 4 renas galopando e rastro cintilante.
+ * Paisagem Natalina Full-Bleed Clay-3D Integrada ao Rodapé (Free e PRO):
+ * Modelada em estilo Pixar / Clay-3D com sombreamento volumétrico, olhos brilhantes,
+ * árvore fofa almofadada com luzes ciano/pink/ouro e biscoitos gingerbread,
+ * Papai Noel 3D com saco e sino dourado decolando com renas articuladas,
+ * e Presépio completo com os Três Reis Magos sob a Estrela Guia.
  */
 export function ChristmasFooterScene({ isLight = false }: ChristmasFooterSceneProps) {
   const topFadeGradient = isLight
-    ? 'linear-gradient(to bottom, #f8fafc 0%, rgba(248, 250, 252, 0.84) 24%, rgba(226, 232, 240, 0.35) 55%, rgba(15, 23, 42, 0) 100%)'
-    : 'linear-gradient(to bottom, #090d14 0%, rgba(9, 13, 20, 0.82) 26%, rgba(9, 13, 20, 0.32) 58%, rgba(9, 13, 20, 0) 100%)';
+    ? 'linear-gradient(to bottom, #f8fafc 0%, rgba(248, 250, 252, 0.72) 28%, rgba(226, 232, 240, 0.2) 65%, rgba(15, 23, 42, 0) 100%)'
+    : 'linear-gradient(to bottom, #090d14 0%, rgba(9, 13, 20, 0.72) 28%, rgba(9, 13, 20, 0.2) 65%, rgba(9, 13, 20, 0) 100%)';
 
   return (
     <section
-      aria-label="Paisagem Natalina SpotQR"
+      aria-label="Paisagem Natalina 3D SpotQR"
       className="relative w-full overflow-hidden select-none bg-[#d7e4f5]"
     >
-      {/* Transição atmosférica contínua entre o fundo da página e o céu estrelado */}
+      {/* Transição atmosférica sutil que preserva o brilho pleno das estrelas no alto */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute top-0 inset-x-0 h-20 sm:h-28 z-10"
+        className="pointer-events-none absolute top-0 inset-x-0 h-12 sm:h-16 z-10"
         style={{ background: topFadeGradient }}
       />
 
-      {/* VERSÃO DESKTOP PANORÂMICA (1440 × 460) — Sem cortes horizontais em nenhuma tela */}
+      {/* VERSÃO DESKTOP PANORÂMICA CLAY-3D (1440 × 475) */}
       <svg
-        viewBox="0 0 1440 460"
+        viewBox="0 0 1440 475"
         preserveAspectRatio="xMidYMid meet"
         className="hidden lg:block w-full h-auto"
         role="img"
-        aria-label="Paisagem natalina contínua: Os Três Reis Magos e o Presépio com Menino Jesus, Maria e José sob a Estrela Guia à esquerda; Árvore de Natal ao centro; Papai Noel no trenó levantando voo com renas à direita"
+        aria-label="Paisagem natalina 3D animada: Os Três Reis Magos e o Presépio com Menino Jesus, Maria e José sob a Estrela Guia à esquerda; Árvore de Natal 3D enfeitada ao centro; Papai Noel 3D no trenó levantando voo com renas à direita"
       >
         <ChristmasSceneDefs prefix="desk" />
-        <SkyAndMountains width={1440} height={460} prefix="desk" />
-        <StarOfBethlehem x={432} y={88} targetX={432} targetY={322} prefix="desk" />
-        <SnowHillsForeground width={1440} height={460} treeX={720} prefix="desk" isDesktop />
+        <SkyAndMountains width={1440} height={475} prefix="desk" />
+        <StarOfBethlehem x={422} y={96} targetX={422} targetY={336} prefix="desk" />
+        <SnowHillsForeground width={1440} height={475} treeX={720} prefix="desk" isDesktop />
 
-        {/* Cenário Religioso à esquerda */}
-        <ThreeWiseMenCaravan x={92} y={222} scale={1.08} prefix="desk" />
-        <BethlehemNativityStable x={312} y={196} scale={1.08} prefix="desk" />
+        {/* Cenário Religioso 3D à esquerda (escala ampliada e expressiva) */}
+        <ThreeWiseMenCaravan x={64} y={222} scale={1.18} prefix="desk" />
+        <BethlehemNativityStable x={294} y={196} scale={1.16} prefix="desk" />
 
-        {/* Árvore Central separando os dois reinos */}
-        <OrnateChristmasTree x={720} y={96} scale={1.05} prefix="desk" />
+        {/* Árvore Central 3D estilo Clay separando os dois cenários */}
+        <OrnateChristmasTree x={720} y={82} scale={1.12} prefix="desk" />
 
-        {/* Papai Noel levantando voo à direita */}
-        <SantaSleighTakeoffTeam x={1000} y={258} scale={1.04} prefix="desk" />
+        {/* Papai Noel Clay-3D levantando voo com 4 renas à direita */}
+        <SantaSleighTakeoffTeam x={960} y={262} scale={1.14} prefix="desk" />
 
-        <SceneAtmosphericSnow width={1440} height={460} />
+        <SceneAtmosphericSnow width={1440} height={475} />
       </svg>
 
-      {/* VERSÃO MOBILE & TABLET STORYBOOK (600 × 555) — Todos os personagens nítidos e amplos sem achatar */}
+      {/* VERSÃO MOBILE & TABLET CLAY-3D (600 × 565) */}
       <svg
-        viewBox="0 0 600 555"
+        viewBox="0 0 600 565"
         preserveAspectRatio="xMidYMid meet"
         className="block lg:hidden w-full h-auto"
         role="img"
-        aria-label="Paisagem natalina: Papai Noel levantando voo no céu estrelado, Árvore de Natal ao lado do Presépio com Menino Jesus e os Três Reis Magos"
+        aria-label="Paisagem natalina 3D animada: Papai Noel levantando voo no céu estrelado, Árvore de Natal 3D ao lado do Presépio com Menino Jesus e os Três Reis Magos"
       >
         <ChristmasSceneDefs prefix="mob" />
-        <SkyAndMountains width={600} height={555} prefix="mob" />
-        <StarOfBethlehem x={182} y={96} targetX={254} targetY={372} prefix="mob" />
-        <SnowHillsForeground width={600} height={555} treeX={455} prefix="mob" isDesktop={false} />
+        <SkyAndMountains width={600} height={565} prefix="mob" />
+        <StarOfBethlehem x={182} y={96} targetX={255} targetY={385} prefix="mob" />
+        <SnowHillsForeground width={600} height={565} treeX={455} prefix="mob" isDesktop={false} />
 
-        {/* Papai Noel voando majestosamente no topo direito do céu */}
-        <SantaSleighTakeoffTeam x={265} y={182} scale={0.76} prefix="mob" />
+        <SantaSleighTakeoffTeam x={238} y={190} scale={0.82} prefix="mob" />
+        <OrnateChristmasTree x={476} y={202} scale={0.96} prefix="mob" />
+        <ThreeWiseMenCaravan x={8} y={358} scale={0.78} prefix="mob" />
+        <BethlehemNativityStable x={148} y={316} scale={0.92} prefix="mob" />
 
-        {/* Árvore enfeitada separando o horizonte direito */}
-        <OrnateChristmasTree x={476} y={214} scale={0.94} prefix="mob" />
-
-        {/* Reis Magos + Presépio bem visíveis e detalhados na colina inferior esquerda */}
-        <ThreeWiseMenCaravan x={26} y={348} scale={0.8} prefix="mob" />
-        <BethlehemNativityStable x={148} y={306} scale={0.95} prefix="mob" />
-
-        <SceneAtmosphericSnow width={600} height={555} />
+        <SceneAtmosphericSnow width={600} height={565} />
       </svg>
     </section>
   );
