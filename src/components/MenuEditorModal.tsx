@@ -82,6 +82,11 @@ import {
   PRICE_SCALE_OPTIONS,
   resolvePriceFontOption,
 } from '@/lib/merchandising';
+import {
+  assignMissingProductCodes,
+  normalizeProductCode,
+  suggestNextProductCode,
+} from '@/lib/product-code';
 
 interface MenuEditorModalProps {
   isOpen: boolean;
@@ -482,7 +487,9 @@ export default function MenuEditorModal({
           setMenu({
             ...resolved,
             items: Array.isArray(resolved.items)
-              ? normalizeMenuItemsProductionDays(resolved.items)
+              ? assignMissingProductCodes(
+                  normalizeMenuItemsProductionDays(resolved.items)
+                )
               : [],
           });
         }
@@ -535,7 +542,9 @@ export default function MenuEditorModal({
   const buildCurrentPayload = (source: RestaurantMenu): RestaurantMenu => ({
     ...source,
     items: Array.isArray(source.items)
-      ? normalizeMenuItemsProductionDays(source.items)
+      ? assignMissingProductCodes(
+          normalizeMenuItemsProductionDays(source.items)
+        )
       : [],
     mode: source.mode || mode,
     allowDelivery: source.allowDelivery ?? !((source.mode || mode) === 'catalog'),
@@ -783,6 +792,7 @@ export default function MenuEditorModal({
     const defaultCat = menu.categories[0]?.id || 'cat-1';
     const newItem: MenuItem = {
       id: `item-${Date.now()}`,
+      productCode: suggestNextProductCode(menu.items),
       name: '',
       description: '',
       price: isCatalog ? 49.9 : 29.9,
@@ -1676,23 +1686,57 @@ export default function MenuEditorModal({
 
                             {/* Fields */}
                             <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div className="sm:col-span-2">
-                                <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
-                                  {isCatalog ? 'Nome do Produto:' : 'Nome do Prato / Produto:'}
-                                </label>
-                                <input
-                                  type="text"
-                                  value={item.name}
-                                  placeholder={
-                                    isCatalog
-                                      ? 'Ex: Camiseta, Caneca, Luminária 3D...'
-                                      : 'Ex: X-Bacon Especial, Pizza Calabresa...'
-                                  }
-                                  onChange={(e) =>
-                                    handleUpdateItem(item.id, { name: e.target.value })
-                                  }
-                                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
-                                />
+                              <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                <div className="sm:col-span-1">
+                                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                    Nº / Cód.:
+                                  </label>
+                                  <div className="relative">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] font-mono font-bold text-slate-500 pointer-events-none">
+                                      #
+                                    </span>
+                                    <input
+                                      type="text"
+                                      maxLength={16}
+                                      value={item.productCode || ''}
+                                      placeholder="001"
+                                      onChange={(e) =>
+                                        handleUpdateItem(item.id, {
+                                          productCode: e.target.value
+                                            .replace(/^#+/, '')
+                                            .slice(0, 16),
+                                        })
+                                      }
+                                      onBlur={(e) =>
+                                        handleUpdateItem(item.id, {
+                                          productCode: normalizeProductCode(
+                                            e.target.value
+                                          ),
+                                        })
+                                      }
+                                      className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-6 pr-2 py-1.5 text-xs text-amber-300 font-mono font-bold placeholder-slate-600"
+                                      title="Código ou numeração individual deste produto (ex: 001, CAM-01)"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="sm:col-span-3">
+                                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                                    {isCatalog ? 'Nome do Produto:' : 'Nome do Prato / Produto:'}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={item.name}
+                                    placeholder={
+                                      isCatalog
+                                        ? 'Ex: Camiseta, Caneca, Luminária 3D...'
+                                        : 'Ex: X-Bacon Especial, Pizza Calabresa...'
+                                    }
+                                    onChange={(e) =>
+                                      handleUpdateItem(item.id, { name: e.target.value })
+                                    }
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white font-bold placeholder-slate-600"
+                                  />
+                                </div>
                               </div>
 
                               <div>

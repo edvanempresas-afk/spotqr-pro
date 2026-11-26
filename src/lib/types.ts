@@ -126,6 +126,7 @@ export interface MenuItemVariant {
 
 export interface MenuItem {
   id: string;
+  productCode?: string; // Numeração / código próprio do produto (ex: "001", "CAM-01")
   name: string;
   description: string;
   price: number;
@@ -242,6 +243,7 @@ export interface SelectedVariantItem {
 
 export interface StoreOrderItem {
   id: string;
+  productCode?: string;
   name: string;
   price: number;
   quantity: number;

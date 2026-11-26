@@ -93,6 +93,10 @@ export async function POST(req: NextRequest) {
 
       const result = await createStoreOrder({
         slug,
+        fallbackSlug:
+          typeof body.fallbackSlug === 'string' && body.fallbackSlug.trim()
+            ? body.fallbackSlug.trim()
+            : undefined,
         customerName: String(body.customerName || ''),
         customerPhone: body.customerPhone
           ? String(body.customerPhone)

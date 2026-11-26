@@ -27,6 +27,11 @@ import {
   acceptsAnyCardPayment,
   resolveCardFeeNotice,
 } from '@/lib/payments';
+import {
+  assignMissingProductCodes,
+  normalizeProductCode,
+  resolveItemProductCode,
+} from '@/lib/product-code';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,12 +53,16 @@ export async function GET(request: NextRequest) {
   const effectiveSlug = resolveEffectiveSlug(slug);
   await syncMenuFromCloud(effectiveSlug);
 
+  const hadExistingMenuBeforeGet = Boolean(peekExistingMenuBySlug(effectiveSlug));
   const menu = getMenuBySlug(effectiveSlug, modeParam, titleParam);
   if (!menu) {
     return NextResponse.json(
       { error: 'Cardápio ou catálogo não encontrado' },
       { status: 404 }
     );
+  }
+  if (!hadExistingMenuBeforeGet) {
+    await persistMenuToCloud(menu);
   }
 
   const qr = getDynamicQRBySlug(effectiveSlug);
@@ -72,12 +81,14 @@ export async function GET(request: NextRequest) {
     getAcceptedPaymentsList(menu).includes('credit_card');
   const canShowInstallments = isPaid && storeAcceptsCreditCard;
 
-  const sanitizedItems = (menu.items || []).map((it) =>
-    isPaid
+  const sanitizedItems = (menu.items || []).map((it) => {
+    const itemProductCode = resolveItemProductCode(it, menu.items);
+    return isPaid
       ? canShowInstallments
-        ? it
+        ? { ...it, productCode: itemProductCode }
         : {
             ...it,
+            productCode: itemProductCode,
             maxInstallments: undefined,
             installmentsHasInterest: undefined,
             installmentsInterestMode: undefined,
@@ -85,6 +96,7 @@ export async function GET(request: NextRequest) {
           }
       : {
           ...it,
+          productCode: itemProductCode,
           galleryImages: undefined,
           originalPrice: undefined,
           promoEffect: undefined,
@@ -98,8 +110,8 @@ export async function GET(request: NextRequest) {
           trustHighlights: undefined,
           variantGroupTitle: undefined,
           variants: undefined,
-        }
-  );
+        };
+  });
 
   const effectiveGrantType =
     qr && isProStillValid(qr)
@@ -481,7 +493,7 @@ export async function POST(request: NextRequest) {
 
     const updatedMenu: RestaurantMenu = {
       ...cleanMenuBody,
-      items: sanitizedIncomingItems,
+      items: assignMissingProductCodes(sanitizedIncomingItems),
       allowMixedCartInstallments:
         canSaveInstallments && Boolean(cleanMenuBody.allowMixedCartInstallments),
       passCardFeeToBuyer: cleanPassCardFee,

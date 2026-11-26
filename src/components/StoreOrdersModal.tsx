@@ -544,6 +544,11 @@ export function StoreOrdersModal({
                                   {it.quantity}x
                                 </span>
                                 <span className="font-medium">
+                                  {it.productCode && (
+                                    <span className="inline-block mr-1.5 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono font-bold text-amber-300 align-middle">
+                                      #{it.productCode}
+                                    </span>
+                                  )}
                                   {it.name}
                                   {it.selectedSize ? ` (${it.selectedSize.name})` : ''}
                                   {it.selectedVariant ? ` — ${it.selectedVariant.label}` : ''}

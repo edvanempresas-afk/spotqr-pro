@@ -59,6 +59,10 @@ import {
 } from '@/lib/merchandising';
 import { isProStillValid } from '@/lib/pro-status';
 import {
+  formatProductCodeLabel,
+  resolveItemProductCode,
+} from '@/lib/product-code';
+import {
   getAcceptedPaymentOptions,
   getAcceptedPaymentsList,
   resolveCardFeeNotice,
@@ -925,8 +929,9 @@ export default function DigitalShowcasePage({
           c.item.pixDiscountPercent >= 1
             ? ` (c/ -${Math.round(c.item.pixDiscountPercent)}% PIX)`
             : '';
+        const itemCode = resolveItemProductCode(c.item, menu?.items);
         const sizeLabel = c.selectedSize ? ` [${c.selectedSize.name}]` : '';
-        let line = `• ${c.quantity}x ${c.item.name}${sizeLabel}${prodDaysInfo}${pixTag} — R$ ${lineTotal}`;
+        let line = `• ${c.quantity}x [#${itemCode}] ${c.item.name}${sizeLabel}${prodDaysInfo}${pixTag} — R$ ${lineTotal}`;
         if (c.selectedVariant) {
           line += `\n   ↳ *${c.selectedVariant.groupLabel || 'Opção'}:* ${c.selectedVariant.label}`;
         }
@@ -1045,8 +1050,16 @@ export default function DigitalShowcasePage({
       message += `\n*Obs. Pagamento no Cartão:* ${cardFeeNotice}\n`;
     }
 
-    if (includePixSummary && isPixSelected) {
-      message += `\n*Pagamento via PIX:* Gerado no valor exato de *R$ ${totalPrice.toFixed(2)}* (vou enviar o comprovante abaixo).\n`;
+    if (isPixSelected) {
+      if (hasPixKey && includePixSummary) {
+        message += `\n*Pagamento via PIX:* Gerado no valor exato de *R$ ${totalPrice.toFixed(
+          2
+        )}*. 📎 *Solicitação ao comprador:* anexe o comprovante do pagamento PIX nesta conversa para confirmarmos o seu pedido.\n`;
+      } else if (hasPixKey) {
+        message += `\n*Pagamento via PIX:* 📎 *Solicitação ao comprador:* anexe o comprovante do pagamento PIX nesta conversa após efetuar o pagamento para confirmarmos o seu pedido.\n`;
+      } else {
+        message += `\n*Pagamento via PIX:* O anunciante irá lhe enviar a chave PIX nesta conversa. 📎 *Não se esqueça de anexar o comprovante do PIX após o pagamento* para confirmarmos o seu pedido.\n`;
+      }
     }
 
     if (notes) {
@@ -1149,7 +1162,9 @@ export default function DigitalShowcasePage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create',
-          slug: menu.slug,
+          slug: slug || menu.slug,
+          fallbackSlug:
+            menu.slug && slug && menu.slug !== slug ? menu.slug : undefined,
           customerName: customerName.trim(),
           customerPhone: undefined,
           orderMode: activeOrderMode,
@@ -1162,6 +1177,7 @@ export default function DigitalShowcasePage({
           paymentMethod: orderPaymentLabel,
           items: itemsList.map((c) => ({
             id: c.item.id,
+            productCode: resolveItemProductCode(c.item, menu.items),
             quantity: c.quantity,
             selectedSize: c.selectedSize,
             selectedVariant: c.selectedVariant,
@@ -2190,8 +2206,22 @@ export default function DigitalShowcasePage({
                       );
                     };
 
+                    const itemProductCode = formatProductCodeLabel(
+                      resolveItemProductCode(item, menu.items)
+                    );
+
                     const renderCardBadgesRow = () => (
                       <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`border text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                            isLight
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                          }`}
+                          title={`Código do produto: ${itemProductCode}`}
+                        >
+                          {itemProductCode}
+                        </span>
                         <h3
                           className={`text-sm sm:text-base font-bold ${headingTextClass}`}
                         >
@@ -2458,6 +2488,7 @@ export default function DigitalShowcasePage({
                               />
                               <ShowcaseBuyBox
                                 item={item}
+                                productCode={itemProductCode}
                                 isPro={isPro}
                                 isCatalog={isCatalog}
                                 allowDelivery={allowDelivery}
@@ -2586,6 +2617,7 @@ export default function DigitalShowcasePage({
                                 {/* Coluna Direita PRO: Buy Box Comercial (PIX, Frete Grátis, Entrega, Dúvida WhatsApp & Comprar) */}
                                 <ShowcaseBuyBox
                                   item={item}
+                                  productCode={itemProductCode}
                                   isPro={isPro}
                                   isCatalog={isCatalog}
                                   allowDelivery={allowDelivery}
@@ -3216,7 +3248,7 @@ export default function DigitalShowcasePage({
               <strong className={headingTextClass}>
                 R$ {closedPixOrder.amount.toFixed(2)}
               </strong>
-              . Após pagar, envie o comprovante no WhatsApp para confirmar seu pedido.
+              . Após pagar, anexe o comprovante do pagamento PIX na conversa do WhatsApp para confirmar seu pedido.
             </p>
 
             <div className="space-y-2.5">
@@ -3433,6 +3465,17 @@ export default function DigitalShowcasePage({
                   >
                     <div className="flex-1 min-w-0 pr-3">
                       <h4 className={`text-xs font-bold ${headingTextClass}`}>
+                        <span
+                          className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border align-middle ${
+                            isLight
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                              : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                          }`}
+                        >
+                          {formatProductCodeLabel(
+                            resolveItemProductCode(c.item, menu.items)
+                          )}
+                        </span>
                         {c.item.name}
                         {c.selectedSize ? ` (${c.selectedSize.name})` : ''}
                         {c.selectedVariant ? ` — ${c.selectedVariant.label}` : ''}
@@ -4084,7 +4127,7 @@ export default function DigitalShowcasePage({
                   <strong className={headingTextClass}>
                     R$ {totalPrice.toFixed(2)}
                   </strong>
-                  .
+                  . Após o pagamento, anexe o comprovante do PIX na conversa do WhatsApp para confirmar seu pedido.
                 </p>
               )}
 
@@ -4103,7 +4146,7 @@ export default function DigitalShowcasePage({
 
               {isPixSelected && !hasPixKey && (
                 <p className={`text-[11px] leading-relaxed ${mutedTextClass}`}>
-                  A chave PIX será combinada com o atendente ao enviar o pedido.
+                  O anunciante irá lhe enviar a chave PIX pelo WhatsApp. Não se esqueça de anexar o comprovante do PIX após o pagamento.
                 </p>
               )}
 
@@ -4205,6 +4248,17 @@ export default function DigitalShowcasePage({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`border text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          isLight
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                            : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                        }`}
+                      >
+                        {formatProductCodeLabel(
+                          resolveItemProductCode(zoomedItem, menu.items)
+                        )}
+                      </span>
                       <h3
                         className={`text-sm sm:text-base font-extrabold truncate ${headingTextClass}`}
                       >

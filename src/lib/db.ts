@@ -32,6 +32,10 @@ import { DEMO_PAYMENTS } from './payments';
 import { computeStableStoreCode, isProStillValid } from './pro-status';
 import { isValidFriendlySlugFormat, normalizeFriendlySlug } from './slugs';
 import {
+  normalizeProductCode,
+  resolveItemProductCode,
+} from './product-code';
+import {
   computeLegacyHmacHash,
   generateFormattedSecurityCode,
   hashPasswordSecure,
@@ -3175,6 +3179,7 @@ export function getAdminSecurityOverview(): {
 
 export interface CreateOrderParams {
   slug: string;
+  fallbackSlug?: string;
   customerName: string;
   customerPhone?: string;
   orderMode?: 'table' | 'delivery' | 'pickup' | 'direct';
@@ -3183,6 +3188,7 @@ export interface CreateOrderParams {
   paymentMethod?: string;
   items: {
     id: string;
+    productCode?: string;
     quantity: number;
     selectedSize?: SelectedSizeItem;
     selectedVariant?: SelectedVariantItem;
@@ -3192,6 +3198,138 @@ export interface CreateOrderParams {
   }[];
   deliveryFee?: number;
   notes?: string;
+}
+
+function collectSlugAliases(
+  db: DatabaseSchema,
+  ...rawSlugs: Array<string | undefined>
+): string[] {
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (val?: string | null) => {
+    const clean = typeof val === 'string' ? val.trim() : '';
+    if (!clean || seen.has(clean)) return;
+    seen.add(clean);
+    ordered.push(clean);
+  };
+
+  for (const raw of rawSlugs) {
+    const clean = typeof raw === 'string' ? raw.trim() : '';
+    if (!clean) continue;
+    const eff = resolveEffectiveSlug(clean);
+    push(eff);
+    push(clean);
+    push(db.slugRedirects?.[clean]);
+    push(db.slugRedirects?.[eff]);
+
+    const normalized = normalizeFriendlySlug(clean);
+    if (normalized) {
+      push(resolveEffectiveSlug(normalized));
+      push(normalized);
+      push(db.slugRedirects?.[normalized]);
+    }
+    if (clean.toLowerCase() !== clean) {
+      push(clean.toLowerCase());
+    }
+  }
+
+  // Enrich with QR aliases (slug, customSlug, originalSlug, linkedMenuId)
+  const snapshot = [...ordered];
+  const lowerSet = new Set(snapshot.map((s) => s.toLowerCase()));
+  for (const qr of Object.values(db.dynamicQRs || {})) {
+    const qrVals = [qr.slug, qr.customSlug, qr.originalSlug, qr.linkedMenuId];
+    const matchesQr = qrVals.some(
+      (v) => typeof v === 'string' && v.trim() && lowerSet.has(v.trim().toLowerCase())
+    );
+    if (matchesQr) {
+      push(qr.slug);
+      push(qr.customSlug);
+      push(qr.originalSlug);
+      push(qr.linkedMenuId);
+      if (qr.slug) push(db.slugRedirects?.[qr.slug]);
+    }
+  }
+
+  // Enrich with any existing in-memory menu keys matching case-insensitively
+  for (const menuKey of Object.keys(db.menus || {})) {
+    if (lowerSet.has(menuKey.toLowerCase())) {
+      push(menuKey);
+    }
+  }
+
+  return ordered;
+}
+
+function findAssociatedQRForSlugs(
+  db: DatabaseSchema,
+  aliases: string[]
+): DynamicQRRecord | undefined {
+  for (const alias of aliases) {
+    if (db.dynamicQRs?.[alias]) return db.dynamicQRs[alias];
+  }
+  const lowerSet = new Set(aliases.map((a) => a.toLowerCase()));
+  for (const qr of Object.values(db.dynamicQRs || {})) {
+    const qrVals = [qr.slug, qr.customSlug, qr.originalSlug, qr.linkedMenuId];
+    if (
+      qrVals.some(
+        (v) => typeof v === 'string' && v.trim() && lowerSet.has(v.trim().toLowerCase())
+      )
+    ) {
+      return qr;
+    }
+  }
+  return undefined;
+}
+
+async function resolveShowcaseForOrderAsync(
+  db: DatabaseSchema,
+  rawSlug?: string,
+  fallbackSlug?: string
+): Promise<{ menu: RestaurantMenu; slug: string; qr?: DynamicQRRecord } | null> {
+  expireDueQRsIfAny();
+  await reconcileCloudSlugMigrations();
+
+  const aliases = collectSlugAliases(db, rawSlug, fallbackSlug);
+  if (aliases.length === 0) return null;
+
+  for (const cand of aliases) {
+    await syncMenuFromCloud(cand);
+    const existing = db.menus[cand];
+    if (existing) {
+      const qr = findAssociatedQRForSlugs(db, [existing.slug, cand, ...aliases]);
+      return {
+        menu: existing,
+        slug: existing.slug || cand,
+        qr,
+      };
+    }
+  }
+
+  // If the QR exists in dynamicQRs (or is a known demo slug) but its menu wasn't
+  // persisted to KV yet, auto-provision and persist to cloud so checkout never 404s.
+  const qr = findAssociatedQRForSlugs(db, aliases);
+  const isKnownDemo = aliases.some(
+    (a) => a === 'demo-catalogo' || a === 'demo-restaurante'
+  );
+  if (qr || isKnownDemo) {
+    const targetSlug = resolveEffectiveSlug(qr?.slug || aliases[0]);
+    const defaultMode: 'menu' | 'catalog' =
+      qr?.type === 'catalog' || targetSlug === 'demo-catalogo'
+        ? 'catalog'
+        : 'menu';
+    const provisioned = getMenuBySlug(targetSlug, defaultMode, qr?.title);
+    if (provisioned) {
+      await persistMenuToCloud(provisioned);
+      return {
+        menu: provisioned,
+        slug: provisioned.slug,
+        qr,
+      };
+    }
+  }
+
+  return null;
 }
 
 export interface CreateOrderResult {
@@ -3206,16 +3344,19 @@ export async function createStoreOrder(
 ): Promise<CreateOrderResult> {
   await syncDbFromCloud();
   const db = ensureDb();
-  const slug = String(params.slug || '').trim();
-  if (!slug) {
+  if (!String(params.slug || '').trim() && !String(params.fallbackSlug || '').trim()) {
     return { success: false, error: 'Identificador da loja não informado.' };
   }
 
-  await syncMenuFromCloud(slug);
-  const menu = db.menus[slug];
-  if (!menu) {
+  const resolvedShowcase = await resolveShowcaseForOrderAsync(
+    db,
+    params.slug,
+    params.fallbackSlug
+  );
+  if (!resolvedShowcase) {
     return { success: false, error: 'Catálogo ou cardápio não encontrado.' };
   }
+  const { menu, slug, qr } = resolvedShowcase;
 
   if (!Array.isArray(params.items) || params.items.length === 0) {
     return { success: false, error: 'Seu carrinho está vazio.' };
@@ -3298,13 +3439,14 @@ export async function createStoreOrder(
     }
   }
 
+  const effectiveQR = qr || db.dynamicQRs[slug];
   const isStorePro = Boolean(
     slug === 'demo-restaurante' ||
       slug === 'demo-catalogo' ||
-      isProStillValid(db.dynamicQRs[slug]) ||
+      isProStillValid(effectiveQR) ||
       resolveAccountProEntitlement(
-        db.dynamicQRs[slug]?.ownerId || menu.ownerId,
-        db.dynamicQRs[slug]?.ownerEmail || menu.ownerEmail
+        effectiveQR?.ownerId || menu.ownerId,
+        effectiveQR?.ownerEmail || menu.ownerEmail
       ).isPaid
   );
   const isOrderPaidWithPix = Boolean(
@@ -3440,8 +3582,13 @@ export async function createStoreOrder(
 
     subtotal += unitCalculatedPrice * reqQty;
 
+    const resolvedProductCode =
+      normalizeProductCode(reqItem.productCode) ||
+      resolveItemProductCode(target, menu.items);
+
     orderItems.push({
       id: target.id,
+      productCode: resolvedProductCode,
       name: target.name,
       price: unitCalculatedPrice,
       quantity: reqQty,
@@ -3515,6 +3662,39 @@ export async function createStoreOrder(
   };
 }
 
+function isUserStoreOrderManager(
+  db: DatabaseSchema,
+  user: ClientUser,
+  storeSlug: string,
+  ownerId?: string,
+  ownerEmail?: string
+): boolean {
+  const userEmailLower = user.email?.toLowerCase();
+  const isOwner = Boolean(
+    (ownerId && ownerId === user.id) ||
+      (ownerEmail && userEmailLower && ownerEmail.toLowerCase() === userEmailLower)
+  );
+  if (isOwner) return true;
+
+  const aliases = collectSlugAliases(db, storeSlug);
+  const isStoreOwnerInMenu = aliases.some((alias) => {
+    const candidate = db.menus?.[alias];
+    return Boolean(
+      candidate &&
+        ((candidate.ownerId && candidate.ownerId === user.id) ||
+          (candidate.ownerEmail &&
+            userEmailLower &&
+            candidate.ownerEmail.toLowerCase() === userEmailLower))
+    );
+  });
+  if (isStoreOwnerInMenu) return true;
+
+  const isMasterAdmin =
+    userEmailLower ===
+    (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
+  return isMasterAdmin;
+}
+
 export async function confirmStoreOrder(params: {
   orderId: string;
   user?: ClientUser | null;
@@ -3528,23 +3708,21 @@ export async function confirmStoreOrder(params: {
     return { success: false, error: 'Pedido não encontrado.' };
   }
 
-  if (!params.isAdmin && params.user) {
-    const isOwner =
-      order.storeOwnerId === params.user.id ||
-      order.storeOwnerEmail?.toLowerCase() === params.user.email?.toLowerCase();
-    const isStoreOwnerInMenu =
-      db.menus[order.slug]?.ownerId === params.user.id ||
-      db.menus[order.slug]?.ownerEmail?.toLowerCase() ===
-        params.user.email?.toLowerCase();
-    const isMasterAdmin =
-      params.user.email?.toLowerCase() ===
-      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
-    if (!isOwner && !isStoreOwnerInMenu && !isMasterAdmin) {
-      return {
-        success: false,
-        error: 'Você não tem permissão para confirmar este pedido.',
-      };
-    }
+  if (
+    !params.isAdmin &&
+    params.user &&
+    !isUserStoreOrderManager(
+      db,
+      params.user,
+      order.slug,
+      order.storeOwnerId,
+      order.storeOwnerEmail
+    )
+  ) {
+    return {
+      success: false,
+      error: 'Você não tem permissão para confirmar este pedido.',
+    };
   }
 
   order.status = 'confirmed';
@@ -3574,23 +3752,21 @@ export async function cancelStoreOrder(params: {
     return { success: false, error: 'Pedido não encontrado.' };
   }
 
-  if (!params.isAdmin && params.user) {
-    const isOwner =
-      order.storeOwnerId === params.user.id ||
-      order.storeOwnerEmail?.toLowerCase() === params.user.email?.toLowerCase();
-    const isStoreOwnerInMenu =
-      db.menus[order.slug]?.ownerId === params.user.id ||
-      db.menus[order.slug]?.ownerEmail?.toLowerCase() ===
-        params.user.email?.toLowerCase();
-    const isMasterAdmin =
-      params.user.email?.toLowerCase() ===
-      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
-    if (!isOwner && !isStoreOwnerInMenu && !isMasterAdmin) {
-      return {
-        success: false,
-        error: 'Você não tem permissão para cancelar este pedido.',
-      };
-    }
+  if (
+    !params.isAdmin &&
+    params.user &&
+    !isUserStoreOrderManager(
+      db,
+      params.user,
+      order.slug,
+      order.storeOwnerId,
+      order.storeOwnerEmail
+    )
+  ) {
+    return {
+      success: false,
+      error: 'Você não tem permissão para cancelar este pedido.',
+    };
   }
 
   if (order.status === 'cancelled') {
@@ -3603,8 +3779,8 @@ export async function cancelStoreOrder(params: {
 
   // Restore inventory and put product back on air
   let updatedItems: MenuItem[] | undefined;
-  await syncMenuFromCloud(order.slug);
-  const menu = db.menus[order.slug];
+  const resolvedOrderMenu = await resolveShowcaseForOrderAsync(db, order.slug);
+  const menu = resolvedOrderMenu?.menu || db.menus[order.slug];
   if (menu) {
     let stockRestored = false;
     for (const ordItem of order.items) {
@@ -3661,24 +3837,31 @@ export async function getStoreOrders(
   const db = ensureDb();
   db.orders = db.orders || {};
 
+  expireDueQRsIfAny();
+  await reconcileCloudSlugMigrations();
   const cleanSlug = String(slug || '').trim();
+  const slugAliases = collectSlugAliases(db, cleanSlug);
+  const aliasLowerSet = new Set(slugAliases.map((s) => s.toLowerCase()));
+  for (const cand of slugAliases) {
+    if (!db.menus[cand]) {
+      await syncMenuFromCloud(cand);
+    }
+  }
   const allOrders = Object.values(db.orders).filter(
-    (o) => o.slug === cleanSlug
+    (o) => o.slug === cleanSlug || aliasLowerSet.has(String(o.slug || '').toLowerCase())
   );
 
   if (!isAdmin && user && allOrders.length > 0) {
     const first = allOrders[0];
-    const isOwner =
-      first.storeOwnerId === user.id ||
-      first.storeOwnerEmail?.toLowerCase() === user.email?.toLowerCase();
-    const isStoreOwnerInMenu =
-      db.menus[cleanSlug]?.ownerId === user.id ||
-      db.menus[cleanSlug]?.ownerEmail?.toLowerCase() ===
-        user.email?.toLowerCase();
-    const isAdmin =
-      user.email?.toLowerCase() ===
-      (process.env.ADMIN_USERNAME || 'spotqr-admin').toLowerCase();
-    if (!isOwner && !isStoreOwnerInMenu && !isAdmin) {
+    if (
+      !isUserStoreOrderManager(
+        db,
+        user,
+        cleanSlug,
+        first.storeOwnerId,
+        first.storeOwnerEmail
+      )
+    ) {
       return {
         success: false,
         error: 'Acesso negado aos pedidos desta loja.',

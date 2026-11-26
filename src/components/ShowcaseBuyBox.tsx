@@ -15,9 +15,14 @@ import {
 } from 'lucide-react';
 import { MenuItem } from '@/lib/types';
 import { PixDiscountInfo } from '@/lib/merchandising';
+import {
+  formatProductCodeLabel,
+  resolveItemProductCode,
+} from '@/lib/product-code';
 
 interface ShowcaseBuyBoxProps {
   item: MenuItem;
+  productCode?: string;
   isPro: boolean;
   isCatalog: boolean;
   allowDelivery: boolean;
@@ -49,6 +54,7 @@ interface ShowcaseBuyBoxProps {
  */
 export function ShowcaseBuyBox({
   item,
+  productCode,
   isPro,
   isCatalog,
   allowDelivery,
@@ -73,7 +79,10 @@ export function ShowcaseBuyBox({
   cartActionControl,
 }: ShowcaseBuyBoxProps) {
   const cleanPhone = (whatsappNumber || '').replace(/\D/g, '');
-  const questionText = `Olá${storeTitle ? ` *${storeTitle}*` : ''}! Tenho uma dúvida sobre o item *${item.name}*${
+  const resolvedCodeLabel = formatProductCodeLabel(
+    productCode || resolveItemProductCode(item)
+  );
+  const questionText = `Olá${storeTitle ? ` *${storeTitle}*` : ''}! Tenho uma dúvida sobre o item *${resolvedCodeLabel} ${item.name}*${
     selectedVariantLabel ? ` (${selectedVariantLabel})` : ''
   }. Poderia me ajudar?`;
   const whatsappQuestionUrl = cleanPhone
