@@ -288,6 +288,15 @@
   }
 }
 
+@keyframes natalMagiStride {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(-0.4deg);
+  }
+  50% {
+    transform: translate3d(1.5px, -2px, 0) rotate(0.5deg);
+  }
+}
+
 .natal-snow-flake {
   animation-name: natalSnowFall;
   animation-timing-function: linear;
@@ -372,6 +381,12 @@
   animation: natalBaubleSwing 2.8s ease-in-out infinite;
 }
 
+.natal-magi-stride {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: natalMagiStride 3.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .natal-snow-flake,
   .natal-aurora-wave,
@@ -384,7 +399,8 @@
   .natal-ornament-sway,
   .natal-santa-wave,
   .natal-reindeer-bob,
-  .natal-bauble-swing {
+  .natal-bauble-swing,
+  .natal-magi-stride {
     animation: none !important;
   }
 }
